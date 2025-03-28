@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -5,9 +7,13 @@ import jax.numpy as jnp
 from .spatial import SpatialData, SpatialModel
 
 
-class Constant(eqx.Module):
-    """A constant line model."""
+class SpectralSpatialModel(eqx.Module):
+    @abstractmethod
+    def __call__(self, λ: jax.Array, data: SpatialData):
+        pass
 
+
+class Constant(SpectralSpatialModel):
     # Model parameters
     const: SpatialModel
 
@@ -18,9 +24,7 @@ class Constant(eqx.Module):
         return self.const(spatial_data) * jnp.ones_like(λ)
 
 
-class Gaussian(eqx.Module):
-    """A Gaussian line model."""
-
+class Gaussian(SpectralSpatialModel):
     # Model parameters
     A: SpatialModel
     λ0: SpatialModel
