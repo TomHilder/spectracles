@@ -1,15 +1,15 @@
 from abc import abstractmethod
 
-import equinox as eqx
-import jax
 import jax.numpy as jnp
+from equinox import Module
+from jaxtyping import Array
 
 from .spatial import SpatialData, SpatialModel
 
 
-class SpectralSpatialModel(eqx.Module):
+class SpectralSpatialModel(Module):
     @abstractmethod
-    def __call__(self, λ: jax.Array, data: SpatialData):
+    def __call__(self, λ: Array, data: SpatialData):
         pass
 
 
@@ -20,7 +20,7 @@ class Constant(SpectralSpatialModel):
     def __init__(self, const: SpatialModel):
         self.const = const
 
-    def __call__(self, λ: jax.Array, spatial_data: SpatialData):
+    def __call__(self, λ: Array, spatial_data: SpatialData):
         return self.const(spatial_data) * jnp.ones_like(λ)
 
 
@@ -35,7 +35,7 @@ class Gaussian(SpectralSpatialModel):
         self.λ0 = λ0
         self.σ = σ
 
-    def __call__(self, λ: jax.Array, spatial_data: SpatialData):
+    def __call__(self, λ: Array, spatial_data: SpatialData):
         A_norm = self.A(spatial_data) / (self.σ(spatial_data) * jnp.sqrt(2 * jnp.pi))
         return A_norm * jnp.exp(-0.5 * ((λ - self.λ0(spatial_data)) / self.σ(spatial_data)) ** 2)
 

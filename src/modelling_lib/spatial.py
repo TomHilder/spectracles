@@ -1,24 +1,14 @@
 from abc import abstractmethod
 
-import equinox as eqx
-import jax
 import jax.numpy as jnp
-from equinox import field
+from equinox import Module
+from jaxtyping import Array
 
+from .data import SpatialData
 from .kernels import Kernel
 
 
-def convert_to_flat_array(array: jax.Array) -> jax.Array:
-    return jnp.asarray(array).flatten()
-
-
-class SpatialData(eqx.Module):
-    x: jax.Array = field(converter=convert_to_flat_array)
-    y: jax.Array = field(converter=convert_to_flat_array)
-    indices: jax.Array = field(converter=convert_to_flat_array)
-
-
-class SpatialModel(eqx.Module):
+class SpatialModel(Module):
     @abstractmethod
     def __call__(self, data: SpatialData):
         pass
@@ -26,7 +16,7 @@ class SpatialModel(eqx.Module):
 
 class FourierGP(SpatialModel):
     n_modes: tuple[int, int]
-    coefficients: jax.Array
+    coefficients: Array
     kernel: Kernel
 
     def __init__(self, n_modes: tuple[int, int], kernel: Kernel):
@@ -44,7 +34,7 @@ class FourierGP(SpatialModel):
 
 class PerSpaxel(SpatialModel):
     # Model parameters
-    values: jax.Array
+    values: Array
 
     def __init__(self, n_spaxels: int):
         self.values = jnp.zeros(n_spaxels)

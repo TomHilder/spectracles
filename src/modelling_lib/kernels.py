@@ -1,10 +1,9 @@
 from abc import abstractmethod
 
-import equinox as eqx
-from equinox import AbstractVar
+from equinox import AbstractVar, Module
 
 
-class Kernel(eqx.Module):
+class Kernel(Module):
     # All kernels should have a length scale and variance
     length_scale: AbstractVar[float]
     variance: AbstractVar[float]
