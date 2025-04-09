@@ -1,6 +1,7 @@
 from abc import abstractmethod
 
 from equinox import AbstractVar, Module
+from jaxtyping import Array
 
 
 class Kernel(Module):
@@ -9,11 +10,11 @@ class Kernel(Module):
     variance: AbstractVar[float]
 
     @abstractmethod
-    def fourier_logprior(self):
+    def feature_weights(self, freqs: Array) -> Array:
         pass
 
 
-class DummyKernel(Kernel):
+class Matern32(Kernel):
     length_scale: float
     variance: float
 
@@ -21,5 +22,6 @@ class DummyKernel(Kernel):
         self.length_scale = length_scale
         self.variance = variance
 
-    def fourier_logprior(self) -> float:
-        return 0
+    def feature_weights(self, freqs: Array) -> Array:
+        print(freqs * self.length_scale)
+        return self.variance / (1 + (freqs * self.length_scale) ** 2)
