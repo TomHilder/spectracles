@@ -1,5 +1,6 @@
 from abc import abstractmethod
 
+import jax.numpy as jnp
 from equinox import AbstractVar, Module
 from jaxtyping import Array
 
@@ -23,5 +24,5 @@ class Matern32(Kernel):
         self.variance = variance
 
     def feature_weights(self, freqs: Array) -> Array:
-        print(freqs * self.length_scale)
-        return self.variance / (1 + (freqs * self.length_scale) ** 2)
+        # return self.variance / (1 + (freqs * self.length_scale) ** 2)
+        return jnp.sqrt(self.length_scale) * self.variance / (1 + (freqs * self.length_scale) ** 2)

@@ -3,7 +3,9 @@ from abc import abstractmethod
 import jax.numpy as jnp
 from equinox import Module, field
 from jax.scipy.stats import norm
+from jax_finufft import nufft2
 from jaxtyping import Array
+from nifty_solve.jax_operators import JaxFinufft2DRealOperator
 
 from .data import SpatialData
 from .kernels import Kernel
@@ -26,39 +28,76 @@ def get_freqs(n_modes, n_dim):
         return modes_grid
 
 
+def _pre_matvec(c, n_modes, _shape_half_p):
+    m, h, p = _shape_half_p
+    f = 0.5 * jnp.hstack([c[: h + 1], jnp.zeros(p - h - 1)]) + 0.5j * jnp.hstack(
+        [jnp.zeros(p - m + h + 1), c[h + 1 :]]
+    )
+    f = f.reshape(n_modes)
+    return f + jnp.conj(jnp.flip(f))
+
+
+# def _matvec(self, c):
+#     return nufft2(self._pre_matvec(c), *self.points, **self.finufft_kwds).real
+
+# @cached_property
+# def _shape_half_p(self):
+# return (self.shape[1], self.shape[1] // 2, int(np.prod(self.n_modes)))
+
+
 class SpatialModel(Module):
     @abstractmethod
     def __call__(self, data: SpatialData):
         pass
 
 
+# class FourierGP(SpatialModel):
+#     n_modes: tuple[int, int]
+#     coefficients: Array
+#     kernel: Kernel
+#     _freqs: Array = field(static=True)
+
+#     def __init__(self, n_modes: tuple[int, int], kernel: Kernel):
+#         # Model specfication
+#         self.n_modes = n_modes
+#         fx, fy = get_freqs(n_modes, 2)
+#         self._freqs = jnp.sqrt(fx**2 + fy**2)
+#         self.kernel = kernel
+#         # Initialise parameters
+#         self.coefficients = jnp.zeros(n_modes)
+
+#     def __call__(self, data: SpatialData):
+#         c = self.coefficients.astype(jnp.complex128)
+#         # f = 0.5 * (c + jnp.conj(jnp.flip(c))) * self.kernel.feature_weights(self.freqs)
+#         f = c * self.kernel.feature_weights(self._freqs)
+#         return nufft2(f, data.x, data.y).real
+
+#     def prior_logpdf(self):
+#         return norm.logpdf(x=self.coefficients)
+
+
 class FourierGP(SpatialModel):
     n_modes: tuple[int, int]
     coefficients: Array
     kernel: Kernel
-    freqs: Array = field(static=True)
+    _freqs: Array = field(static=True)
 
     def __init__(self, n_modes: tuple[int, int], kernel: Kernel):
         # Model specfication
         self.n_modes = n_modes
         fx, fy = get_freqs(n_modes, 2)
-        self.freqs = jnp.sqrt(fx**2 + fy**2)
+        self._freqs = jnp.sqrt(fx**2 + fy**2)
         self.kernel = kernel
         # Initialise parameters
         self.coefficients = jnp.zeros(n_modes)
 
     def __call__(self, data: SpatialData):
-        x, y = data.x, data.y
-        # Leave this stupid for now
-        return x + y
+        op = JaxFinufft2DRealOperator(data.x, data.y, self.n_modes)
+        scaled_coeffs = self.coefficients * self.kernel.feature_weights(self._freqs)
+        return op @ scaled_coeffs.flatten()
 
     def prior_logpdf(self):
-        prior_stddev = self.kernel.feature_weights(self.freqs)
-        return norm.logpdf(
-            x=self.coefficients,
-            loc=jnp.zeros(self.n_modes),
-            scale=prior_stddev,
-        )
+        return norm.logpdf(x=self.coefficients)
 
 
 class PerSpaxel(SpatialModel):
