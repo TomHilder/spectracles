@@ -62,12 +62,14 @@ class FourierGP(SpatialModel):
         self._shape_info = (p, p // 2, p)
 
     def __call__(self, data: SpatialData):
+        # Feature weighted coefficients
         scaled_coeffs = self.coefficients * self.kernel.feature_weights(self._freqs)
+        # Sum basis functions with nufft after processing the coefficients to enforce conjugate symmetry
         return nufft2(
-            self._pre_matvec(scaled_coeffs.flatten()), data.x, data.y, **FINUFFT_KWDS
+            self._conj_symmetry(scaled_coeffs.flatten()), data.x, data.y, **FINUFFT_KWDS
         ).real
 
-    def _pre_matvec(self, c):
+    def _conj_symmetry(self, c):
         m, h, p = self._shape_info
         f = 0.5 * jnp.hstack(
             [c[: h + 1], jnp.zeros(p - h - 1)],
