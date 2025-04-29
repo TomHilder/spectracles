@@ -5,10 +5,18 @@ from equinox import Module, field
 from jax.scipy.stats import norm
 from jax_finufft import nufft2
 from jaxtyping import Array
-from nifty_solve.jax_operators import JaxFinufft2DRealOperator
 
 from .data import SpatialData
 from .kernels import Kernel
+
+# NOTE: List of current obvious foot guns:
+# - n_modes must always be two odd integers, but this is not enforced
+#   - in theory the nifty-solve full implementation should be able to handle
+#     this, but from memory it doesn't work right now. This is why p is
+#     repeated in the shape info right now, since I didn't implement n_modes
+#     != n_requested_modes yet.
+
+FINUFFT_KWDS = dict(eps=1e-6)
 
 
 def get_freqs_1D(n_modes):
@@ -28,52 +36,10 @@ def get_freqs(n_modes, n_dim):
         return modes_grid
 
 
-def _pre_matvec(c, n_modes, _shape_half_p):
-    m, h, p = _shape_half_p
-    f = 0.5 * jnp.hstack([c[: h + 1], jnp.zeros(p - h - 1)]) + 0.5j * jnp.hstack(
-        [jnp.zeros(p - m + h + 1), c[h + 1 :]]
-    )
-    f = f.reshape(n_modes)
-    return f + jnp.conj(jnp.flip(f))
-
-
-# def _matvec(self, c):
-#     return nufft2(self._pre_matvec(c), *self.points, **self.finufft_kwds).real
-
-# @cached_property
-# def _shape_half_p(self):
-# return (self.shape[1], self.shape[1] // 2, int(np.prod(self.n_modes)))
-
-
 class SpatialModel(Module):
     @abstractmethod
     def __call__(self, data: SpatialData):
         pass
-
-
-# class FourierGP(SpatialModel):
-#     n_modes: tuple[int, int]
-#     coefficients: Array
-#     kernel: Kernel
-#     _freqs: Array = field(static=True)
-
-#     def __init__(self, n_modes: tuple[int, int], kernel: Kernel):
-#         # Model specfication
-#         self.n_modes = n_modes
-#         fx, fy = get_freqs(n_modes, 2)
-#         self._freqs = jnp.sqrt(fx**2 + fy**2)
-#         self.kernel = kernel
-#         # Initialise parameters
-#         self.coefficients = jnp.zeros(n_modes)
-
-#     def __call__(self, data: SpatialData):
-#         c = self.coefficients.astype(jnp.complex128)
-#         # f = 0.5 * (c + jnp.conj(jnp.flip(c))) * self.kernel.feature_weights(self.freqs)
-#         f = c * self.kernel.feature_weights(self._freqs)
-#         return nufft2(f, data.x, data.y).real
-
-#     def prior_logpdf(self):
-#         return norm.logpdf(x=self.coefficients)
 
 
 class FourierGP(SpatialModel):
@@ -81,6 +47,7 @@ class FourierGP(SpatialModel):
     coefficients: Array
     kernel: Kernel
     _freqs: Array = field(static=True)
+    _shape_info: tuple[int, int, int] = field(static=True)
 
     def __init__(self, n_modes: tuple[int, int], kernel: Kernel):
         # Model specfication
@@ -90,11 +57,25 @@ class FourierGP(SpatialModel):
         self.kernel = kernel
         # Initialise parameters
         self.coefficients = jnp.zeros(n_modes)
+        # Initialise the shape info
+        p = int(jnp.prod(jnp.array(n_modes)))
+        self._shape_info = (p, p // 2, p)
 
     def __call__(self, data: SpatialData):
-        op = JaxFinufft2DRealOperator(data.x, data.y, self.n_modes)
         scaled_coeffs = self.coefficients * self.kernel.feature_weights(self._freqs)
-        return op @ scaled_coeffs.flatten()
+        return nufft2(
+            self._pre_matvec(scaled_coeffs.flatten()), data.x, data.y, **FINUFFT_KWDS
+        ).real
+
+    def _pre_matvec(self, c):
+        m, h, p = self._shape_info
+        f = 0.5 * jnp.hstack(
+            [c[: h + 1], jnp.zeros(p - h - 1)],
+        ) + 0.5j * jnp.hstack(
+            [jnp.zeros(p - m + h + 1), c[h + 1 :]],
+        )
+        f = f.reshape(self.n_modes)
+        return f + jnp.conj(jnp.flip(f))
 
     def prior_logpdf(self):
         return norm.logpdf(x=self.coefficients)
