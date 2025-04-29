@@ -5,4 +5,5 @@ Will contain anything related to instantiating & fitting models, as well as gene
 
 TODO:
 
-* ???
+- [ ] Instead of replacing shared leaves with `0`, replace with some class/object instead
+- [ ] Handle non-odd number of modes

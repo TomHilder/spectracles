@@ -43,9 +43,9 @@ class SpatialModel(Module):
 
 
 class FourierGP(SpatialModel):
-    n_modes: tuple[int, int]
     coefficients: Array
     kernel: Kernel
+    n_modes: tuple[int, int] = field(static=True)
     _freqs: Array = field(static=True)
     _shape_info: tuple[int, int, int] = field(static=True)
 
