@@ -11,7 +11,10 @@ type LeafPath = tuple[GetAttrKey]
 def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Any:
     current_node = tree
     for node in path:
-        current_node = getattr(current_node, node.name)
+        try:
+            current_node = getattr(current_node, node.name)
+        except AttributeError:
+            return current_node
     return current_node
 
 

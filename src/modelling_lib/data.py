@@ -4,7 +4,6 @@ from jaxtyping import Array
 
 
 def convert_to_flat_array(array: Array) -> Array:
-    # return jnp.asarray(array)
     return jnp.asarray(array).flatten()
 
 

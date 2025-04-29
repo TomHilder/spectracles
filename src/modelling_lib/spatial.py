@@ -1,13 +1,14 @@
 from abc import abstractmethod
 
 import jax.numpy as jnp
-from equinox import Module, field
+from equinox import Module
 from jax.scipy.stats import norm
 from jax_finufft import nufft2
 from jaxtyping import Array
 
 from .data import SpatialData
 from .kernels import Kernel
+from .parameter import Parameter
 
 # NOTE: List of current obvious foot guns:
 # - n_modes must always be two odd integers, but this is not enforced
@@ -45,9 +46,9 @@ class SpatialModel(Module):
 class FourierGP(SpatialModel):
     coefficients: Array
     kernel: Kernel
-    n_modes: tuple[int, int] = field(static=True)
-    _freqs: Array = field(static=True)
-    _shape_info: tuple[int, int, int] = field(static=True)
+    n_modes: tuple[int, int]
+    _freqs: Array
+    _shape_info: tuple[int, int, int]
 
     def __init__(self, n_modes: tuple[int, int], kernel: Kernel):
         # Model specfication
@@ -56,7 +57,7 @@ class FourierGP(SpatialModel):
         self._freqs = jnp.sqrt(fx**2 + fy**2)
         self.kernel = kernel
         # Initialise parameters
-        self.coefficients = jnp.zeros(n_modes)
+        self.coefficients = Parameter(dims=n_modes)
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
@@ -88,7 +89,7 @@ class PerSpaxel(SpatialModel):
     values: Array
 
     def __init__(self, n_spaxels: int):
-        self.values = jnp.zeros(n_spaxels)
+        self.values = Parameter(dims=n_spaxels)
 
     def __call__(self, data: SpatialData):
         return self.values[data.indices]
