@@ -1,32 +1,58 @@
 from typing import Any, Callable, Dict, Tuple
 
+# import equinox as eqx
 from equinox import Module, field, tree_at
 from jax.tree import leaves_with_path
-from jaxlib.xla_extension.pytree import GetAttrKey
-from jaxtyping import PyTree
+from jaxlib.xla_extension.pytree import DictKey, GetAttrKey, SequenceKey
+from jaxtyping import Array, PyTree
 
-type LeafPath = tuple[GetAttrKey]
+from .parameter import Param
+
+LeafKey = SequenceKey | DictKey | GetAttrKey
+LeafPath = Tuple[LeafKey, ...]
 
 
-def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Any:
+def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Array | None:
+    """
+    Iterates through the path to find the leaf in the tree, returning the leaf value only if it is a Param. If the leaf is not a Param, returns None.
+    """
     current_node = tree
-    for node in path:
-        try:
-            current_node = getattr(current_node, node.name)
-        except AttributeError:
-            return current_node
-    return current_node
+    for key in path:
+        if isinstance(current_node, Param):
+            return getattr(current_node, key.name)
+        if isinstance(key, GetAttrKey):
+            current_node = getattr(current_node, key.name)
+        elif isinstance(key, SequenceKey):
+            current_node = current_node[key.idx]
+        elif isinstance(key, DictKey):
+            current_node = current_node[key.key]
+        else:
+            raise TypeError(
+                f"Unsupported key type: {type(key)}. In practice if this happens you're either doing something crazy or JAX has added new types. Honestly, raise a GH issue if you see this, because it's probably the latter."
+            )
+    return None
 
 
 def use_paths_get_leaves(tree: PyTree, paths: list[LeafPath]) -> list[Any]:
     leaves = []
     for path in paths:
-        leaves.append(use_path_get_leaf(tree, path))
+        leaf = use_path_get_leaf(tree, path)
+        if leaf is not None:
+            print(path)
+            print(type(leaf))
+            leaves.append(leaf)
     return leaves
 
 
+# def unwrap_leaf(leaf: Any) -> Any:
+#     # Unwrap the leaf if it's an instance of _LeafWrapper
+#     if isinstance(leaf, eqx._tree._LeafWrapper):
+#         return leaf.value
+#     return leaf
+
+
 def get_duplicated_leaves(tree: PyTree) -> Tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
-    leaves = leaves_with_path(tree)
+    leaves = leaves_with_path(tree, is_leaf=lambda x: isinstance(x, Param))
     parent_leaf_paths: dict[int, LeafPath] = dict()
     dupl_leaf_paths = []
     dupl_leaf_ids = []

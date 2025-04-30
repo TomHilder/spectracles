@@ -1,20 +1,20 @@
-import jax
 import jax.numpy as jnp
 from equinox import Module
+from jaxtyping import Array
 
 
 class Param(Module):
     """A varied parameter that is trainable. This is just for the purpose of internal tree surgery required when fitting the model."""
 
-    value: jax.Array
+    value: Array
 
 
 class Parameter:
     """Factory class for instantiating parameters and avoiding the user screwing it up."""
 
     def __new__(
-        self, dims: int | tuple = None, initial: jax.Array = None, fixed: bool = False
-    ) -> Param | jax.Array:
+        self, dims: int | tuple = None, initial: Array = None, fixed: bool = False
+    ) -> Param | Array:
         # If user provided nothing assume scalar parameter
         if dims is None and initial is None:
             shape = (1,)
