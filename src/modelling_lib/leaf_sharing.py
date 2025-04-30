@@ -1,8 +1,8 @@
 from typing import Any, Callable, Dict, Tuple
 
-# import equinox as eqx
-from equinox import Module, field, tree_at
+from equinox import Module, field, filter, tree_at
 from jax.tree import leaves_with_path
+from jax.tree_util import tree_map
 from jaxlib.xla_extension.pytree import DictKey, GetAttrKey, SequenceKey
 from jaxtyping import Array, PyTree
 
@@ -18,19 +18,8 @@ def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Array | None:
     """
     current_node = tree
     for key in path:
-        if isinstance(current_node, Param):
-            return getattr(current_node, key.name)
-        if isinstance(key, GetAttrKey):
-            current_node = getattr(current_node, key.name)
-        elif isinstance(key, SequenceKey):
-            current_node = current_node[key.idx]
-        elif isinstance(key, DictKey):
-            current_node = current_node[key.key]
-        else:
-            raise TypeError(
-                f"Unsupported key type: {type(key)}. In practice if this happens you're either doing something crazy or JAX has added new types. Honestly, raise a GH issue if you see this, because it's probably the latter."
-            )
-    return None
+        current_node = getattr(current_node, key.name)
+    return current_node
 
 
 def use_paths_get_leaves(tree: PyTree, paths: list[LeafPath]) -> list[Any]:
@@ -38,21 +27,18 @@ def use_paths_get_leaves(tree: PyTree, paths: list[LeafPath]) -> list[Any]:
     for path in paths:
         leaf = use_path_get_leaf(tree, path)
         if leaf is not None:
-            print(path)
-            print(type(leaf))
             leaves.append(leaf)
     return leaves
 
 
-# def unwrap_leaf(leaf: Any) -> Any:
-#     # Unwrap the leaf if it's an instance of _LeafWrapper
-#     if isinstance(leaf, eqx._tree._LeafWrapper):
-#         return leaf.value
-#     return leaf
-
-
 def get_duplicated_leaves(tree: PyTree) -> Tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
-    leaves = leaves_with_path(tree, is_leaf=lambda x: isinstance(x, Param))
+    # Filter out leaves that are not Param
+    filter_spec = tree_map(
+        lambda x: isinstance(x, Param), tree, is_leaf=lambda x: isinstance(x, Param)
+    )
+    filtered_tree = filter(tree, filter_spec=filter_spec)
+    leaves = leaves_with_path(filtered_tree)
+    # Create a dictionary to keep track of the parent leaves
     parent_leaf_paths: dict[int, LeafPath] = dict()
     dupl_leaf_paths = []
     dupl_leaf_ids = []
