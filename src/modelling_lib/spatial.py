@@ -44,7 +44,7 @@ class SpatialModel(Module):
 
 
 class FourierGP(SpatialModel):
-    coefficients: Array
+    coefficients: Parameter
     kernel: Kernel
     n_modes: tuple[int, int]
     _freqs: Array
@@ -62,7 +62,7 @@ class FourierGP(SpatialModel):
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
 
-    def __call__(self, data: SpatialData):
+    def __call__(self, data: SpatialData) -> Array:
         # Feature weighted coefficients
         scaled_coeffs = self.coefficients * self.kernel.feature_weights(self._freqs)
         # Sum basis functions with nufft after processing the coefficients to enforce conjugate symmetry
@@ -70,7 +70,7 @@ class FourierGP(SpatialModel):
             self._conj_symmetry(scaled_coeffs.flatten()), data.x, data.y, **FINUFFT_KWDS
         ).real
 
-    def _conj_symmetry(self, c):
+    def _conj_symmetry(self, c: Array) -> Array:
         m, h, p = self._shape_info
         f = 0.5 * jnp.hstack(
             [c[: h + 1], jnp.zeros(p - h - 1)],
@@ -86,10 +86,10 @@ class FourierGP(SpatialModel):
 
 class PerSpaxel(SpatialModel):
     # Model parameters
-    values: Array
+    spaxel_values: Array
 
     def __init__(self, n_spaxels: int):
-        self.values = Parameter(dims=n_spaxels)
+        self.spaxel_values = Parameter(dims=n_spaxels)
 
-    def __call__(self, data: SpatialData):
-        return self.values[data.indices]
+    def __call__(self, data: SpatialData) -> Array:
+        return self.spaxel_values[data.indices]

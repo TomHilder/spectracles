@@ -1,8 +1,10 @@
 from abc import abstractmethod
 
 import jax.numpy as jnp
-from equinox import AbstractVar, Module
+from equinox import Module
 from jaxtyping import Array
+
+from .parameter import Parameter
 
 
 def normalise_fw(fw: Array) -> Array:
@@ -23,8 +25,8 @@ def matern_kernel_fw_nd(freqs: Array, length: float, var: float, nu: float, n: i
 
 class Kernel(Module):
     # All kernels should have a length scale and variance
-    length_scale: AbstractVar[float]
-    variance: AbstractVar[float]
+    length_scale: Parameter
+    variance: Parameter
 
     @abstractmethod
     def feature_weights(self, freqs: Array) -> Array:
@@ -32,8 +34,8 @@ class Kernel(Module):
 
 
 class Matern12(Kernel):
-    length_scale: float
-    variance: float
+    length_scale: Parameter
+    variance: Parameter
 
     def __init__(self, length_scale: float, variance: float):
         self.length_scale = length_scale
@@ -44,8 +46,8 @@ class Matern12(Kernel):
 
 
 class Matern32(Kernel):
-    length_scale: float
-    variance: float
+    length_scale: Parameter
+    variance: Parameter
 
     def __init__(self, length_scale: float, variance: float):
         self.length_scale = length_scale
@@ -56,8 +58,8 @@ class Matern32(Kernel):
 
 
 class Matern52(Kernel):
-    length_scale: float
-    variance: float
+    length_scale: Parameter
+    variance: Parameter
 
     def __init__(self, length_scale: float, variance: float):
         self.length_scale = length_scale
@@ -68,8 +70,8 @@ class Matern52(Kernel):
 
 
 class SquaredExponential(Kernel):
-    length_scale: float
-    variance: float
+    length_scale: Parameter
+    variance: Parameter
 
     def __init__(self, length_scale: float, variance: float):
         self.length_scale = length_scale

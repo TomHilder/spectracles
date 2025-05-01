@@ -1,20 +1,19 @@
 from typing import Any, Callable, Dict, Tuple
 
-from equinox import Module, field, filter, is_inexact_array, tree_at
+from equinox import Module, filter, is_inexact_array, tree_at
 from jax.tree import leaves_with_path
 from jax.tree_util import tree_map
-from jaxlib.xla_extension.pytree import DictKey, GetAttrKey, SequenceKey
+from jaxlib.xla_extension.pytree import GetAttrKey
 from jaxtyping import Array, PyTree
 
 from .parameter import Parameter
 
-LeafKey = SequenceKey | DictKey | GetAttrKey
-LeafPath = Tuple[LeafKey, ...]
+LeafPath = Tuple[GetAttrKey, ...]
 
 
-def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Array | None:
+def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Array:
     """
-    Iterates through the path to find the leaf in the tree.
+    Iterates through the path to find the leaf in the tree. Doesn't work if leaves are sequences.
     """
     current_node = tree
     for key in path:
@@ -67,19 +66,19 @@ def get_duplicated_leaves(tree: PyTree) -> Tuple[list[int], list[LeafPath], dict
 class Shared:
     """A sentinel object used to indicate a parameter is shared."""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "shared"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "shared"
 
 
 class ShareModule(Module):
     model: Module
 
-    _dupl_leaf_ids: list[int] = field(static=True)
-    _dupl_leaf_paths: list[LeafPath] = field(static=True)
-    _parent_leaf_paths: Dict[int, LeafPath] = field(static=True)
+    _dupl_leaf_ids: list[int]
+    _dupl_leaf_paths: list[LeafPath]
+    _parent_leaf_paths: Dict[int, LeafPath]
 
     def __init__(self, model: Module):
         # Save the sharing info
@@ -91,7 +90,7 @@ class ShareModule(Module):
         # Remove leaves that are coupled to other leaves
         self.model = tree_at(self._where, model, replace_fn=lambda _: Shared())
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> Any:
         # Replace nodes specified by `where` with the nodes specified by `get`
         # This places the deleted nodes back in the tree before calling the model
         restored_model = tree_at(self._where, self.model, self._get(self.model))

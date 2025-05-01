@@ -26,7 +26,7 @@ class Parameter(Module):
         self.fixed = fixed
 
     @staticmethod
-    def _to_float_array(x):
+    def _to_float_array(x) -> Array:
         if jnp.isscalar(x):
             return jnp.array([float(x)])
         return jnp.asarray(x, dtype=float)

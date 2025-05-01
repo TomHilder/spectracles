@@ -38,18 +38,3 @@ class Gaussian(SpectralSpatialModel):
     def __call__(self, λ: Array, spatial_data: SpatialData):
         A_norm = self.A(spatial_data) / (self.σ(spatial_data) * jnp.sqrt(2 * jnp.pi))
         return A_norm * jnp.exp(-0.5 * ((λ - self.λ0(spatial_data)) / self.σ(spatial_data)) ** 2)
-
-
-# class Combined(eqx.Module):
-#     """A combined model of a constant and a Gaussian line."""
-
-#     # Model components
-#     gaussian: Gaussian
-#     constant: Constant
-
-#     def __init__(self, const, A, λ0, σ):
-#         self.gaussian = Gaussian(A, λ0, σ)
-#         self.constant = Constant(const)
-
-#     def __call__(self, λ, x, y):
-#         return self.constant(λ, x, y) + self.gaussian(λ, x, y)
