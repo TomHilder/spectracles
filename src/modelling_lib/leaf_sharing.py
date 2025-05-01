@@ -11,7 +11,7 @@ from .parameter import Parameter
 LeafPath = Tuple[GetAttrKey, ...]
 
 
-def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Array:
+def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Any:
     """
     Iterates through the path to find the leaf in the tree. Doesn't work if leaves are sequences.
     """

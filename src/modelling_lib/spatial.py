@@ -3,7 +3,7 @@ from abc import abstractmethod
 import jax.numpy as jnp
 from equinox import Module
 from jax.scipy.stats import norm
-from jax_finufft import nufft2
+from jax_finufft import nufft2  # type: ignore
 from jaxtyping import Array
 
 from .data import SpatialData
@@ -20,21 +20,28 @@ from .parameter import Parameter
 FINUFFT_KWDS = dict(eps=1e-6)
 
 
-def get_freqs_1D(n_modes):
+def get_freqs_1D(n_modes: int) -> Array:
     if n_modes % 2 == 0:
         return jnp.arange(-n_modes // 2, n_modes // 2, dtype=float)
     else:
         return jnp.arange(-(n_modes - 1) // 2, (n_modes - 1) // 2 + 1, dtype=float)
 
 
-def get_freqs(n_modes, n_dim):
-    if n_dim == 1:
+def get_freqs(n_modes: int | tuple[int, ...], n_dim: int = 2) -> Array | list[Array]:
+    if n_dim == 1 and isinstance(n_modes, int):
         return get_freqs_1D(n_modes)
-    else:
-        assert len(n_modes) == n_dim
+    elif isinstance(n_modes, tuple):
+        if len(n_modes) != n_dim:
+            raise ValueError(
+                f"n_modes must be a tuple of length {n_dim} for {n_dim}D data, but got {len(n_modes)}",
+            )
         modes_grid = jnp.meshgrid(*[get_freqs_1D(n_modes[i]) for i in range(n_dim)], indexing="ij")
         # Transpose because fiNUFFT treats the first dimension as the fastest changing
         return modes_grid
+    else:
+        raise ValueError(
+            f"n_modes must be an int or a tuple of ints, but got {type(n_modes)}",
+        )
 
 
 class SpatialModel(Module):
@@ -50,25 +57,37 @@ class FourierGP(SpatialModel):
     _freqs: Array
     _shape_info: tuple[int, int, int]
 
-    def __init__(self, n_modes: tuple[int, int], kernel: Kernel):
+    def __init__(
+        self,
+        n_modes: tuple[int, int],
+        kernel: Kernel,
+        coefficients: Parameter | None = None,
+    ):
         # Model specfication
         self.n_modes = n_modes
-        fx, fy = get_freqs(n_modes, 2)
+        fx, fy = get_freqs(n_modes)
         self._freqs = jnp.sqrt(fx**2 + fy**2)
         self.kernel = kernel
         # Initialise parameters
-        self.coefficients = Parameter(dims=n_modes)
+        if coefficients is None:
+            self.coefficients = Parameter(dims=n_modes)
+        else:
+            self.coefficients = coefficients
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
 
     def __call__(self, data: SpatialData) -> Array:
         # Feature weighted coefficients
-        scaled_coeffs = self.coefficients * self.kernel.feature_weights(self._freqs)
+        scaled_coeffs = self.coefficients.val * self.kernel.feature_weights(self._freqs)
         # Sum basis functions with nufft after processing the coefficients to enforce conjugate symmetry
-        return nufft2(
-            self._conj_symmetry(scaled_coeffs.flatten()), data.x, data.y, **FINUFFT_KWDS
+        model_eval: Array = nufft2(
+            self._conj_symmetry(scaled_coeffs.flatten()),
+            data.x,
+            data.y,
+            **FINUFFT_KWDS,
         ).real
+        return model_eval
 
     def _conj_symmetry(self, c: Array) -> Array:
         m, h, p = self._shape_info
@@ -80,16 +99,16 @@ class FourierGP(SpatialModel):
         f = f.reshape(self.n_modes)
         return f + jnp.conj(jnp.flip(f))
 
-    def prior_logpdf(self):
-        return norm.logpdf(x=self.coefficients)
+    def prior_logpdf(self) -> Array:
+        return norm.logpdf(x=self.coefficients.val)
 
 
 class PerSpaxel(SpatialModel):
     # Model parameters
-    spaxel_values: Array
+    spaxel_values: Parameter
 
     def __init__(self, n_spaxels: int):
         self.spaxel_values = Parameter(dims=n_spaxels)
 
     def __call__(self, data: SpatialData) -> Array:
-        return self.spaxel_values[data.indices]
+        return self.spaxel_values.val[data.indices]
