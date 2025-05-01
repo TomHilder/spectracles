@@ -14,7 +14,7 @@ LeafPath = Tuple[LeafKey, ...]
 
 def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Array | None:
     """
-    Iterates through the path to find the leaf in the tree, returning the leaf value only if it is a Param. If the leaf is not a Param, returns None.
+    Iterates through the path to find the leaf in the tree.
     """
     current_node = tree
     for key in path:
@@ -23,6 +23,9 @@ def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Array | None:
 
 
 def use_paths_get_leaves(tree: PyTree, paths: list[LeafPath]) -> list[Any]:
+    """
+    Iterates through the paths to find the leaves in the tree. Returns a list of leaves.
+    """
     leaves = []
     for path in paths:
         leaf = use_path_get_leaf(tree, path)
@@ -57,7 +60,7 @@ def get_duplicated_leaves(tree: PyTree) -> Tuple[list[int], list[LeafPath], dict
     return dupl_leaf_ids, dupl_leaf_paths, parent_leaf_paths
 
 
-class ShareParams(Module):
+class ShareModule(Module):
     model: Module
 
     _dupl_leaf_ids: list[int] = field(static=True)
@@ -93,12 +96,12 @@ class ShareParams(Module):
         )
 
 
-def parent_model(model) -> ShareParams:
+def parent_model(model) -> ShareModule:
     # Check if it is already wrapped
-    if isinstance(model, ShareParams):
+    if isinstance(model, ShareModule):
         return model
-    return ShareParams(model)
+    return ShareModule(model)
 
 
-def build_model(cls: Callable[..., Module], *args, **kwargs) -> ShareParams:
+def build_model(cls: Callable[..., Module], *args, **kwargs) -> ShareModule:
     return parent_model(cls(*args, **kwargs))
