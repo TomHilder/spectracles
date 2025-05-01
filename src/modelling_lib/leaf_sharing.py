@@ -4,7 +4,7 @@ from equinox import Module, filter, is_inexact_array, tree_at
 from jax.tree import leaves_with_path
 from jax.tree_util import tree_map
 from jaxlib.xla_extension.pytree import GetAttrKey
-from jaxtyping import Array, PyTree
+from jaxtyping import PyTree
 
 from .parameter import Parameter
 
