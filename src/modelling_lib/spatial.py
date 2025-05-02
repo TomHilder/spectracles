@@ -104,8 +104,8 @@ class PerSpaxel(SpatialModel):
     # Model parameters
     spaxel_values: Parameter
 
-    def __init__(self, n_spaxels: int):
-        self.spaxel_values = init_parameter(self.spaxel_values, dims=n_spaxels)
+    def __init__(self, n_spaxels: int, spaxel_values: Parameter | None = None):
+        self.spaxel_values = init_parameter(spaxel_values, dims=n_spaxels)
 
     def __call__(self, data: SpatialData) -> Array:
         return self.spaxel_values.val[data.indices]
