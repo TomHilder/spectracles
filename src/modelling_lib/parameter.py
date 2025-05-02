@@ -3,6 +3,10 @@ from equinox import Module
 from jaxtyping import Array
 
 
+def init_parameter(value, **kwargs):
+    return Parameter(**kwargs) if value is None else value
+
+
 class Parameter(Module):
     """A parameter in a statistical model, which may be fixed or free."""
 

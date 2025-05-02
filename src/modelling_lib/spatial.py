@@ -8,7 +8,7 @@ from jaxtyping import Array
 
 from .data import SpatialData
 from .kernels import Kernel
-from .parameter import Parameter
+from .parameter import Parameter, init_parameter
 
 # NOTE: List of current obvious foot guns:
 # - n_modes must always be two odd integers, but this is not enforced
@@ -69,10 +69,7 @@ class FourierGP(SpatialModel):
         self._freqs = jnp.sqrt(fx**2 + fy**2)
         self.kernel = kernel
         # Initialise parameters
-        if coefficients is None:
-            self.coefficients = Parameter(dims=n_modes)
-        else:
-            self.coefficients = coefficients
+        self.coefficients = init_parameter(coefficients, dims=n_modes)
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
@@ -108,7 +105,7 @@ class PerSpaxel(SpatialModel):
     spaxel_values: Parameter
 
     def __init__(self, n_spaxels: int):
-        self.spaxel_values = Parameter(dims=n_spaxels)
+        self.spaxel_values = init_parameter(self.spaxel_values, dims=n_spaxels)
 
     def __call__(self, data: SpatialData) -> Array:
         return self.spaxel_values.val[data.indices]
