@@ -91,5 +91,6 @@ class SquaredExponential(Kernel):
         self.variance = variance
 
     def feature_weights(self, freqs: Array) -> Array:
-        fw = jnp.sqrt(jnp.exp(-0.5 * freqs**2 * softplus(self.length_scale.val) ** 2))
+        # fw = jnp.sqrt(jnp.exp(-0.5 * freqs**2 * softplus(self.length_scale.val) ** 2))
+        fw = jnp.exp(-0.25 * freqs**2 * softplus(self.length_scale.val) ** 2 + 1e-4)
         return jnp.sqrt(softplus(self.variance.val)) * normalise_fw(fw)
