@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple, TypeAlias
 
 from equinox import Module, filter, is_inexact_array, tree_at
 from jax.tree import leaves_with_path
@@ -6,9 +6,9 @@ from jax.tree_util import tree_map
 from jaxlib.xla_extension.pytree import GetAttrKey
 from jaxtyping import PyTree
 
-from .parameter import Parameter
+from .parameter import AnyParameter
 
-LeafPath = Tuple[GetAttrKey, ...]
+LeafPath: TypeAlias = Tuple[GetAttrKey, ...]
 
 
 def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Any:
@@ -36,7 +36,7 @@ def use_paths_get_leaves(tree: PyTree, paths: list[LeafPath]) -> list[Any]:
 def get_duplicated_leaves(tree: PyTree) -> Tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
     # Filter out leaves that are not Parameter
     filter_spec = tree_map(
-        lambda x: isinstance(x, Parameter), tree, is_leaf=lambda x: isinstance(x, Parameter)
+        lambda x: isinstance(x, AnyParameter), tree, is_leaf=lambda x: isinstance(x, AnyParameter)
     )
     filtered_tree = filter(tree, filter_spec=filter_spec)
     # Filter out leaves that are not inexact arrays (avoids Parameter class's other attributes)

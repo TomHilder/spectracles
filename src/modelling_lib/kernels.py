@@ -2,7 +2,6 @@ from abc import abstractmethod
 
 import jax.numpy as jnp
 from equinox import Module
-from jax.nn import softplus
 from jaxtyping import Array, ArrayLike
 
 from .parameter import Parameter
@@ -49,9 +48,7 @@ class Matern12(Kernel):
         self.variance = variance
 
     def feature_weights(self, freqs: Array) -> Array:
-        return matern_kernel_fw_nd(
-            freqs, softplus(self.length_scale.val), softplus(self.variance.val), nu=0.5, n=2
-        )
+        return matern_kernel_fw_nd(freqs, self.length_scale.val, self.variance.val, nu=0.5, n=2)
 
 
 class Matern32(Kernel):
@@ -63,9 +60,7 @@ class Matern32(Kernel):
         self.variance = variance
 
     def feature_weights(self, freqs: Array) -> Array:
-        return matern_kernel_fw_nd(
-            freqs, softplus(self.length_scale.val), softplus(self.variance.val), nu=1.5, n=2
-        )
+        return matern_kernel_fw_nd(freqs, self.length_scale.val, self.variance.val, nu=1.5, n=2)
 
 
 class Matern52(Kernel):
@@ -77,9 +72,7 @@ class Matern52(Kernel):
         self.variance = variance
 
     def feature_weights(self, freqs: Array) -> Array:
-        return matern_kernel_fw_nd(
-            freqs, softplus(self.length_scale.val), softplus(self.variance.val), nu=2.5, n=2
-        )
+        return matern_kernel_fw_nd(freqs, self.length_scale.val, self.variance.val, nu=2.5, n=2)
 
 
 class SquaredExponential(Kernel):
@@ -91,6 +84,5 @@ class SquaredExponential(Kernel):
         self.variance = variance
 
     def feature_weights(self, freqs: Array) -> Array:
-        # fw = jnp.sqrt(jnp.exp(-0.5 * freqs**2 * softplus(self.length_scale.val) ** 2))
-        fw = jnp.exp(-0.25 * freqs**2 * softplus(self.length_scale.val) ** 2 + 1e-4)
-        return jnp.sqrt(softplus(self.variance.val)) * normalise_fw(fw)
+        fw = jnp.exp(-0.25 * freqs**2 * self.length_scale.val**2 + 1e-4)
+        return jnp.sqrt(self.variance.val) * normalise_fw(fw)

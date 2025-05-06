@@ -1,3 +1,5 @@
+from typing import TypeAlias
+
 import jax.numpy as jnp
 from equinox import Module
 from jaxtyping import Array
@@ -94,6 +96,9 @@ class ConstrainedParameter(Module):
     @property
     def val(self) -> Array:
         return self.forward_transform(self.unconstrained_val)
+
+
+AnyParameter: TypeAlias = Parameter | ConstrainedParameter
 
 
 def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:
