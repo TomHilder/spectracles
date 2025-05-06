@@ -81,9 +81,8 @@ class ConstrainedParameter(Module):
                 "Either lower or upper bound must be provided, or both. For no bounds, use Parameter."
             )
 
-        # Initialise the unconstrained value
+        # Initialise the unconstrained value within bounds if not provided
         if initial is None:
-            # We need to set the initial value to be within the bounds
             if lower is not None and upper is not None and (lower > 0 or upper < 0):
                 initial = (lower + upper) / 2
             elif lower is not None and lower > 0:
