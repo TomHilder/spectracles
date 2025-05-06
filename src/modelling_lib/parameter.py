@@ -66,15 +66,15 @@ class ConstrainedParameter(Module):
         # If only lower bound
         if lower is not None and upper is None:
             self.forward_transform = lambda x: l_bounded(x, lower)
-            self.backward_transform = ...
+            self.backward_transform = lambda x: l_bounded_inv(x, lower)
         # If only upper bound
         elif lower is None and upper is not None:
             self.forward_transform = lambda x: u_bounded(x, upper)
-            self.backward_transform = ...
+            self.backward_transform = lambda x: u_bounded_inv(x, upper)
         # If both bounds
         elif lower is not None and upper is not None:
             self.forward_transform = lambda x: lu_bounded(x, lower, upper)
-            self.backward_transform = ...
+            self.backward_transform = lambda x: lu_bounded_inv(x, lower, upper)
         # If no bounds
         else:
             raise ValueError(
@@ -109,8 +109,17 @@ def softplus(x: Array) -> Array:
 
 def softplus_inv(f: Array) -> Array:
     if jnp.any(f <= 0):
-        raise ValueError("Specified initial value is likely outside bounds.")
+        raise ValueError(
+            "Specified initial value is likely outside bounds, or you've hit under/overflow. The inverse transformations used to initialise constrained parameters can be unstable for large values."
+        )
     return jnp.where(f > 20, f + jnp.log1p(-jnp.exp(-f)), jnp.log(jnp.expm1(f)))
+
+
+def softplus_frac_inv(x: Array, eps: float = 1e-16) -> Array:
+    x_clamped = jnp.clip(x, eps, 1.0 - eps)
+    t = x_clamped / (1.0 - x_clamped)
+    expm1_t = jnp.expm1(t)
+    return jnp.log(expm1_t)
 
 
 def l_bounded(x: Array, lower: float) -> Array:
@@ -126,9 +135,13 @@ def u_bounded(x: Array, upper: float) -> Array:
 
 
 def u_bounded_inv(f: Array, upper: float) -> Array:
-    return softplus_inv(upper - f)
+    return -softplus_inv(upper - f)
 
 
 def lu_bounded(x: Array, lower: float, upper: float) -> Array:
     s = softplus(x)
     return lower + (upper - lower) * s / (1.0 + s)
+
+
+def lu_bounded_inv(x: Array, lower: float, upper: float) -> Array:
+    return softplus_frac_inv((x - lower) / (upper - lower))
