@@ -108,6 +108,9 @@ class ShareModule(Module):
             [self._parent_leaf_paths[id_val] for id_val in self._dupl_leaf_ids],
         )
 
+    def fill_shared(self):
+        return tree_at(self._where, self.model, self._get(self.model))
+
 
 def parent_model(model) -> ShareModule:
     # Check if it is already wrapped
