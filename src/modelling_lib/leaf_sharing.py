@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Tuple, TypeAlias
+from typing import Any, Callable, Dict, Self, Tuple, TypeAlias
 
 from equinox import Module, filter, is_inexact_array, tree_at
 from jax.tree import leaves_with_path
@@ -66,29 +66,57 @@ def get_duplicated_leaves(tree: PyTree) -> Tuple[list[int], list[LeafPath], dict
 class Shared:
     """A sentinel object used to indicate a parameter is shared."""
 
+    id: int
+
+    def __init__(self, id: int):
+        self.id = id
+
     def __repr__(self) -> str:
-        return "shared"
+        return f"Shared({self.id})"
 
     def __str__(self) -> str:
-        return "shared"
+        return f"Shared({self.id})"
 
 
 class ShareModule(Module):
     model: Module
 
+    # Sharing metadata
     _dupl_leaf_ids: list[int]
     _dupl_leaf_paths: list[LeafPath]
     _parent_leaf_paths: Dict[int, LeafPath]
 
-    def __init__(self, model: Module):
+    # Is this instance locked?
+    _locked: bool = False
+
+    def __init__(self, model: Module, locked: bool = False):
         # Save the sharing info
         (
             self._dupl_leaf_ids,
             self._dupl_leaf_paths,
             self._parent_leaf_paths,
         ) = get_duplicated_leaves(model)
+        # Other metadata
+        self._locked = locked
+
         # Remove leaves that are coupled to other leaves
-        self.model = tree_at(self._where, model, replace_fn=lambda _: Shared())
+        def replace_fn(leaf):
+            return Shared(id(leaf))
+
+        # Initialise the model to None to avoid recursion issues
+        self.model = None
+
+        # If locked, we don't want Shared() objects because all sub-models need to be callable
+        # and if we replace some leaves with Shared() objects, they won't be
+        if locked:
+            self.model = model
+        # Otherwise, replace the leaves with Shared objects
+        else:
+            self.model = tree_at(self._where, model, replace_fn=replace_fn)
+
+    def __getattr__(self, name):
+        # Delegate unknown attributes to the model
+        return getattr(self.model, name)
 
     def __call__(self, *args, **kwargs) -> Any:
         # Replace nodes specified by `where` with the nodes specified by `get`
@@ -108,8 +136,9 @@ class ShareModule(Module):
             [self._parent_leaf_paths[id_val] for id_val in self._dupl_leaf_ids],
         )
 
-    def fill_shared(self):
-        return tree_at(self._where, self.model, self._get(self.model))
+    def get_locked_model(self) -> Self:
+        cls = type(self)
+        return cls(tree_at(self._where, self.model, self._get(self.model)), locked=True)
 
 
 def parent_model(model) -> ShareModule:
