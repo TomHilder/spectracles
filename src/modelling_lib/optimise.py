@@ -9,7 +9,6 @@ from equinox import (
     is_array,
     partition,
 )
-from jax import vmap
 from jax.tree_util import tree_map
 from optax import GradientTransformation
 from tqdm import tqdm
@@ -106,24 +105,24 @@ class OptimiserFrame:
 
     def run(self, n_steps, *loss_args, **loss_kwargs):
         # Grab current opt state and model
-        opt_state = self.opt_state
-        model = self.model
+        opt_state_ = self.opt_state
+        model_ = self.model
         # Perform optimisation by calling stepping function
         loss = []
         for _ in tqdm(range(n_steps), desc="optimising"):
-            loss, model, opt_state = self.make_step(
-                model,
+            loss_, model_, opt_state_ = self.make_step(
+                model_,
                 self.optimiser,
-                opt_state,
+                opt_state_,
                 self.filter_spec,
                 self.loss_fn,
                 *loss_args,
                 **loss_kwargs,
             )
-            self.loss_history.append(loss)
+            loss.append(loss_)
         # Save results
-        self.opt_state = opt_state
-        self.model = model
-        # self.loss += loss
+        self.opt_state = opt_state_
+        self.model = model_
+        self.loss_history += loss
         # Return the model I guess?
         return self.model
