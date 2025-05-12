@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Self, Tuple, TypeAlias
 
 from equinox import Module, filter, is_inexact_array, tree_at
-from jax.tree import leaves_with_path
+from jax.tree import leaves, leaves_with_path
 from jax.tree_util import tree_map
 from jaxlib.xla_extension.pytree import GetAttrKey
 from jaxtyping import PyTree
@@ -137,8 +137,24 @@ class ShareModule(Module):
         )
 
     def get_locked_model(self) -> Self:
+        """
+        Get a locked model. Locked models do not properly track shared parameters and so can no longer be optimised. Since all model parameters contained their actual values instead of some containing Shared objects, any subcomponent of the model may be called to make predictions, which is the primary use case for a locked model. You can't convert a locked model back, but this function returns a copy anyway so it doesn't matter.
+        """
         cls = type(self)
         return cls(tree_at(self._where, self.model, self._get(self.model)), locked=True)
+
+    def copy(self) -> Self:
+        """
+        NOTE: BROKEN since it the memory ids in the Shared objects are not updated
+        Return a copy of this model this is bad don't use it. (I can use it I know how it's bad)
+        """
+        return tree_at(leaves, self, replace_fn=lambda x: x)
+
+    def rebuild(self) -> Self:
+        """
+        Return a rebuilt copy of this model. Rebuilding is useful in case you have replaced any Parameters using tree surgery, since it will re-calculate the sharing structure. Changing Parameters of a built model without rebuilding can have unintended consequences and so is not recommended.
+        """
+        raise NotImplementedError
 
 
 def parent_model(model) -> ShareModule:
