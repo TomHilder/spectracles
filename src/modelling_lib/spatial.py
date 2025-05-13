@@ -17,7 +17,7 @@ from .parameter import Parameter, init_parameter
 #     repeated in the shape info right now, since I didn't implement n_modes
 #     != n_requested_modes yet.
 
-FINUFFT_KWDS = dict(eps=1e-8)
+FINUFFT_KWDS = dict(eps=1e-10)
 
 
 def get_freqs_1D(n_modes: int) -> Array:

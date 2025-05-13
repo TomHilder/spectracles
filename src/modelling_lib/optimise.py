@@ -1,5 +1,6 @@
 from typing import Callable
 
+import jax.numpy as jnp
 from equinox import (
     apply_updates,
     combine,
@@ -60,7 +61,6 @@ class OptimiserFrame:
         self.loss_history = []
 
         # Get the stepping function
-        @staticmethod
         @filter_jit
         def make_step(
             model,
@@ -104,6 +104,8 @@ class OptimiserFrame:
         self.make_step = make_step
 
     def run(self, n_steps, *loss_args, **loss_kwargs):
+        # Verify loss function
+        self._verify_loss_fn(*loss_args, **loss_kwargs)
         # Grab current opt state and model
         opt_state_ = self.opt_state
         model_ = self.model
@@ -126,3 +128,19 @@ class OptimiserFrame:
         self.loss_history += loss
         # Return the model I guess?
         return self.model
+
+    def _verify_loss_fn(self, *loss_args, **loss_kwargs):
+        # Check the loss function is callable
+        if not callable(self.loss_fn):
+            raise ValueError("Loss function is not callable.")
+        # Check the loss function doesn't output nan or raise Exceptions
+        try:
+            loss_output = self.loss_fn(self.model, *loss_args, **loss_kwargs)
+        except TypeError as e:
+            print(e)
+            raise ValueError(
+                "Loss function raised an exception. Probably you are trying to evaluate a prior on a shared Parameter, and the Shared object in place of an array is not an array. You should evaluate the prior on the root Parameter (given by the id of the Shared object)."
+            )
+        if jnp.any(jnp.isnan(loss_output)):
+            print(loss_output)
+            raise ValueError("Loss function outputs NaN.")
