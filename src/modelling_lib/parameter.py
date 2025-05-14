@@ -1,4 +1,4 @@
-from typing import TypeAlias
+from typing import Callable, TypeAlias
 
 import jax.numpy as jnp
 from equinox import Module
@@ -52,8 +52,8 @@ class ConstrainedParameter(Module):
 
     unconstrained_val: Array
     fix: bool
-    forward_transform: callable
-    backward_transform: callable
+    forward_transform: Callable
+    backward_transform: Callable
 
     def __init__(
         self,
@@ -132,6 +132,8 @@ def l_bounded(x: Array, lower: float) -> Array:
 
 
 def l_bounded_inv(f: Array, lower: float) -> Array:
+    if jnp.any(f < lower):
+        raise ValueError("Initial value lies below lower bound.")
     return softplus_inv(f - lower)
 
 
@@ -140,6 +142,8 @@ def u_bounded(x: Array, upper: float) -> Array:
 
 
 def u_bounded_inv(f: Array, upper: float) -> Array:
+    if jnp.any(f > upper):
+        raise ValueError("Initial value lies above upper bound.")
     return -softplus_inv(upper - f)
 
 
@@ -148,5 +152,9 @@ def lu_bounded(x: Array, lower: float, upper: float) -> Array:
     return lower + (upper - lower) * s / (1.0 + s)
 
 
-def lu_bounded_inv(x: Array, lower: float, upper: float) -> Array:
-    return softplus_frac_inv((x - lower) / (upper - lower))
+def lu_bounded_inv(f: Array, lower: float, upper: float) -> Array:
+    if jnp.any(f < lower):
+        raise ValueError("Initial value lies below lower bound.")
+    elif jnp.any(f > upper):
+        raise ValueError("Initial value lies above upper bound.")
+    return softplus_frac_inv((f - lower) / (upper - lower))
