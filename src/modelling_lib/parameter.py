@@ -5,6 +5,10 @@ from equinox import Module
 from jaxtyping import Array
 
 
+class BoundsError(Exception):
+    pass
+
+
 def _to_float_array(x) -> Array:
     if jnp.isscalar(x):
         return jnp.array([float(x)])
@@ -84,14 +88,23 @@ class ConstrainedParameter(Module):
             )
 
         # Initialise the unconstrained value within bounds if not provided
+        init_none_flag: bool = False
         if initial is None:
-            if lower is not None and upper is not None and (lower > 0 or upper < 0):
-                initial = (lower + upper) / 2
-            elif lower is not None and lower > 0:
-                initial = lower + 1
-            elif upper is not None and upper < 0:
-                initial = upper - 1
-        self.unconstrained_val = self.backward_transform(_array_from_user(dims, initial))
+            init_none_flag = True
+
+        # Try to initialise
+        try:
+            self.unconstrained_val = self.backward_transform(_array_from_user(dims, initial))
+        # Initial is outside bounds either
+        except BoundsError as e:
+            # Because we auto-initialised with zeros which is outside the bounds
+            if init_none_flag:
+                raise BoundsError(
+                    "Attempted to auto-initialise ConstrainedParameter with zeros by default, but this lies outside provided bounds. Please provide a manual intialisation inside the bounds instead."
+                )
+            # Or because the user asked for an initial value outside the bounds
+            else:
+                raise e
 
     @property
     def val(self) -> Array:
@@ -133,7 +146,7 @@ def l_bounded(x: Array, lower: float) -> Array:
 
 def l_bounded_inv(f: Array, lower: float) -> Array:
     if jnp.any(f < lower):
-        raise ValueError("Initial value lies below lower bound.")
+        raise BoundsError("Initial value lies below lower bound.")
     return softplus_inv(f - lower)
 
 
@@ -143,7 +156,7 @@ def u_bounded(x: Array, upper: float) -> Array:
 
 def u_bounded_inv(f: Array, upper: float) -> Array:
     if jnp.any(f > upper):
-        raise ValueError("Initial value lies above upper bound.")
+        raise BoundsError("Initial value lies above upper bound.")
     return -softplus_inv(upper - f)
 
 
@@ -154,7 +167,7 @@ def lu_bounded(x: Array, lower: float, upper: float) -> Array:
 
 def lu_bounded_inv(f: Array, lower: float, upper: float) -> Array:
     if jnp.any(f < lower):
-        raise ValueError("Initial value lies below lower bound.")
+        raise BoundsError("Initial value lies below lower bound.")
     elif jnp.any(f > upper):
-        raise ValueError("Initial value lies above upper bound.")
+        raise BoundsError("Initial value lies above upper bound.")
     return softplus_frac_inv((f - lower) / (upper - lower))
