@@ -79,7 +79,8 @@ class Shared:
 
 
 class ShareModule(Module):
-    model: Module
+    # None only support since we intialise to None to avoid recursion problems with the custom __getattr__
+    model: None | Module
 
     # Sharing metadata
     _dupl_leaf_ids: list[int]
@@ -146,9 +147,9 @@ class ShareModule(Module):
     def copy(self) -> Self:
         """
         NOTE: BROKEN since it the memory ids in the Shared objects are not updated
-        Return a copy of this model this is bad don't use it. (I can use it I know how it's bad)
+        Return a copy of this model this is bad don't use it. (I can use it, I know how it's bad)
         """
-        return tree_at(leaves, self, replace_fn=lambda x: x)
+        return tree_at(leaves, self, replace_fn=lambda x: x)  # type: ignore[no-any-return]
 
     def rebuild(self) -> Self:
         """

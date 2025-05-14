@@ -56,8 +56,8 @@ class ConstrainedParameter(Module):
 
     unconstrained_val: Array
     fix: bool
-    forward_transform: Callable
-    backward_transform: Callable
+    forward_transform: Callable[[Array], Array]
+    backward_transform: Callable[[Array], Array]
 
     def __init__(
         self,

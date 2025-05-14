@@ -28,7 +28,7 @@ def get_filter_spec(model: ShareModule) -> Callable:
     def is_trainable(x):
         return is_parameter(x) and not x.fix
 
-    return tree_map(is_trainable, model, is_leaf=is_parameter)
+    return tree_map(is_trainable, model, is_leaf=is_parameter)  # type: ignore[no-any-return]
 
 
 class OptimiserFrame:
@@ -58,7 +58,7 @@ class OptimiserFrame:
         self.opt_state = self.optimiser.init(filter(vary_model, is_array))
 
         # Initialise the optimisation history
-        self.loss_history = []
+        self.loss_history: list = []
 
         # Get the stepping function
         @filter_jit
