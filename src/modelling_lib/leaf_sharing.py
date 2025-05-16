@@ -90,6 +90,9 @@ class ShareModule(Module):
     # Is this instance locked?
     _locked: bool = False
 
+    # Keep track of attributes to avoid recursion
+    _attr_names = {"model", "_dupl_leaf_ids", "_dupl_leaf_paths", "_parent_leaf_paths", "_locked"}
+
     def __init__(self, model: Module, locked: bool = False):
         # Save the sharing info
         (
@@ -116,8 +119,35 @@ class ShareModule(Module):
             self.model = tree_at(self._where, model, replace_fn=replace_fn)
 
     def __getattr__(self, name):
-        # Delegate unknown attributes to the model
-        return getattr(self.model, name)
+        # Use the class attribute instead of instance attribute
+        if name in self._attr_names or name.startswith("__"):
+            raise AttributeError(f"{type(self).__name__} has no attribute {name}")
+
+        # Safe delegation to model
+        if self.model is None:
+            raise AttributeError(f"The model attribute is None, cannot access {name}")
+
+        try:
+            return getattr(self.model, name)
+        except AttributeError:
+            raise AttributeError(
+                f"Neither {type(self).__name__} nor {type(self.model).__name__} has attribute {name}"
+            )
+
+    def __getstate__(self):
+        # Make sure we don't include any computed properties that might cause recursion
+        return {
+            "model": self.model,
+            "_dupl_leaf_ids": self._dupl_leaf_ids,
+            "_dupl_leaf_paths": self._dupl_leaf_paths,
+            "_parent_leaf_paths": self._parent_leaf_paths,
+            "_locked": self._locked,
+        }
+
+    def __setstate__(self, state):
+        # When dealing with frozen instances, we need to use object.__setattr__
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
 
     def __call__(self, *args, **kwargs) -> Any:
         # Replace nodes specified by `where` with the nodes specified by `get`
@@ -146,10 +176,36 @@ class ShareModule(Module):
 
     def copy(self) -> Self:
         """
-        NOTE: BROKEN since it the memory ids in the Shared objects are not updated
-        Return a copy of this model this is bad don't use it. (I can use it, I know how it's bad)
+        Create a proper copy of the ShareModule with correct sharing structure preserved and duplicated array data. It's like deepcopy but preserves the sharing structure.
         """
-        return tree_at(leaves, self, replace_fn=lambda x: x)  # type: ignore[no-any-return]
+        # First, create a fresh restored model with all proper sharing
+        restored_model = tree_at(self._where, self.model, self._get(self.model))
+
+        # Create an ID map to keep track of which arrays we've already copied
+        # This ensures we create exactly one copy of each unique array
+        id_to_copy_map = {}
+
+        def deep_copy_with_sharing(x):
+            if is_inexact_array(x):
+                # Get the ID of this array
+                x_id = id(x)
+
+                # If we've already copied this exact array, return the existing copy
+                if x_id in id_to_copy_map:
+                    return id_to_copy_map[x_id]
+
+                # Otherwise, create a new copy and remember it
+                x_copy = x.copy()
+                id_to_copy_map[x_id] = x_copy
+                return x_copy
+            return x
+
+        # Apply the deep copy to all leaves in the model, preserving sharing
+        copied_model = tree_map(deep_copy_with_sharing, restored_model)
+
+        # Return a new instance with the deep-copied model
+        cls = type(self)
+        return cls(copied_model, locked=self._locked)
 
     def rebuild(self) -> Self:
         """

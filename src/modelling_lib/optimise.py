@@ -136,11 +136,7 @@ class OptimiserFrame:
         # Check the loss function doesn't output nan or raise Exceptions
         try:
             loss_output = self.loss_fn(self.model, *loss_args, **loss_kwargs)
-        except TypeError as e:
-            print(e)
-            raise ValueError(
-                "Loss function raised an exception. Probably you are trying to evaluate a prior on a shared Parameter, and the Shared object in place of an array is not an array. You should evaluate the prior on the root Parameter (given by the id of the Shared object)."
-            )
+        except Exception as e:
+            raise ValueError("Evaluating provided loss function causes an Exception.") from e
         if jnp.any(jnp.isnan(loss_output)):
-            print(loss_output)
             raise ValueError("Loss function outputs NaN.")
