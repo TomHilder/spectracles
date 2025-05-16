@@ -1,7 +1,6 @@
 """Tests for modelling_lib.spatial module."""
 
 import jax.numpy as jnp
-import numpy as np
 import pytest
 from jax.scipy.stats import norm
 from modelling_lib.data import SpatialData
@@ -10,7 +9,6 @@ from modelling_lib.parameter import Parameter
 from modelling_lib.spatial import (
     FourierGP,
     PerSpaxel,
-    SpatialModel,
     get_freqs,
     get_freqs_1D,
 )

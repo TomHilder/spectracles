@@ -2,7 +2,6 @@
 
 import jax.numpy as jnp
 import numpy as np
-import pytest
 from modelling_lib.data import SpatialData, convert_to_flat_array
 
 

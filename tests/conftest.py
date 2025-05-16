@@ -5,9 +5,7 @@ from pathlib import Path
 
 import jax.numpy as jnp
 import pytest
-from equinox import Module
 from modelling_lib.data import SpatialData
-from modelling_lib.leaf_sharing import build_model
 from modelling_lib.parameter import Parameter
 
 

@@ -1,10 +1,7 @@
 """Tests for modelling_lib.kernels module."""
 
 import jax.numpy as jnp
-import numpy as np
-import pytest
 from modelling_lib.kernels import (
-    Kernel,
     Matern12,
     Matern32,
     Matern52,

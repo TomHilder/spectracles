@@ -1,16 +1,12 @@
 """Tests for modelling_lib.spectral module."""
 
 import jax.numpy as jnp
-import numpy as np
-import pytest
-from equinox import Module
 from jax import vmap
 from modelling_lib.data import SpatialData
 from modelling_lib.spatial import SpatialModel
 from modelling_lib.spectral import (
     Constant,
     Gaussian,
-    SpectralSpatialModel,
 )
 
 

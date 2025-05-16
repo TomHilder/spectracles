@@ -6,7 +6,6 @@ from pathlib import Path
 import equinox as eqx
 import jax.numpy as jnp
 import optax
-import pytest
 from equinox import Module
 from modelling_lib.data import SpatialData
 from modelling_lib.io import load_model, save_model

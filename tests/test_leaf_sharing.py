@@ -3,7 +3,7 @@
 import equinox as eqx
 import jax.numpy as jnp
 import pytest
-from equinox import Module, is_array
+from equinox import is_array
 from jax.tree_util import tree_map
 from modelling_lib.leaf_sharing import (
     Shared,
