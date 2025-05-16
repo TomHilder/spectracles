@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Self, Tuple, TypeAlias
 
 from equinox import Module, filter, is_inexact_array, tree_at
-from jax.tree import leaves, leaves_with_path
+from jax.tree import leaves_with_path
 from jax.tree_util import tree_map
 from jaxlib.xla_extension.pytree import GetAttrKey
 from jaxtyping import PyTree
