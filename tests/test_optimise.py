@@ -2,7 +2,7 @@
 
 import equinox as eqx
 import jax.numpy as jnp
-import optax
+import optax  # type: ignore[import]
 import pytest
 from jax.tree_util import tree_map
 from modelling_lib.leaf_sharing import ShareModule, build_model

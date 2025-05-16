@@ -11,7 +11,7 @@ from equinox import (
     partition,
 )
 from jax.tree_util import tree_map
-from optax import GradientTransformation
+from optax import GradientTransformation  # type: ignore[import]
 from tqdm import tqdm
 
 from modelling_lib.leaf_sharing import ShareModule

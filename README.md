@@ -7,3 +7,5 @@ TODO:
 
 - [x] Instead of replacing shared leaves with `0`, replace with some class/object instead
 - [ ] Handle non-odd number of modes
+- [ ] Write better tests
+- [ ] Rigorously type check the tests

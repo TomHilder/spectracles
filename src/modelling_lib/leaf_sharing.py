@@ -4,7 +4,7 @@ from equinox import Module, filter, is_inexact_array, tree_at
 from jax.tree import leaves_with_path
 from jax.tree_util import tree_map
 from jaxlib.xla_extension.pytree import GetAttrKey
-from jaxtyping import PyTree
+from jaxtyping import Array, PyTree
 
 from .parameter import AnyParameter
 
@@ -183,7 +183,7 @@ class ShareModule(Module):
 
         # Create an ID map to keep track of which arrays we've already copied
         # This ensures we create exactly one copy of each unique array
-        id_to_copy_map = {}
+        id_to_copy_map: Dict[int, Array] = {}
 
         def deep_copy_with_sharing(x):
             if is_inexact_array(x):

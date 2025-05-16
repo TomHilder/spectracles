@@ -1,7 +1,7 @@
 from pathlib import Path
 from warnings import catch_warnings, filterwarnings
 
-from dill import PicklingWarning, dump, load
+from dill import PicklingWarning, dump, load  # type: ignore[import]
 
 from modelling_lib.leaf_sharing import ShareModule
 
