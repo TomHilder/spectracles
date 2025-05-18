@@ -1,65 +1,25 @@
 from typing import Any, Callable, Dict, Self
 
-from equinox import Module, filter, is_inexact_array, tree_at
-from jax.tree import leaves_with_path
-from jax.tree_util import GetAttrKey, tree_map
+from equinox import Module, is_inexact_array, tree_at
+from jax.tree_util import tree_map
 from jaxtyping import Array, PyTree
 
 from modelling_lib.parameter import AnyParameter
-
-type LeafPath = tuple[GetAttrKey, ...]  # type: ignore
-
-
-def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Any:
-    """
-    Iterates through the path to find the leaf in the tree. Doesn't work if leaves are sequences.
-    """
-    current_node = tree
-    for key in path:
-        current_node = getattr(current_node, key.name)
-    return current_node
+from modelling_lib.path_utils import LeafPath, get_duplicated_leaves, use_paths_get_leaves
 
 
-def use_paths_get_leaves(tree: PyTree, paths: list[LeafPath]) -> list[Any]:
-    """
-    Iterates through the paths to find the leaves in the tree. Returns a list of leaves.
-    """
-    leaves = []
-    for path in paths:
-        leaf = use_path_get_leaf(tree, path)
-        if leaf is not None:
-            leaves.append(leaf)
-    return leaves
-
-
-def get_duplicated_leaves(tree: PyTree) -> tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
-    # Filter out leaves that are not Parameter
-    filter_spec = tree_map(
-        lambda x: isinstance(x, AnyParameter), tree, is_leaf=lambda x: isinstance(x, AnyParameter)
-    )
-    filtered_tree = filter(tree, filter_spec=filter_spec)
-    # Filter out leaves that are not inexact arrays (avoids Parameter class's other attributes)
-    filtered_tree = filter(
-        filtered_tree, filter_spec=tree_map(lambda x: is_inexact_array(x), filtered_tree)
-    )
-    leaves = leaves_with_path(filtered_tree)
-    # Create a dictionary to keep track of the parent leaves
-    parent_leaf_paths: dict[int, LeafPath] = dict()
-    dupl_leaf_paths = []
-    dupl_leaf_ids = []
-    # Go through all leaves and keep track of ids
-    for path, leaf in leaves:
-        leaf_id = id(leaf)
-        # If id already seen:
-        if leaf_id in parent_leaf_paths.keys():
-            # Remember path to duplicated leaf
-            dupl_leaf_paths.append(path)
-            dupl_leaf_ids.append(leaf_id)
-        # If not already seen:
-        else:
-            # Add path to dictionary with id as key
-            parent_leaf_paths[leaf_id] = path
-    return dupl_leaf_ids, dupl_leaf_paths, parent_leaf_paths
+def get_duplicated_parameters(
+    tree: PyTree,
+) -> tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
+    filter_specs = [
+        tree_map(
+            lambda x: isinstance(x, AnyParameter),
+            tree,
+            is_leaf=lambda x: isinstance(x, AnyParameter),
+        ),
+        tree_map(lambda x: is_inexact_array(x), tree),
+    ]
+    return get_duplicated_leaves(tree, filter_specs)
 
 
 class Shared:
@@ -98,7 +58,7 @@ class ShareModule(Module):
             self._dupl_leaf_ids,
             self._dupl_leaf_paths,
             self._parent_leaf_paths,
-        ) = get_duplicated_leaves(model)
+        ) = get_duplicated_parameters(model)
         # Other metadata
         self._locked = locked
 
@@ -202,12 +162,6 @@ class ShareModule(Module):
         # Return a new instance with the deep-copied model
         cls = type(self)
         return cls(copied_model, locked=self._locked)
-
-    def rebuild(self) -> Self:
-        """
-        Return a rebuilt copy of this model. Rebuilding is useful in case you have replaced any Parameters using tree surgery, since it will re-calculate the sharing structure. Changing Parameters of a built model without rebuilding can have unintended consequences and so is not recommended.
-        """
-        raise NotImplementedError
 
 
 def parent_model(model) -> ShareModule:

@@ -111,11 +111,19 @@ class ConstrainedParameter(Module):
         return self.forward_transform(self.unconstrained_val)
 
 
-type AnyParameter = Parameter | ConstrainedParameter
+AnyParameter = Parameter | ConstrainedParameter
 
 
 def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:
     return Parameter(**kwargs) if parameter is None else parameter
+
+
+def is_parameter(x):
+    return isinstance(x, AnyParameter)
+
+
+def is_trainable(x):
+    return is_parameter(x) and not x.fix
 
 
 # ==== Transformations for constrained parameters ====

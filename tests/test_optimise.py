@@ -6,7 +6,7 @@ import optax  # type: ignore[import]
 import pytest
 from jax.tree_util import tree_map
 from modelling_lib.leaf_sharing import ShareModule, build_model
-from modelling_lib.optimise import OptimiserFrame, get_filter_spec
+from modelling_lib.optimise import OptimiserFrame, get_opt_filter_spec
 from modelling_lib.parameter import AnyParameter, Parameter
 
 from .test_models import SharedLeafModel, SimpleModel
@@ -16,7 +16,7 @@ class TestGetFilterSpec:
     def test_basic_model(self):
         # Test with a simple model
         model = build_model(SimpleModel, value=1.0)
-        filter_spec = get_filter_spec(model)
+        filter_spec = get_opt_filter_spec(model)
 
         # Should be a function that returns True for trainable parameters
         assert callable(filter_spec)
@@ -37,7 +37,7 @@ class TestGetFilterSpec:
         model = build_model(ModelWithFixedParam)
 
         # Apply filter spec to model
-        filter_spec = get_filter_spec(model)
+        filter_spec = get_opt_filter_spec(model)
 
         # Use the filter_spec with eqx.filter to extract trainable parameters
         trainable_model, fixed_model = eqx.partition(model, filter_spec)

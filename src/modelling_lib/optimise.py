@@ -15,18 +15,10 @@ from optax import GradientTransformation  # type: ignore[import]
 from tqdm import tqdm
 
 from modelling_lib.leaf_sharing import ShareModule
-from modelling_lib.parameter import AnyParameter
+from modelling_lib.parameter import is_parameter, is_trainable
 
 
-def get_filter_spec(model: ShareModule) -> Callable:
-    # Is a leaf a Parameter
-    def is_parameter(x):
-        return isinstance(x, AnyParameter)
-
-    # Is a leaf a Parameter and trainable
-    def is_trainable(x):
-        return is_parameter(x) and not x.fix
-
+def get_opt_filter_spec(model: ShareModule) -> Callable:
     return tree_map(is_trainable, model, is_leaf=is_parameter)  # type: ignore[no-any-return]
 
 
@@ -36,7 +28,7 @@ class OptimiserFrame:
         model: ShareModule,
         loss_fn: Callable[..., float],
         optimiser: GradientTransformation,
-        get_filter_spec_fn: Callable[[ShareModule], Callable] = get_filter_spec,
+        get_filter_spec_fn: Callable[[ShareModule], Callable] = get_opt_filter_spec,
     ):
         # Check sensible input first
         if not isinstance(model, ShareModule):

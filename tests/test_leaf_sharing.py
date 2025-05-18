@@ -9,23 +9,26 @@ from modelling_lib.leaf_sharing import (
     Shared,
     ShareModule,
     build_model,
-    get_duplicated_leaves,
+    # get_duplicated_leaves, # TODO: this should be tested in test_path_utils.py
+    get_duplicated_parameters,
     parent_model,
-    use_path_get_leaf,
     use_paths_get_leaves,
 )
 from modelling_lib.parameter import Parameter
+from modelling_lib.path_utils import (
+    use_path_get_leaf,  # TODO: this test should be in test_path_utils.py
+)
 
 from .test_models import ComplexSharedModel, NestedModel, SharedLeafModel, SimpleModel
 
 
 class TestLeafHelperFunctions:
-    def test_get_duplicated_leaves(self):
+    def test_get_duplicated_parameters(self):
         # Create a model with shared leaves
         model = SharedLeafModel()
 
         # Get duplicated leaves
-        dupl_ids, dupl_paths, parent_paths = get_duplicated_leaves(model)
+        dupl_ids, dupl_paths, parent_paths = get_duplicated_parameters(model)
 
         # There should be 1 duplicate
         assert len(dupl_ids) == 1
@@ -36,12 +39,12 @@ class TestLeafHelperFunctions:
         leaf_b = use_path_get_leaf(model, dupl_paths[0])
         assert leaf_b is model.b.val  # Changed from model.b
 
-    def test_get_duplicated_leaves_nested(self):
+    def test_get_duplicated_parameters_nested(self):
         # Create a more complex model with nested sharing
         model = ComplexSharedModel()
 
         # Get duplicated leaves
-        dupl_ids, dupl_paths, parent_paths = get_duplicated_leaves(model)
+        dupl_ids, dupl_paths, parent_paths = get_duplicated_parameters(model)
 
         # There should be 3 duplicates
         assert len(dupl_ids) == 3
@@ -57,7 +60,7 @@ class TestLeafHelperFunctions:
         model = SimpleModel()
 
         # Get duplicated leaves to get paths
-        _, _, parent_paths = get_duplicated_leaves(model)
+        _, _, parent_paths = get_duplicated_parameters(model)
 
         # Use the path to get the parameter
         param_path = list(parent_paths.values())[0]
@@ -71,7 +74,7 @@ class TestLeafHelperFunctions:
         model = NestedModel()
 
         # Get duplicated leaves to get paths
-        _, _, parent_paths = get_duplicated_leaves(model)
+        _, _, parent_paths = get_duplicated_parameters(model)
 
         # Use the paths to get parameters
         paths = list(parent_paths.values())
