@@ -1,14 +1,13 @@
-from typing import Any, Callable, Dict, Self, Tuple, TypeAlias
+from typing import Any, Callable, Dict, Self
 
 from equinox import Module, filter, is_inexact_array, tree_at
 from jax.tree import leaves_with_path
-from jax.tree_util import tree_map
-from jaxlib.xla_extension.pytree import GetAttrKey
+from jax.tree_util import GetAttrKey, tree_map
 from jaxtyping import Array, PyTree
 
-from .parameter import AnyParameter
+from modelling_lib.parameter import AnyParameter
 
-LeafPath: TypeAlias = Tuple[GetAttrKey, ...]
+type LeafPath = tuple[GetAttrKey, ...]  # type: ignore
 
 
 def use_path_get_leaf(tree: PyTree, path: LeafPath) -> Any:
@@ -33,7 +32,7 @@ def use_paths_get_leaves(tree: PyTree, paths: list[LeafPath]) -> list[Any]:
     return leaves
 
 
-def get_duplicated_leaves(tree: PyTree) -> Tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
+def get_duplicated_leaves(tree: PyTree) -> tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
     # Filter out leaves that are not Parameter
     filter_spec = tree_map(
         lambda x: isinstance(x, AnyParameter), tree, is_leaf=lambda x: isinstance(x, AnyParameter)
@@ -80,7 +79,7 @@ class Shared:
 
 class ShareModule(Module):
     # None only support since we intialise to None to avoid recursion problems with the custom __getattr__
-    model: None | Module
+    model: Module
 
     # Sharing metadata
     _dupl_leaf_ids: list[int]
@@ -106,9 +105,6 @@ class ShareModule(Module):
         # Remove leaves that are coupled to other leaves
         def replace_fn(leaf):
             return Shared(id(leaf))
-
-        # Initialise the model to None to avoid recursion issues
-        self.model = None
 
         # If locked, we don't want Shared() objects because all sub-models need to be callable
         # and if we replace some leaves with Shared() objects, they won't be

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from equinox import Module
 from jaxtyping import Array
 
-from .spatial import SpatialData, SpatialModel
+from modelling_lib.spatial import SpatialData, SpatialModel
 
 
 class SpectralSpatialModel(Module):

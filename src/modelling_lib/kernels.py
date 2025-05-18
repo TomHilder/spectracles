@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from equinox import Module
 from jaxtyping import Array, ArrayLike
 
-from .parameter import Parameter
+from modelling_lib.parameter import Parameter
 
 
 def normalise_fw(fw: ArrayLike) -> Array:

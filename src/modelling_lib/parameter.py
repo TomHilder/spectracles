@@ -1,4 +1,4 @@
-from typing import Callable, TypeAlias
+from typing import Callable
 
 import jax.numpy as jnp
 from equinox import Module
@@ -111,7 +111,7 @@ class ConstrainedParameter(Module):
         return self.forward_transform(self.unconstrained_val)
 
 
-AnyParameter: TypeAlias = Parameter | ConstrainedParameter
+type AnyParameter = Parameter | ConstrainedParameter
 
 
 def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:

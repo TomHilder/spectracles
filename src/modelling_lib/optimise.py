@@ -15,8 +15,7 @@ from optax import GradientTransformation  # type: ignore[import]
 from tqdm import tqdm
 
 from modelling_lib.leaf_sharing import ShareModule
-
-from .parameter import AnyParameter
+from modelling_lib.parameter import AnyParameter
 
 
 def get_filter_spec(model: ShareModule) -> Callable:
