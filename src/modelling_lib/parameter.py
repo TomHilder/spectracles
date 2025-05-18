@@ -126,6 +126,12 @@ def is_trainable(x):
     return is_parameter(x) and not x.fix
 
 
+def is_constrained(x):
+    if not is_parameter(x):
+        raise ValueError("is_constrained only works on AnyParameter.")
+    return isinstance(x, ConstrainedParameter)
+
+
 # ==== Transformations for constrained parameters ====
 
 

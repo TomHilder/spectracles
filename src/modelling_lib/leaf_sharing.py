@@ -4,8 +4,16 @@ from equinox import Module, is_inexact_array, tree_at
 from jax.tree_util import tree_map
 from jaxtyping import Array, PyTree
 
-from modelling_lib.parameter import AnyParameter
-from modelling_lib.path_utils import LeafPath, get_duplicated_leaves, use_paths_get_leaves
+from modelling_lib.parameter import AnyParameter, is_constrained, is_parameter
+from modelling_lib.path_utils import (
+    GetAttrKey,
+    LeafPath,
+    get_duplicated_leaves,
+    leafpath_to_str,
+    str_to_leafpath,
+    use_path_get_leaf,
+    use_paths_get_leaves,
+)
 
 
 def get_duplicated_parameters(
@@ -35,6 +43,10 @@ class Shared:
 
     def __str__(self) -> str:
         return f"Shared({self.id})"
+
+
+def is_shared(x: Any) -> bool:
+    return isinstance(x, Shared)
 
 
 class ShareModule(Module):
@@ -123,6 +135,43 @@ class ShareModule(Module):
             [self._parent_leaf_paths[id_val] for id_val in self._dupl_leaf_ids],
         )
 
+    def _param_from_path(self, param_path: LeafPath) -> AnyParameter:
+        leaf: AnyParameter = use_path_get_leaf(self.model, param_path)
+        if not is_parameter(leaf):
+            raise ValueError(f"Leaf at path '{leafpath_to_str(param_path)}' is not a Parameter.")
+        return leaf
+
+    def _get_val_path(self, param_path: LeafPath) -> LeafPath:
+        param_leaf = self._param_from_path(param_path)
+        val_attr = "val" if not is_constrained(param_leaf) else "unconstrained_val"
+        val = getattr(param_leaf, val_attr)
+        return (
+            self._parent_leaf_paths[val.id]
+            if isinstance(val, Shared)
+            else param_path + (GetAttrKey(val_attr),)
+        )
+
+    def _get_val_paths(self, params: list[str]) -> list[LeafPath]:
+        """
+        Get the value paths for the given parameter path strings.
+        """
+        param_paths = [str_to_leafpath(p) for p in params]
+        return [self._get_val_path(p) for p in param_paths]
+
+    def _prepare_new_val(self, val_path: LeafPath, new_val: Array) -> Array:
+        param_leaf = self._param_from_path(val_path[:-1])
+        if param_leaf.val.shape != new_val.shape:
+            raise ValueError(
+                f"New value shape {new_val.shape} does not match parameter leaf shape {param_leaf.val.shape}."
+            )
+        if is_constrained(param_leaf):
+            return param_leaf.backward_transform(new_val)  # type: ignore
+        else:
+            return new_val
+
+    def _prepare_new_vals(self, val_paths: list[LeafPath], new_vals: list[Array]) -> list[Array]:
+        return [self._prepare_new_val(p, v) for p, v in zip(val_paths, new_vals)]
+
     def get_locked_model(self) -> Self:
         """
         Get a locked model. Locked models do not properly track shared parameters and so can no longer be optimised. Since all model parameters contained their actual values instead of some containing Shared objects, any subcomponent of the model may be called to make predictions, which is the primary use case for a locked model. You can't convert a locked model back, but this function returns a copy anyway so it doesn't matter.
@@ -162,6 +211,16 @@ class ShareModule(Module):
         # Return a new instance with the deep-copied model
         cls = type(self)
         return cls(copied_model, locked=self._locked)
+
+    def set(self, params: list[str], values: list[Array]) -> Self:
+        """
+        Return a new model with updated parameter values. Can only be used to update Parameters or ConstrainedParameters. The model must not be locked.
+        """
+        if self._locked:
+            raise ValueError("Cannot set parameters on a locked model.")
+        val_paths = self._get_val_paths(params)
+        replace_vals = self._prepare_new_vals(val_paths, values)
+        return tree_at(lambda x: use_paths_get_leaves(x, val_paths), self, replace_vals)  # type: ignore[no-any-return]
 
 
 def parent_model(model) -> ShareModule:
