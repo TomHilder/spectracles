@@ -21,9 +21,9 @@ def get_duplicated_parameters(
 ) -> tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
     filter_specs = [
         tree_map(
-            lambda x: isinstance(x, AnyParameter),
+            is_parameter,
             tree,
-            is_leaf=lambda x: isinstance(x, AnyParameter),
+            is_leaf=is_parameter,
         ),
         tree_map(lambda x: is_inexact_array(x), tree),
     ]
