@@ -6,6 +6,7 @@ Will contain anything related to instantiating & fitting models, as well as gene
 TODO:
 
 - [x] Instead of replacing shared leaves with `0`, replace with some class/object instead
+- [ ] Support tuples, lists and dicts of models as attributes of models
 - [ ] Handle non-odd number of modes
 - [ ] Write better tests
 - [ ] Rigorously type check the tests
