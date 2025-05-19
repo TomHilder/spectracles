@@ -1,9 +1,14 @@
 from typing import Any, Callable, Dict, Self
 
-from equinox import Module, is_inexact_array, tree_at
+import matplotlib.pyplot as plt
+from equinox import Module, filter, is_inexact_array, tree_at
+from jax.tree import leaves_with_path
 from jax.tree_util import tree_map
 from jaxtyping import Array, PyTree
+from matplotlib.axes import Axes
+from networkx import DiGraph, draw
 
+from modelling_lib.graph import DEFAULT_NX_KWDS, layered_hierarchy_pos, print_graph
 from modelling_lib.parameter import AnyParameter, is_constrained, is_parameter
 from modelling_lib.path_utils import (
     GetAttrKey,
@@ -222,6 +227,34 @@ class ShareModule(Module):
         replace_vals = self._prepare_new_vals(val_paths, values)
         return tree_at(lambda x: use_paths_get_leaves(x, val_paths), self, replace_vals)  # type: ignore[no-any-return]
 
+    def print_model_tree(self) -> None:
+        """
+        Print the model tree in an easy to parse format. This is a simple tree structure that shows the model and its parameters. It does not show the sharing structure.
+        """
+        print_graph(*get_digraph(self))
+
+    def plot_model_graph(
+        self,
+        ax: Axes = None,
+        show: bool = True,
+        label_func: Callable[[DiGraph], Dict[int, str]] = None,
+        nx_draw_kwds: dict = DEFAULT_NX_KWDS,
+    ) -> None:
+        """
+        Plot the model as a graph using networkx and matplotlib. The graph is directed towards parameters and accounts for the sharing structure.
+        """
+        graph, root_id = get_digraph(self)
+        pos = layered_hierarchy_pos(graph, root_id)
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 10), layout="compressed")
+        if label_func is None:
+            labels = {n: f"{d['name']}\n({d['type']})" for n, d in graph.nodes(data=True)}
+        else:
+            labels = label_func(graph)
+        draw(graph, pos, ax=ax, labels=labels, **nx_draw_kwds)
+        if show:
+            plt.show()
+
 
 def parent_model(model) -> ShareModule:
     # Check if it is already wrapped
@@ -232,3 +265,51 @@ def parent_model(model) -> ShareModule:
 
 def build_model(cls: Callable[..., Module], *args, **kwargs) -> ShareModule:
     return parent_model(cls(*args, **kwargs))
+
+
+def get_digraph(module: ShareModule) -> tuple[DiGraph, int]:
+    # Filter tree and extract leaves + paths
+    filtered_tree = filter(module, is_parameter)
+    leaves = leaves_with_path(filtered_tree.model, is_leaf=is_parameter)
+    paths = [leaf[0] for leaf in leaves]
+    leaves = [leaf[1] for leaf in leaves]
+    # Start with root node
+    root_id = id(module.model)
+    graph = DiGraph()
+    graph.add_node(
+        root_id,
+        name="model",
+        type=module.model.__class__.__name__,
+        is_param=False,
+        is_root=True,
+    )
+    # Select one path to a leaf
+    for p in paths:
+        # Iterate from model down to leaf
+        parent = module.model
+        for entry in p:
+            leaf = getattr(parent, entry.name)
+            # Figure out what leaf we are adding, accounting for sharing
+            if is_parameter(leaf):
+                if is_constrained(leaf):
+                    val_attr = "unconstrained_val"
+                else:
+                    val_attr = "val"
+                val_leaf = getattr(leaf, val_attr)
+                if is_shared(val_leaf):
+                    parent_path = module._parent_leaf_paths[val_leaf.id][:-1]
+                else:
+                    parent_path = p
+                leaf = use_path_get_leaf(module, parent_path)
+            # If it was a shared leaf, then the following will actually do nothing, as desired
+            graph.add_node(
+                id(leaf),
+                name=entry.name,
+                type=leaf.__class__.__name__,
+                is_param=is_parameter(leaf),
+                is_root=False,
+            )
+            # Connect edges then set leaf to parent for next loop
+            graph.add_edge(id(parent), id(leaf))
+            parent = leaf
+    return graph, root_id
