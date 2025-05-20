@@ -1,17 +1,12 @@
-"""Tests for modelling_lib.spatial module."""
+"""test_spatial.py - tests for the modelling_lib.model.spatial module."""
 
 import jax.numpy as jnp
 import pytest
 from jax.scipy.stats import norm
-from modelling_lib.data import SpatialData
-from modelling_lib.kernels import Matern12, Matern32, Matern52, SquaredExponential
-from modelling_lib.parameter import Parameter
-from modelling_lib.spatial import (
-    FourierGP,
-    PerSpaxel,
-    get_freqs,
-    get_freqs_1D,
-)
+from modelling_lib.model.data import SpatialData
+from modelling_lib.model.kernels import Matern12, Matern32, Matern52, SquaredExponential
+from modelling_lib.model.parameter import Parameter
+from modelling_lib.model.spatial import FourierGP, PerSpaxel, get_freqs, get_freqs_1D
 
 
 class TestGetFreqs:

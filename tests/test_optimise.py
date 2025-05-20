@@ -1,13 +1,13 @@
-"""Tests for modelling_lib.optimise module."""
+"""test_optimise.py tests for the modelling_lib.optimise.optimiser_frame module."""
 
 import equinox as eqx
 import jax.numpy as jnp
 import optax  # type: ignore[import]
 import pytest
 from jax.tree_util import tree_map
-from modelling_lib.leaf_sharing import ShareModule, build_model
-from modelling_lib.optimise import OptimiserFrame, get_opt_filter_spec
-from modelling_lib.parameter import AnyParameter, Parameter
+from modelling_lib.model.parameter import AnyParameter, Parameter
+from modelling_lib.model.share_module import ShareModule, build_model
+from modelling_lib.optimise.optimiser_frame import OptimiserFrame, get_opt_filter_spec
 
 from .test_models import SharedLeafModel, SimpleModel
 

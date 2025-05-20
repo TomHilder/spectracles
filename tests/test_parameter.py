@@ -1,9 +1,9 @@
-"""Tests for modelling_lib.parameter module."""
+"""test_parameters.py - tests for the modelling_lib.model.parameter module."""
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from modelling_lib.parameter import (
+from modelling_lib.model.parameter import (
     BoundsError,
     ConstrainedParameter,
     Parameter,

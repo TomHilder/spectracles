@@ -1,10 +1,13 @@
+"""spectral.py - Spectral models with components that are spatial models."""
+
 from abc import abstractmethod
 
 import jax.numpy as jnp
 from equinox import Module
 from jaxtyping import Array
 
-from modelling_lib.spatial import SpatialData, SpatialModel
+from modelling_lib.model.data import SpatialData
+from modelling_lib.model.spatial import SpatialModel
 
 
 class SpectralSpatialModel(Module):

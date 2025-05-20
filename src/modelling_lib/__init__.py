@@ -1,11 +1,11 @@
-from modelling_lib.data import SpatialData
-from modelling_lib.io import load_model, save_model
-from modelling_lib.kernels import Kernel, Matern12, Matern32, Matern52, SquaredExponential
-from modelling_lib.leaf_sharing import build_model
-from modelling_lib.optimise import OptimiserFrame
-from modelling_lib.parameter import AnyParameter, ConstrainedParameter, Parameter, l_bounded
-from modelling_lib.spatial import FourierGP, PerSpaxel, SpatialModel
-from modelling_lib.spectral import Constant, Gaussian, SpectralSpatialModel
+from modelling_lib.model.data import SpatialData
+from modelling_lib.model.io import load_model, save_model
+from modelling_lib.model.kernels import Kernel, Matern12, Matern32, Matern52, SquaredExponential
+from modelling_lib.model.parameter import AnyParameter, ConstrainedParameter, Parameter, l_bounded
+from modelling_lib.model.share_module import build_model
+from modelling_lib.model.spatial import FourierGP, PerSpaxel, SpatialModel
+from modelling_lib.model.spectral import Constant, Gaussian, SpectralSpatialModel
+from modelling_lib.optimise.optimiser_frame import OptimiserFrame
 
 __all__ = [
     "FourierGP",

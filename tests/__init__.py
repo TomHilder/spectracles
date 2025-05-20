@@ -1,1 +1,1 @@
-"""Test package for modelling_lib."""
+"""Test package for modelling_lib library."""

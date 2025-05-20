@@ -1,3 +1,5 @@
+"""data.py - Data structures used as arguments for model evaluations/predictions."""
+
 import jax.numpy as jnp
 from equinox import Module, field
 from jaxtyping import Array

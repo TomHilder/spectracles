@@ -1,3 +1,5 @@
+"""spatial.py - Spatial models, especially flexible models built on Fourier-accelerated Gaussian Processes."""
+
 from abc import abstractmethod
 
 import jax.numpy as jnp
@@ -6,9 +8,9 @@ from jax.scipy.stats import norm
 from jax_finufft import nufft2  # type: ignore
 from jaxtyping import Array
 
-from modelling_lib.data import SpatialData
-from modelling_lib.kernels import Kernel
-from modelling_lib.parameter import Parameter, init_parameter
+from modelling_lib.model.data import SpatialData
+from modelling_lib.model.kernels import Kernel
+from modelling_lib.model.parameter import Parameter, init_parameter
 
 # NOTE: List of current obvious foot guns:
 # - n_modes must always be two odd integers, but this is not enforced

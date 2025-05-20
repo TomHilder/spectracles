@@ -1,3 +1,5 @@
+"""graph.py - Graph utilities for the modelling framework."""
+
 from networkx import DiGraph
 
 DEFAULT_NX_KWDS = {

@@ -1,3 +1,5 @@
+"""optimiser_frame.py - Frame for optimising a model using an optimiser and a loss function."""
+
 from typing import Callable
 
 import jax.numpy as jnp
@@ -14,8 +16,8 @@ from jax.tree_util import tree_map
 from optax import GradientTransformation  # type: ignore[import]
 from tqdm import tqdm
 
-from modelling_lib.leaf_sharing import ShareModule
-from modelling_lib.parameter import is_parameter, is_trainable
+from modelling_lib.model.parameter import is_parameter, is_trainable
+from modelling_lib.model.share_module import ShareModule
 
 
 def get_opt_filter_spec(model: ShareModule) -> Callable:

@@ -1,3 +1,5 @@
+"""parameter.py - Parameter objects for use with the modelling framework."""
+
 from typing import Callable
 
 import jax.numpy as jnp

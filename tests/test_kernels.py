@@ -1,7 +1,7 @@
-"""Tests for modelling_lib.kernels module."""
+"""test_kernels.py - tests for the modelling_lib.model.kernels module."""
 
 import jax.numpy as jnp
-from modelling_lib.kernels import (
+from modelling_lib.model.kernels import (
     Matern12,
     Matern32,
     Matern52,
@@ -9,7 +9,7 @@ from modelling_lib.kernels import (
     matern_kernel_fw_nd,
     normalise_fw,
 )
-from modelling_lib.parameter import Parameter
+from modelling_lib.model.parameter import Parameter
 
 
 class TestNormaliseFW:

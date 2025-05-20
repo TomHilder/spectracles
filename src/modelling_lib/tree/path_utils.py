@@ -1,3 +1,5 @@
+"""path_utils.py - utilities for handling paths in PyTree structures."""
+
 from typing import Any
 
 from equinox import filter

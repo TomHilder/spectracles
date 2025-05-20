@@ -1,10 +1,12 @@
+"""kernels.py - Kernel classes that implement various covariance functions expressed by their power spectral density or 'feature weights' for use with Fourier-accelerated GP models."""
+
 from abc import abstractmethod
 
 import jax.numpy as jnp
 from equinox import Module
 from jaxtyping import Array, ArrayLike
 
-from modelling_lib.parameter import Parameter
+from modelling_lib.model.parameter import Parameter
 
 
 def normalise_fw(fw: ArrayLike) -> Array:

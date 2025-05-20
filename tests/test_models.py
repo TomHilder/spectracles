@@ -1,13 +1,12 @@
-"""Test models for the leaf_sharing module tests.
+"""test_models.py - example models used for testing purposes, especially for testing that sharing is handled correctly.
 
-These need to be in a separate file from the tests due to the way dill serialization works.
-"""
+These need to be in a separate file from the tests beacuse the serialisation we use to save and load models relies on dill, which requires it."""
 
 import equinox as eqx
 import jax.numpy as jnp
 from equinox import Module
-from modelling_lib.data import SpatialData
-from modelling_lib.parameter import Parameter
+from modelling_lib.model.data import SpatialData
+from modelling_lib.model.parameter import Parameter
 
 
 class SimpleModel(Module):

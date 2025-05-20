@@ -1,8 +1,8 @@
-"""Tests for modelling_lib.data module."""
+"""test_data.py - tests for the modelling_lib.model.data module."""
 
 import jax.numpy as jnp
 import numpy as np
-from modelling_lib.data import SpatialData, convert_to_flat_array
+from modelling_lib.model.data import SpatialData, convert_to_flat_array
 
 
 class TestConvertToFlatArray:

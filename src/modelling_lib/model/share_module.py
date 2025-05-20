@@ -1,3 +1,5 @@
+"""share_module.py - Models built on equinox and jax that can have parameters that are shared between leaves of the model tree. Module refers to equinox Modules not Python modules."""
+
 from typing import Any, Callable, Dict, Self
 
 import matplotlib.pyplot as plt
@@ -8,9 +10,9 @@ from jaxtyping import Array, PyTree
 from matplotlib.axes import Axes
 from networkx import DiGraph, draw
 
-from modelling_lib.graph import DEFAULT_NX_KWDS, layered_hierarchy_pos, print_graph
-from modelling_lib.parameter import AnyParameter, is_constrained, is_parameter
-from modelling_lib.path_utils import (
+from modelling_lib.model.graph import DEFAULT_NX_KWDS, layered_hierarchy_pos, print_graph
+from modelling_lib.model.parameter import AnyParameter, is_constrained, is_parameter
+from modelling_lib.tree.path_utils import (
     GetAttrKey,
     LeafPath,
     get_duplicated_leaves,

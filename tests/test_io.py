@@ -1,8 +1,8 @@
-"""Tests for modelling_lib.io module."""
+"""test.io - tests for the modelling_lib.model.io module."""
 
 import pytest
-from modelling_lib.io import MODELFILE_EXT, load_model, save_model
-from modelling_lib.leaf_sharing import ShareModule, build_model
+from modelling_lib.model.io import MODELFILE_EXT, load_model, save_model
+from modelling_lib.model.share_module import ShareModule, build_model
 
 from .test_models import ComplexSharedModel, SimpleModel
 
