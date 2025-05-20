@@ -237,9 +237,9 @@ class ShareModule(Module):
 
     def plot_model_graph(
         self,
-        ax: Axes = None,
+        ax: Axes | None = None,
         show: bool = True,
-        label_func: Callable[[DiGraph], Dict[int, str]] = None,
+        label_func: Callable[[DiGraph], Dict[int, str]] | None = None,
         nx_draw_kwds: dict = DEFAULT_NX_KWDS,
     ) -> None:
         """
@@ -277,7 +277,7 @@ def get_digraph(module: ShareModule) -> tuple[DiGraph, int]:
     leaves = [leaf[1] for leaf in leaves]
     # Start with root node
     root_id = id(module.model)
-    graph = DiGraph()
+    graph: DiGraph = DiGraph()
     graph.add_node(
         root_id,
         name="model",
