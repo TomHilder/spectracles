@@ -1,5 +1,8 @@
 """graph.py - Graph utilities for the modelling framework."""
 
+from contextlib import contextmanager
+
+import matplotlib as mpl
 from networkx import DiGraph
 
 DEFAULT_NX_KWDS = {
@@ -11,6 +14,16 @@ DEFAULT_NX_KWDS = {
     "font_size": 8,
     "font_color": "black",
 }
+
+
+@contextmanager
+def temporarily_disable_tex():
+    prev_setting = mpl.rcParams["text.usetex"]
+    mpl.rcParams["text.usetex"] = False
+    try:
+        yield
+    finally:
+        mpl.rcParams["text.usetex"] = prev_setting
 
 
 def print_graph(graph: DiGraph, root_id: int, indent: str = "", is_last: bool = True) -> None:
