@@ -14,7 +14,7 @@ from modelling_lib.model.graph import (
     DEFAULT_NX_KWDS,
     layered_hierarchy_pos,
     print_graph,
-    temporarily_disable_tex,
+    # temporarily_disable_tex,
 )
 from modelling_lib.model.parameter import AnyParameter, is_constrained, is_parameter
 from modelling_lib.tree.path_utils import (

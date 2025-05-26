@@ -91,7 +91,7 @@ class OptimiserFrame:
             )
             # Update the model
             model = apply_updates(model, updates)
-            return loss, model, opt_state
+            return loss, model, opt_state  # , grad
 
         # Save the make step function we made
         self.make_step = make_step
