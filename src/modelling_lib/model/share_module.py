@@ -70,11 +70,9 @@ def is_shared(x: Any) -> bool:
 
 
 class ShareModule(Module):
-    # None only support since we intialise to None to avoid recursion problems with the custom __getattr__
     model: Module
 
     # Sharing metadata
-    # TODO: Refactor dupl_leaf_ids and dupl_leaf_paths to be a dict like parent_leaf_paths
     _dupl_leaf_ids: list[int]
     _dupl_leaf_paths: list[LeafPath]
     _parent_leaf_paths: Dict[int, LeafPath]
@@ -242,7 +240,7 @@ class ShareModule(Module):
 
     def set(self, params: list[str], values: list[Array]) -> Self:
         """
-        Return a new model with updated parameter values. Can only be used to update Parameters or ConstrainedParameters. The model must not be locked.
+        Return a new model with updated parameter values. Can only be used to update values of Parameters or ConstrainedParameters. The model must not be locked.
         """
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")
@@ -252,9 +250,9 @@ class ShareModule(Module):
 
     def set_fixed_status(self, params: list[str], fix: list[bool]) -> Self:
         """
-        Return a new model with parameters updated to be fixed or not based on provided paths and list of bools. Can only be used to update Parameters or ConstrainedParameters. The model must not be locked.
+        Return a new model with parameters updated to be fixed or not based on provided paths and list of bools. Can only be used to update fixed statuses of Parameters or ConstrainedParameters. The model must not be locked.
         """
-        # TODO: This is a bit spaghetti, but it works fine. We should refactor this to be cleaner by combining reused functionality/code.
+        # TODO: Refactor based on reused functionality
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")
         # Convert the path strings to LeafPath
