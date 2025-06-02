@@ -28,6 +28,14 @@ from modelling_lib.tree.path_utils import (
 )
 
 
+def id_from_path(dictionary, value):
+    return next((key for key, val in dictionary.items() if val == value), None)
+
+
+def get_indices(lst, target):
+    return [i for i, x in enumerate(lst) if x == target]
+
+
 def get_duplicated_parameters(
     tree: PyTree,
 ) -> tuple[list[int], list[LeafPath], dict[int, LeafPath]]:
@@ -66,6 +74,7 @@ class ShareModule(Module):
     model: Module
 
     # Sharing metadata
+    # TODO: Refactor dupl_leaf_ids and dupl_leaf_paths to be a dict like parent_leaf_paths
     _dupl_leaf_ids: list[int]
     _dupl_leaf_paths: list[LeafPath]
     _parent_leaf_paths: Dict[int, LeafPath]
@@ -153,10 +162,14 @@ class ShareModule(Module):
             raise ValueError(f"Leaf at path '{leafpath_to_str(param_path)}' is not a Parameter.")
         return leaf
 
-    def _get_val_path(self, param_path: LeafPath) -> LeafPath:
+    def _get_val_and_attr(self, param_path: LeafPath) -> LeafPath:
         param_leaf = self._param_from_path(param_path)
         val_attr = "val" if not is_constrained(param_leaf) else "unconstrained_val"
         val = getattr(param_leaf, val_attr)
+        return val, val_attr
+
+    def _get_val_path(self, param_path: LeafPath) -> LeafPath:
+        val, val_attr = self._get_val_and_attr(param_path)
         return (
             self._parent_leaf_paths[val.id]
             if isinstance(val, Shared)
@@ -236,6 +249,32 @@ class ShareModule(Module):
         val_paths = self._get_val_paths(params)
         replace_vals = self._prepare_new_vals(val_paths, values)
         return tree_at(lambda x: use_paths_get_leaves(x, val_paths), self, replace_vals)  # type: ignore[no-any-return]
+
+    def set_fixed_status(self, params: list[str], fix: list[bool]) -> Self:
+        """
+        Return a new model with parameters updated to be fixed or not based on provided paths and list of bools. Can only be used to update Parameters or ConstrainedParameters. The model must not be locked.
+        """
+        # TODO: This is a bit spaghetti, but it works fine. We should refactor this to be cleaner by combining reused functionality/code.
+        if self._locked:
+            raise ValueError("Cannot set parameters on a locked model.")
+        # Convert the path strings to LeafPath
+        param_paths = [str_to_leafpath(p) for p in params]
+        # Iterate over all paths, find all shared copies of each, since we update them all
+        fix_paths = []
+        new_fix = []
+        for pp, ff in zip(param_paths, fix):
+            val, val_attr = self._get_val_and_attr(pp)
+            if is_shared(val):
+                p_id = val.id
+            else:
+                p_id = id_from_path(self._parent_leaf_paths, pp + (GetAttrKey(val_attr),))
+            fix_paths.append(self._parent_leaf_paths[p_id][:-1] + (GetAttrKey("fix"),))
+            new_fix.append(ff)
+            inds = get_indices(self._dupl_leaf_ids, p_id)
+            for ii in inds:
+                fix_paths.append(self._dupl_leaf_paths[ii][:-1] + (GetAttrKey("fix"),))
+                new_fix.append(ff)
+        return tree_at(lambda x: use_paths_get_leaves(x, fix_paths), self, new_fix)  # type: ignore[no-any-return]
 
     def print_model_tree(self) -> None:
         """
