@@ -7,7 +7,7 @@ import pytest
 from jax.tree_util import tree_map
 from modelling_lib.model.parameter import AnyParameter, Parameter
 from modelling_lib.model.share_module import ShareModule, build_model
-from modelling_lib.optimise.optimiser_frame import OptimiserFrame, get_opt_filter_spec
+from modelling_lib.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
 
 from .test_models import SharedLeafModel, SimpleModel
 

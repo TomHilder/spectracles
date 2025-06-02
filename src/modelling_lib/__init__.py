@@ -5,7 +5,7 @@ from modelling_lib.model.parameter import AnyParameter, ConstrainedParameter, Pa
 from modelling_lib.model.share_module import build_model
 from modelling_lib.model.spatial import FourierGP, PerSpaxel, SpatialModel
 from modelling_lib.model.spectral import Constant, Gaussian, SpectralSpatialModel
-from modelling_lib.optimise.optimiser_frame import OptimiserFrame
+from modelling_lib.optimise.opt_frame import OptimiserFrame
 
 __all__ = [
     "FourierGP",
