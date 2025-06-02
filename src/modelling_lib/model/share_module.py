@@ -363,18 +363,3 @@ def get_digraph(module: ShareModule) -> tuple[DiGraph, int]:
             graph.add_edge(id(parent), id(leaf))
             parent = leaf
     return graph, root_id
-
-
-# We need an additional feature for ShareModule which is a set_fixed method which takes a list of paths (the same as set) and a list of Booleans, and updates each parameter at each path to be fixed or not (returning a copy of the model)
-# The main difficulty is that we want to update such that all shared copies retain the same fixed status. It not seem like it matters, since only the one containing the array not the Shared() sentinel gets checked. However, I think for stuff like the copy method we should get it right.
-# The rough steps that could be taken for each path provided:
-#   - Traverse the path and check if Shared
-#       - If Shared()
-#           - This is not the parent
-#           - Read the ID from Shared.id
-#       - If not Shared():
-#           - This is the parent
-#           - Get the ID from parent_leaf_paths
-#   - Check dupl_leaf_ids + dupl_leaf_paths for other copies of
-#     this parameter to update
-#   - Update the parent using parent_leaf_paths
