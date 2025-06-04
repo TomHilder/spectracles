@@ -1,6 +1,6 @@
 """opt_schedule.py - OptimiserSchedule encapsulates many OptimiserFrames in a sequence for more control over how the optimisation proceeds."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Literal, get_args
 
 from jaxtyping import Array
@@ -16,9 +16,9 @@ ExitStrategy = Literal[None, "placeholder"]
 class PhaseConfig:
     n_steps: int
     optimiser: GradientTransformation
-    fix_status_updates: dict[str, bool]
-    param_val_updates: dict[str, Array]
-    exit_strategy: ExitStrategy
+    exit_strategy: ExitStrategy = field(default=None)
+    fix_status_updates: dict[str, bool] = field(default_factory=dict)
+    param_val_updates: dict[str, Array] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self._validate_phase_config()
@@ -50,6 +50,7 @@ class Phase:
     def __post_init__(self) -> None:
         self._validate_phase(self.config, self.frame.model)
 
+    @staticmethod
     def _validate_phase(config: PhaseConfig, model: ShareModule) -> None:
         # Try and check for failures.
         # We'll just use whatever exceptions are raised by methods instead of reraising.
@@ -80,7 +81,7 @@ class OptimiserSchedule:
                 Phase(
                     config,
                     OptimiserFrame(
-                        self.model,
+                        model,
                         loss_fn,
                         config.optimiser,
                         get_filter_spec_fn,
