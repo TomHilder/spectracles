@@ -1,4 +1,5 @@
-"""optimiser_frame.py - Frame for optimising a model using an optimiser and a loss function."""
+"""opt_frame.py - Frame for optimising a model using an optimiser and a loss function."""
+# TODO: typing!
 
 from typing import Callable
 
@@ -47,8 +48,9 @@ class OptimiserFrame:
         self.filter_spec = get_filter_spec_fn(self.model)
 
         # Initialise the optimisation state
-        vary_model, _ = partition(self.model, self.filter_spec)
-        self.opt_state = self.optimiser.init(filter(vary_model, is_array))
+        self.set_opt_state(self.model)
+        # vary_model, _ = partition(self.model, self.filter_spec)
+        # self.opt_state = self.optimiser.init(filter(vary_model, is_array))
 
         # Initialise the optimisation history
         self.loss_history: list = []
@@ -91,7 +93,7 @@ class OptimiserFrame:
             )
             # Update the model
             model = apply_updates(model, updates)
-            return loss, model, opt_state  # , grad
+            return loss, model, opt_state
 
         # Save the make step function we made
         self.make_step = make_step
@@ -121,6 +123,11 @@ class OptimiserFrame:
         self.loss_history += loss
         # Return the model I guess?
         return self.model
+
+    def set_opt_state(self, model: ShareModule):
+        self.model = model
+        vary_model, _ = partition(self.model, self.filter_spec)
+        self.opt_state = self.optimiser.init(filter(vary_model, is_array))
 
     def _verify_loss_fn(self, *loss_args, **loss_kwargs):
         # Check the loss function is callable
