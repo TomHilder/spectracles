@@ -45,10 +45,10 @@ class OptimiserFrame:
         self.model = model
         self.loss_fn = loss_fn
         self.optimiser = optimiser
-        self.filter_spec = get_filter_spec_fn(self.model)
+        self.get_filter_spec = get_filter_spec_fn
 
         # Initialise the optimisation state
-        self.set_opt_state(self.model)
+        self._set_opt_state(self.model)
         # vary_model, _ = partition(self.model, self.filter_spec)
         # self.opt_state = self.optimiser.init(filter(vary_model, is_array))
 
@@ -101,6 +101,8 @@ class OptimiserFrame:
     def run(self, n_steps, *loss_args, **loss_kwargs):
         # Verify loss function
         self._verify_loss_fn(*loss_args, **loss_kwargs)
+        # Get the filter spec for the model
+        filter_spec = self.get_filter_spec(self.model)
         # Grab current opt state and model
         opt_state_ = self.opt_state
         model_ = self.model
@@ -111,7 +113,7 @@ class OptimiserFrame:
                 model_,
                 self.optimiser,
                 opt_state_,
-                self.filter_spec,
+                filter_spec,
                 self.loss_fn,
                 *loss_args,
                 **loss_kwargs,
@@ -124,9 +126,9 @@ class OptimiserFrame:
         # Return the model I guess?
         return self.model
 
-    def set_opt_state(self, model: ShareModule):
+    def _set_opt_state(self, model: ShareModule):
         self.model = model
-        vary_model, _ = partition(self.model, self.filter_spec)
+        vary_model, _ = partition(self.model, self.get_filter_spec(model))
         self.opt_state = self.optimiser.init(filter(vary_model, is_array))
 
     def _verify_loss_fn(self, *loss_args, **loss_kwargs):

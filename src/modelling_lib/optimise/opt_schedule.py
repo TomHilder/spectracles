@@ -88,3 +88,36 @@ class OptimiserSchedule:
                     ),
                 )
             )
+
+    def run_all(self, *loss_args, **loss_kwargs) -> None:
+        """Run all phases in the schedule."""
+        for phase in self.phases:
+            self.run_phase(phase, *loss_args, **loss_kwargs)
+
+    def run_phase(self, phase: Phase, *loss_args, **loss_kwargs) -> None:
+        """Run a single phase in the schedule."""
+        # Grab the most recent model from history
+        recent_model = self.model_history[-1]
+        # Apply the phase updates
+        recent_model = recent_model.set_fixed_status(
+            list(phase.config.fix_status_updates.keys()),
+            list(phase.config.fix_status_updates.values()),
+        )
+        recent_model = recent_model.set(
+            list(phase.config.param_val_updates.keys()),
+            list(phase.config.param_val_updates.values()),
+        )
+        # Now we have the model for this phase, we can reinitialise the state of the frame
+        phase.frame._set_opt_state(recent_model)
+        # Run the optimiser with the phase's frame
+        updated_model = phase.frame.run(phase.config.n_steps, *loss_args, **loss_kwargs)
+        # Update the model history
+        self.model_history.append(updated_model)
+
+    @property
+    def total_loss_history(self, combine: bool = True) -> list[float]:
+        """Get the total loss history from all phases."""
+        # TODO: implement combine option
+        if combine:
+            raise NotImplementedError
+        return [phase.frame.loss_history for phase in self.phases]
