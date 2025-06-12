@@ -6,6 +6,7 @@ from modelling_lib.model.share_module import build_model
 from modelling_lib.model.spatial import FourierGP, PerSpaxel, SpatialModel
 from modelling_lib.model.spectral import Constant, Gaussian, SpectralSpatialModel
 from modelling_lib.optimise.opt_frame import OptimiserFrame
+from modelling_lib.optimise.opt_schedule import OptimiserSchedule, PhaseConfig
 
 __all__ = [
     "FourierGP",
@@ -28,4 +29,6 @@ __all__ = [
     "OptimiserFrame",
     "save_model",
     "load_model",
+    "PhaseConfig",
+    "OptimiserSchedule",
 ]
