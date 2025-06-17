@@ -19,6 +19,8 @@ class SpatialDataLVM(Module):
     x: Array = field(converter=convert_to_flat_array)
     y: Array = field(converter=convert_to_flat_array)
     idx: Array = field(converter=convert_to_flat_array)
+    tile_idx: Array = field(converter=convert_to_flat_array)
+    ifu_idx: Array = field(converter=convert_to_flat_array)
 
 
 # TODO: This is bad. We want users to be able to write their own SpatialDataFoo class, but with the current setup the typing doesn't strictly allow this. Really this should be a Protocol or subclassing sitation. Not worth refactoring right now.
