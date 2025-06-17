@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 import numpy as np
-from modelling_lib.model.data import SpatialData, convert_to_flat_array
+from modelling_lib.model.data import SpatialDataGeneric, convert_to_flat_array
 
 
 class TestConvertToFlatArray:
@@ -48,49 +48,49 @@ class TestConvertToFlatArray:
 class TestSpatialData:
     def test_initialization(self):
         # Test basic initialization
-        data = SpatialData(
-            x=jnp.array([1.0, 2.0]), y=jnp.array([3.0, 4.0]), indices=jnp.array([0, 1])
+        data = SpatialDataGeneric(
+            x=jnp.array([1.0, 2.0]), y=jnp.array([3.0, 4.0]), idx=jnp.array([0, 1])
         )
         assert jnp.allclose(data.x, jnp.array([1.0, 2.0]))
         assert jnp.allclose(data.y, jnp.array([3.0, 4.0]))
-        assert jnp.allclose(data.indices, jnp.array([0, 1]))
+        assert jnp.allclose(data.idx, jnp.array([0, 1]))
 
     def test_auto_conversion(self):
         # Test with lists
-        data = SpatialData(x=[1.0, 2.0], y=[3.0, 4.0], indices=[0, 1])
+        data = SpatialDataGeneric(x=[1.0, 2.0], y=[3.0, 4.0], idx=[0, 1])
         assert data.x.shape == (2,)
         assert data.y.shape == (2,)
-        assert data.indices.shape == (2,)
+        assert data.idx.shape == (2,)
 
         # Test with numpy arrays
-        data = SpatialData(
-            x=np.array([1.0, 2.0]), y=np.array([3.0, 4.0]), indices=np.array([0, 1])
+        data = SpatialDataGeneric(
+            x=np.array([1.0, 2.0]), y=np.array([3.0, 4.0]), idx=np.array([0, 1])
         )
         assert isinstance(data.x, jnp.ndarray)
         assert isinstance(data.y, jnp.ndarray)
-        assert isinstance(data.indices, jnp.ndarray)
+        assert isinstance(data.idx, jnp.ndarray)
 
         # Test with 2D arrays
-        data = SpatialData(
-            x=np.array([[1.0], [2.0]]), y=np.array([[3.0], [4.0]]), indices=np.array([[0], [1]])
+        data = SpatialDataGeneric(
+            x=np.array([[1.0], [2.0]]), y=np.array([[3.0], [4.0]]), idx=np.array([[0], [1]])
         )
         assert data.x.shape == (2,)
         assert data.y.shape == (2,)
-        assert data.indices.shape == (2,)
+        assert data.idx.shape == (2,)
 
     def test_empty_data(self):
         # Test with empty arrays
-        data = SpatialData(x=jnp.array([]), y=jnp.array([]), indices=jnp.array([]))
+        data = SpatialDataGeneric(x=jnp.array([]), y=jnp.array([]), idx=jnp.array([]))
         assert data.x.shape == (0,)
         assert data.y.shape == (0,)
-        assert data.indices.shape == (0,)
+        assert data.idx.shape == (0,)
 
     def test_dimension_mismatch_handling(self):
-        # The module doesn't explicitly check for dimension matching between x, y, and indices
+        # The module doesn't explicitly check for dimension matching between x, y, and idx
         # This is more of a "what happens" test than a correctness test
-        data = SpatialData(
-            x=jnp.array([1.0, 2.0]), y=jnp.array([3.0]), indices=jnp.array([0, 1, 2])
+        data = SpatialDataGeneric(
+            x=jnp.array([1.0, 2.0]), y=jnp.array([3.0]), idx=jnp.array([0, 1, 2])
         )
         assert data.x.shape == (2,)
         assert data.y.shape == (1,)
-        assert data.indices.shape == (3,)
+        assert data.idx.shape == (3,)

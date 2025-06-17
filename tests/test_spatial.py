@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest
 from jax.scipy.stats import norm
-from modelling_lib.model.data import SpatialData
+from modelling_lib.model.data import SpatialDataGeneric
 from modelling_lib.model.kernels import Matern12, Matern32, Matern52, SquaredExponential
 from modelling_lib.model.parameter import Parameter
 from modelling_lib.model.spatial import FourierGP, PerSpaxel, get_freqs, get_freqs_1D
@@ -71,10 +71,10 @@ class TestFourierGP:
         self.kernel = Matern32(
             length_scale=Parameter(initial=1.0), variance=Parameter(initial=1.0)
         )
-        self.data = SpatialData(
+        self.data = SpatialDataGeneric(
             x=jnp.array([0.0, 0.1, 0.2, 0.3, 0.4]),
             y=jnp.array([0.5, 0.6, 0.7, 0.8, 0.9]),
-            indices=jnp.array([0, 1, 2, 3, 4]),
+            idx=jnp.array([0, 1, 2, 3, 4]),
         )
 
     def test_initialization(self):
@@ -160,7 +160,9 @@ class TestFourierGP:
     def test_larger_dataset(self):
         # Test with larger dataset
         n = 100
-        data = SpatialData(x=jnp.linspace(0, 1, n), y=jnp.linspace(0, 1, n), indices=jnp.arange(n))
+        data = SpatialDataGeneric(
+            x=jnp.linspace(0, 1, n), y=jnp.linspace(0, 1, n), idx=jnp.arange(n)
+        )
         gp = FourierGP(n_modes=self.n_modes, kernel=self.kernel)
         out = gp(data)
         assert out.shape == (n,)
@@ -170,10 +172,10 @@ class TestPerSpaxel:
     def setup_method(self):
         # Common setup for PerSpaxel tests
         self.n_spaxels = 10
-        self.data = SpatialData(
+        self.data = SpatialDataGeneric(
             x=jnp.array([0.0, 0.1, 0.2, 0.3, 0.4]),
             y=jnp.array([0.5, 0.6, 0.7, 0.8, 0.9]),
-            indices=jnp.array([0, 1, 2, 3, 4]),
+            idx=jnp.array([0, 1, 2, 3, 4]),
         )
 
     def test_initialization(self):
@@ -201,15 +203,15 @@ class TestPerSpaxel:
         assert out.shape == (self.data.x.shape[0],)
 
         # Check output values (should match values at corresponding indices)
-        expected = values[self.data.indices.astype(int)]
+        expected = values[self.data.idx.astype(int)]
         assert jnp.allclose(out, expected)
 
     def test_out_of_bounds_indices(self):
         # Test behavior with out-of-bounds indices
-        data_bad = SpatialData(
+        data_bad = SpatialDataGeneric(
             x=jnp.array([0.0]),
             y=jnp.array([0.0]),
-            indices=jnp.array([self.n_spaxels + 5]),  # Out of bounds
+            idx=jnp.array([self.n_spaxels + 5]),  # Out of bounds
         )
         ps = PerSpaxel(n_spaxels=self.n_spaxels)
 

@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 from jax import vmap
-from modelling_lib.model.data import SpatialData
+from modelling_lib.model.data import SpatialDataGeneric
 from modelling_lib.model.spatial import SpatialModel
 from modelling_lib.model.spectral import Constant, Gaussian
 
@@ -15,17 +15,17 @@ class DummySpatialModel(SpatialModel):
     def __init__(self, value: float = 1.0):
         self.value = value
 
-    def __call__(self, data: SpatialData):
+    def __call__(self, data: SpatialDataGeneric):
         return self.value * jnp.ones(data.x.shape)
 
 
 class TestConstant:
     def setup_method(self):
         # Common setup for Constant tests
-        self.data = SpatialData(
+        self.data = SpatialDataGeneric(
             x=jnp.array([0.0, 0.1, 0.2, 0.3, 0.4]),
             y=jnp.array([0.5, 0.6, 0.7, 0.8, 0.9]),
-            indices=jnp.array([0, 1, 2, 3, 4]),
+            idx=jnp.array([0, 1, 2, 3, 4]),
         )
         self.λ = jnp.array([650.0, 651.0, 652.0, 653.0, 654.0])
 
@@ -49,7 +49,7 @@ class TestConstant:
         vmap_out = vmap(call_at_spatial_data)(self.λ)
 
         # Check output shape
-        expected_shape = (len(self.λ), len(self.data.indices))
+        expected_shape = (len(self.λ), len(self.data.idx))
         assert vmap_out.shape == expected_shape
 
         # Check output values (should be constant for all wavelengths)
@@ -58,8 +58,8 @@ class TestConstant:
     def test_different_spatial_values(self):
         # Test with spatial model that returns different values per spaxel
         class VaryingSpatialModel(SpatialModel):
-            def __call__(self, data: SpatialData):
-                return data.indices.astype(float)
+            def __call__(self, data: SpatialDataGeneric):
+                return data.idx.astype(float)
 
         const_model = VaryingSpatialModel()
         model = Constant(const=const_model)
@@ -70,21 +70,21 @@ class TestConstant:
         vmap_out = vmap(call_at_spatial_data)(self.λ)
 
         # Output should be a 2D array with shape (n_wavelengths, n_spaxels)
-        expected_shape = (len(self.λ), len(self.data.indices))
+        expected_shape = (len(self.λ), len(self.data.idx))
         assert vmap_out.shape == expected_shape
 
         # Each column should match the indices
-        for i in range(len(self.data.indices)):
-            assert jnp.allclose(vmap_out[:, i], float(self.data.indices[i]))
+        for i in range(len(self.data.idx)):
+            assert jnp.allclose(vmap_out[:, i], float(self.data.idx[i]))
 
 
 class TestGaussian:
     def setup_method(self):
         # Common setup for Gaussian tests
-        self.data = SpatialData(
+        self.data = SpatialDataGeneric(
             x=jnp.array([0.0, 0.1, 0.2, 0.3, 0.4]),
             y=jnp.array([0.5, 0.6, 0.7, 0.8, 0.9]),
-            indices=jnp.array([0, 1, 2, 3, 4]),
+            idx=jnp.array([0, 1, 2, 3, 4]),
         )
         self.λ = jnp.linspace(650.0, 660.0, 100)
 
@@ -114,7 +114,7 @@ class TestGaussian:
         vmap_out = vmap(call_at_spatial_data)(self.λ)
 
         # Check output shape
-        expected_shape = (len(self.λ), len(self.data.indices))
+        expected_shape = (len(self.λ), len(self.data.idx))
         assert vmap_out.shape == expected_shape
 
         # Check output values (should be Gaussian centered at λ0)
@@ -128,8 +128,8 @@ class TestGaussian:
     def test_varying_parameters(self):
         # Test with varying parameters across spaxels
         class PosSpatialModel(SpatialModel):
-            def __call__(self, data: SpatialData):
-                return 650.0 + data.indices  # Different center for each spaxel
+            def __call__(self, data: SpatialDataGeneric):
+                return 650.0 + data.idx  # Different center for each spaxel
 
         A = DummySpatialModel(value=1.0)
         λ0 = PosSpatialModel()
@@ -142,7 +142,7 @@ class TestGaussian:
         vmap_out = vmap(call_at_spatial_data)(self.λ)
 
         # Output should be a 2D array with shape (n_wavelengths, n_spaxels)
-        expected_shape = (len(self.λ), len(self.data.indices))
+        expected_shape = (len(self.λ), len(self.data.idx))
         assert vmap_out.shape == expected_shape
 
         # Check that maximum value for each spaxel is at the corresponding center
@@ -151,7 +151,7 @@ class TestGaussian:
         λ_max = self.λ[max_indices]
 
         # The maximum should be close to the centers specified by λ0
-        centers = 650.0 + self.data.indices
+        centers = 650.0 + self.data.idx
         assert jnp.allclose(λ_max, centers, atol=self.λ[1] - self.λ[0])
 
     def test_normalization(self):

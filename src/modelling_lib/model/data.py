@@ -9,7 +9,17 @@ def convert_to_flat_array(array: Array) -> Array:
     return jnp.asarray(array).flatten()
 
 
-class SpatialData(Module):
+class SpatialDataGeneric(Module):
     x: Array = field(converter=convert_to_flat_array)
     y: Array = field(converter=convert_to_flat_array)
-    indices: Array = field(converter=convert_to_flat_array)
+    idx: Array = field(converter=convert_to_flat_array)
+
+
+class SpatialDataLVM(Module):
+    x: Array = field(converter=convert_to_flat_array)
+    y: Array = field(converter=convert_to_flat_array)
+    idx: Array = field(converter=convert_to_flat_array)
+
+
+# TODO: This is bad. We want users to be able to write their own SpatialDataFoo class, but with the current setup the typing doesn't strictly allow this. Really this should be a Protocol or subclassing sitation. Not worth refactoring right now.
+SpatialData = SpatialDataGeneric | SpatialDataLVM

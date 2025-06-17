@@ -1,4 +1,4 @@
-from modelling_lib.model.data import SpatialData
+from modelling_lib.model.data import SpatialDataGeneric, SpatialDataLVM
 from modelling_lib.model.io import load_model, save_model
 from modelling_lib.model.kernels import Kernel, Matern12, Matern32, Matern52, SquaredExponential
 from modelling_lib.model.parameter import AnyParameter, ConstrainedParameter, Parameter, l_bounded
@@ -11,7 +11,8 @@ from modelling_lib.optimise.opt_schedule import OptimiserSchedule, PhaseConfig
 __all__ = [
     "FourierGP",
     "Gaussian",
-    "SpatialData",
+    "SpatialDataGeneric",
+    "SpatialDataLVM",
     "PerSpaxel",
     "Constant",
     "Kernel",
