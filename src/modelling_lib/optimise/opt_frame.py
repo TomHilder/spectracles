@@ -15,6 +15,7 @@ from equinox import (
 )
 from jax.tree_util import tree_map
 from optax import GradientTransformation  # type: ignore[import]
+from optax.tree_utils import tree_linf_norm
 from tqdm import tqdm
 
 from modelling_lib.model.parameter import is_parameter, is_trainable
@@ -93,6 +94,7 @@ class OptimiserFrame:
             )
             # Update the model
             model = apply_updates(model, updates)
+            # Check convergence
             return loss, model, opt_state
 
         # Save the make step function we made
@@ -108,7 +110,7 @@ class OptimiserFrame:
         model_ = self.model
         # Perform optimisation by calling stepping function
         loss = []
-        for _ in tqdm(range(n_steps), desc="optimising"):
+        for i in tqdm(range(n_steps), desc="optimising"):
             loss_, model_, opt_state_ = self.make_step(
                 model_,
                 self.optimiser,
@@ -119,6 +121,12 @@ class OptimiserFrame:
                 **loss_kwargs,
             )
             loss.append(loss_)
+            # Check for convergence
+            if i > 100 and i % 100 == 0:
+                loss_trend = loss[-100] - loss[-1]
+                if jnp.abs(loss_trend) < 1e3:
+                    print(f"Convergence reached after {i} steps with loss trend {loss_trend}.")
+                    break
         # Save results
         self.opt_state = opt_state_
         self.model = model_
