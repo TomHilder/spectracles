@@ -15,7 +15,6 @@ from equinox import (
 )
 from jax.tree_util import tree_map
 from optax import GradientTransformation  # type: ignore[import]
-from optax.tree_utils import tree_linf_norm
 from tqdm import tqdm
 
 from modelling_lib.model.parameter import is_parameter, is_trainable
@@ -33,6 +32,7 @@ class OptimiserFrame:
         loss_fn: Callable[..., float],
         optimiser: GradientTransformation,
         get_filter_spec_fn: Callable[[ShareModule], Callable] = get_opt_filter_spec,
+        Δloss_criterion: float = 1e5,
     ):
         # Check sensible input first
         if not isinstance(model, ShareModule):
@@ -47,11 +47,10 @@ class OptimiserFrame:
         self.loss_fn = loss_fn
         self.optimiser = optimiser
         self.get_filter_spec = get_filter_spec_fn
+        self.Δloss_criterion = Δloss_criterion
 
         # Initialise the optimisation state
         self._set_opt_state(self.model)
-        # vary_model, _ = partition(self.model, self.filter_spec)
-        # self.opt_state = self.optimiser.init(filter(vary_model, is_array))
 
         # Initialise the optimisation history
         self.loss_history: list = []
@@ -110,7 +109,9 @@ class OptimiserFrame:
         model_ = self.model
         # Perform optimisation by calling stepping function
         loss = []
-        for i in tqdm(range(n_steps), desc="optimising"):
+        # Loop over number of steps
+        pbar = tqdm(iterable=range(n_steps), desc="Optimising", unit="step")
+        for i in pbar:
             loss_, model_, opt_state_ = self.make_step(
                 model_,
                 self.optimiser,
@@ -121,11 +122,17 @@ class OptimiserFrame:
                 **loss_kwargs,
             )
             loss.append(loss_)
+
             # Check for convergence
-            if i > 100 and i % 100 == 0:
-                loss_trend = loss[-100] - loss[-1]
-                if jnp.abs(loss_trend) < 1e3:
-                    print(f"Convergence reached after {i} steps with loss trend {loss_trend}.")
+            if i >= 100 and i % 50 == 0:
+                if self._check_convergence(
+                    loss_history=loss,
+                    Δloss=self.Δloss_criterion,
+                    pbar=pbar,
+                ):
+                    print(
+                        f"Early exist based on Δloss_criterion of {self.Δloss_criterion:.2e} at step {i}."
+                    )
                     break
         # Save results
         self.opt_state = opt_state_
@@ -150,3 +157,14 @@ class OptimiserFrame:
             raise ValueError("Evaluating provided loss function causes an Exception.") from e
         if jnp.any(jnp.isnan(loss_output)):
             raise ValueError("Loss function outputs NaN.")
+
+    @staticmethod
+    def _check_convergence(
+        loss_history: list[float],
+        Δloss: float,
+        pbar: tqdm = None,
+    ) -> bool:
+        trend = loss_history[-50] - loss_history[-1]
+        if pbar is not None:
+            pbar.set_description(f"Optimising (Δloss trend: {trend:.2e})")
+        return jnp.abs(trend) < Δloss

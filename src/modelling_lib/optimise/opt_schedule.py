@@ -18,7 +18,8 @@ ExitStrategy = Literal[None, "placeholder"]
 class PhaseConfig:
     n_steps: int
     optimiser: GradientTransformation
-    exit_strategy: ExitStrategy = field(default=None)
+    # exit_strategy: ExitStrategy = field(default=None)
+    Δloss_criterion: float = field(default=1e2)
     fix_status_updates: dict[str, bool] = field(default_factory=dict)
     param_val_updates: dict[str, Array] = field(default_factory=dict)
 
@@ -40,8 +41,8 @@ class PhaseConfig:
             if not isinstance(val, Array):
                 raise TypeError("All values in param_val_updates must be jax Arrays.")
         # Check exit strategy exists
-        if self.exit_strategy not in get_args(ExitStrategy):
-            raise ValueError(f"Unkown exit strategy: {self.exit_strategy}")
+        # if self.exit_strategy not in get_args(ExitStrategy):
+        # raise ValueError(f"Unkown exit strategy: {self.exit_strategy}")
 
 
 @dataclass
@@ -87,6 +88,7 @@ class OptimiserSchedule:
                         loss_fn,
                         config.optimiser,
                         get_filter_spec_fn,
+                        config.Δloss_criterion,
                     ),
                 )
             )
