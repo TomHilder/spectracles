@@ -99,7 +99,23 @@ class FourierGP(SpatialModel):
         return f + jnp.conj(jnp.flip(f))
 
     def prior_logpdf(self) -> Array:
-        return norm.logpdf(x=self.coefficients.val)
+        # fw = self.kernel.feature_weights(self._freqs)
+        return norm.logpdf(x=self.coefficients.val).sum()  # - jnp.log(fw).sum()
+
+    # def prior_logpdf(self) -> Array:
+    #     fw = self.kernel.feature_weights(self._freqs)
+    #     return norm.logpdf(x=self.coefficients.val, loc=0.0, scale=fw).sum()
+
+    # ChatGPT's version:
+    # def prior_logpdf(self) -> Array:
+    # fw = self.kernel.feature_weights(self._freqs)  # depends on θ
+    # alpha = self.coefficients.val  # MAP parameter
+    # return (-0.5 * alpha**2 * fw**2 - jnp.log(fw)).sum()
+
+    # ChatGPT's version using norm.logpdf:
+    # def prior_logpdf(self) -> Array:
+    # fw = self.kernel.feature_weights(self._freqs)  # depends on θ
+    # return norm.logpdf(x=self.coefficients.val * fw, loc=0.0, scale=fw).sum()
 
 
 class PerSpaxel(SpatialModel):
