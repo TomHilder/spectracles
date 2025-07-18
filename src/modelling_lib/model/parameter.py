@@ -68,11 +68,21 @@ class ConstrainedParameter(Module):
         fixed: bool = False,
         lower: float | None = None,
         upper: float | None = None,
+        log: bool = False,
     ):
         self.fix = fixed
 
+        # If log parameterization is requested
+        if log:
+            if lower is not None or upper is not None:
+                raise ValueError(
+                    "Cannot specify bounds (lower/upper) when log=True. "
+                    "Log parameterization already ensures positivity."
+                )
+            self.forward_transform = lambda x: log_bounded(x)
+            self.backward_transform = lambda x: log_bounded_inv(x)
         # If only lower bound
-        if lower is not None and upper is None:
+        elif lower is not None and upper is None:
             self.forward_transform = lambda x: l_bounded(x, lower)
             self.backward_transform = lambda x: l_bounded_inv(x, lower)
         # If only upper bound
@@ -86,13 +96,17 @@ class ConstrainedParameter(Module):
         # If no bounds
         else:
             raise ValueError(
-                "Either lower or upper bound must be provided, or both. For no bounds, use Parameter."
+                "Either lower or upper bound must be provided, or both, or log=True. "
+                "For no bounds, use Parameter."
             )
 
         # Initialise the unconstrained value within bounds if not provided
         init_none_flag: bool = False
         if initial is None:
             init_none_flag = True
+            # For log parameterization, default to exp(0) = 1 instead of 0
+            if log:
+                initial = 1.0
 
         # Try to initialise
         try:
@@ -101,9 +115,17 @@ class ConstrainedParameter(Module):
         except BoundsError as e:
             # Because we auto-initialised with zeros which is outside the bounds
             if init_none_flag:
-                raise BoundsError(
-                    "Attempted to auto-initialise ConstrainedParameter with zeros by default, but this lies outside provided bounds. Please provide a manual intialisation inside the bounds instead."
-                )
+                if log:
+                    raise BoundsError(
+                        "Attempted to auto-initialise log-parameterized ConstrainedParameter "
+                        "but encountered an error. Please provide a manual positive initialisation."
+                    )
+                else:
+                    raise BoundsError(
+                        "Attempted to auto-initialise ConstrainedParameter with zeros by default, "
+                        "but this lies outside provided bounds. Please provide a manual "
+                        "intialisation inside the bounds instead."
+                    )
             # Or because the user asked for an initial value outside the bounds
             else:
                 raise e
@@ -187,3 +209,18 @@ def lu_bounded_inv(f: Array, lower: float, upper: float) -> Array:
     elif jnp.any(f > upper):
         raise BoundsError("Initial value lies above upper bound.")
     return softplus_frac_inv((f - lower) / (upper - lower))
+
+
+# ==== Log parameterization functions ====
+
+
+def log_bounded(x: Array) -> Array:
+    """Transform unconstrained parameter to positive parameter via exp."""
+    return jnp.exp(x)
+
+
+def log_bounded_inv(f: Array) -> Array:
+    """Transform positive parameter to unconstrained parameter via log."""
+    if jnp.any(f <= 0):
+        raise BoundsError("Initial value must be positive for log parameterization.")
+    return jnp.log(f)
