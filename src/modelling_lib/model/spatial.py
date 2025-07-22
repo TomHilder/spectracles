@@ -99,9 +99,9 @@ class FourierGP(SpatialModel):
         return f + jnp.conj(jnp.flip(f))
 
     def prior_logpdf(self) -> Array:
-        # fw = self.kernel.feature_weights(self._freqs)
-        # jacobian = -0.5 * jnp.log(fw).sum()
-        return norm.logpdf(x=self.coefficients.val).sum()  # + 5e-1 * jacobian
+        fw = self.kernel.feature_weights(self._freqs)
+        jacobian = -0.5 * jnp.log(fw).sum()
+        return norm.logpdf(x=self.coefficients.val).sum() + jacobian
 
 
 class PerSpaxel(SpatialModel):
