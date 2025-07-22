@@ -32,7 +32,7 @@ class OptimiserFrame:
         loss_fn: Callable[..., float],
         optimiser: GradientTransformation,
         get_filter_spec_fn: Callable[[ShareModule], Callable] = get_opt_filter_spec,
-        Δloss_criterion: float = 1e5,
+        Δloss_criterion: float = None,
     ):
         # Check sensible input first
         if not isinstance(model, ShareModule):
@@ -124,16 +124,17 @@ class OptimiserFrame:
             loss.append(loss_)
 
             # Check for convergence
-            if i >= 100 and i % 50 == 0:
-                if self._check_convergence(
-                    loss_history=loss,
-                    Δloss=self.Δloss_criterion,
-                    pbar=pbar,
-                ):
-                    print(
-                        f"Early exist based on Δloss_criterion of {self.Δloss_criterion:.2e} at step {i}."
-                    )
-                    break
+            if self.Δloss_criterion is not None:
+                if i >= 100 and i % 50 == 0:
+                    if self._check_convergence(
+                        loss_history=loss,
+                        Δloss=self.Δloss_criterion,
+                        pbar=pbar,
+                    ):
+                        print(
+                            f"Early exit based on Δloss_criterion of {self.Δloss_criterion:.2e} at step {i}."
+                        )
+                        break
         # Save results
         self.opt_state = opt_state_
         self.model = model_
