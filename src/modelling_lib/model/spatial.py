@@ -115,7 +115,7 @@ class PerSpaxel(SpatialModel):
         return self.spaxel_values.val[data.idx]
 
 
-class PerIFU(SpatialModel):
+class PerIFUAndTile(SpatialModel):
     # Model parameters
     ifu_values: Parameter
 
@@ -124,3 +124,25 @@ class PerIFU(SpatialModel):
 
     def __call__(self, data: SpatialData) -> Array:
         return self.ifu_values.val[data.tile_idx, data.ifu_idx]
+
+
+class PerIFU(SpatialModel):
+    # Model parameters
+    ifu_values: Parameter
+
+    def __init__(self, n_ifus: int, ifu_values: Parameter | None = None):
+        self.ifu_values = init_parameter(ifu_values, dims=n_ifus)
+
+    def __call__(self, data: SpatialData) -> Array:
+        return self.ifu_values.val[data.ifu_idx]
+
+
+class PerTile(SpatialModel):
+    # Model parameters
+    tile_values: Parameter
+
+    def __init__(self, n_tiles: int, tile_values: Parameter | None = None):
+        self.tile_values = init_parameter(tile_values, dims=n_tiles)
+
+    def __call__(self, data: SpatialData) -> Array:
+        return self.tile_values.val[data.tile_idx]
