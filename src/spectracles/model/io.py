@@ -5,7 +5,7 @@ from warnings import catch_warnings, filterwarnings
 
 from dill import PicklingWarning, dump, load  # type: ignore[import]
 
-from modelling_lib.model.share_module import ShareModule
+from spectracles.model.share_module import ShareModule
 
 MODELFILE_EXT = ".model"
 

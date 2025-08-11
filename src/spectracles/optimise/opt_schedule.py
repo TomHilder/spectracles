@@ -8,8 +8,8 @@ import jax.numpy as jnp
 from jaxtyping import Array
 from optax import GradientTransformation  # type: ignore[import]
 
-from modelling_lib.model.share_module import ShareModule
-from modelling_lib.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
+from spectracles.model.share_module import ShareModule
+from spectracles.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
 
 ExitStrategy = Literal[None, "placeholder"]
 
@@ -195,7 +195,9 @@ class OptimiserScheduleUnsafe:
     def run_phase_by_index(self, phase_idx: int, *loss_args, **loss_kwargs) -> None:
         """Run a specific phase by index, with validation."""
         if phase_idx < 0 or phase_idx >= len(self.phases):
-            raise ValueError(f"Phase index {phase_idx} out of range [0, {len(self.phases) - 1}]")
+            raise ValueError(
+                f"Phase index {phase_idx} out of range [0, {len(self.phases) - 1}]"
+            )
 
         # Validation: can't run phases out of order
         if phase_idx > self.current_phase_index:
@@ -245,7 +247,9 @@ class OptimiserScheduleUnsafe:
         # Update the model history
         self.model_history.append(updated_model)
 
-    def run_phases(self, phase_indices: Union[int, list[int]], *loss_args, **loss_kwargs) -> None:
+    def run_phases(
+        self, phase_indices: Union[int, list[int]], *loss_args, **loss_kwargs
+    ) -> None:
         """Run multiple phases by index."""
         if isinstance(phase_indices, int):
             phase_indices = [phase_indices]
@@ -259,7 +263,9 @@ class OptimiserScheduleUnsafe:
             raise ValueError(f"Phase index {phase_idx} out of range")
 
         if phase_idx > self.current_phase_index:
-            raise RuntimeError(f"Cannot skip phase {phase_idx} - must process phases in order")
+            raise RuntimeError(
+                f"Cannot skip phase {phase_idx} - must process phases in order"
+            )
 
         if self.phase_states[phase_idx] == PhaseState.COMPLETED:
             raise RuntimeError(f"Phase {phase_idx} has already been completed")
@@ -326,11 +332,19 @@ class OptimiserScheduleUnsafe:
 
     def get_completed_phases(self) -> list[int]:
         """Get indices of all completed phases."""
-        return [i for i, state in enumerate(self.phase_states) if state == PhaseState.COMPLETED]
+        return [
+            i
+            for i, state in enumerate(self.phase_states)
+            if state == PhaseState.COMPLETED
+        ]
 
     def get_pending_phases(self) -> list[int]:
         """Get indices of all pending phases."""
-        return [i for i, state in enumerate(self.phase_states) if state == PhaseState.PENDING]
+        return [
+            i
+            for i, state in enumerate(self.phase_states)
+            if state == PhaseState.PENDING
+        ]
 
     @property
     def loss_histories(self) -> list[Array]:

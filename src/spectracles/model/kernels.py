@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from equinox import Module
 from jaxtyping import Array, ArrayLike
 
-from modelling_lib.model.parameter import Parameter
+from spectracles.model.parameter import Parameter
 
 
 def normalise_fw(fw: ArrayLike) -> Array:

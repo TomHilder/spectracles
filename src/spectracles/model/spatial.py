@@ -8,9 +8,9 @@ from jax.scipy.stats import norm
 from jax_finufft import nufft2  # type: ignore
 from jaxtyping import Array
 
-from modelling_lib.model.data import SpatialData
-from modelling_lib.model.kernels import Kernel
-from modelling_lib.model.parameter import Parameter, init_parameter
+from spectracles.model.data import SpatialData
+from spectracles.model.kernels import Kernel
+from spectracles.model.parameter import Parameter, init_parameter
 
 # NOTE: List of current obvious foot guns:
 # - n_modes must always be two odd integers, but this is not enforced

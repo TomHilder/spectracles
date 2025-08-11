@@ -17,8 +17,8 @@ from jax.tree_util import tree_map
 from optax import GradientTransformation  # type: ignore[import]
 from tqdm import tqdm
 
-from modelling_lib.model.parameter import is_parameter, is_trainable
-from modelling_lib.model.share_module import ShareModule
+from spectracles.model.parameter import is_parameter, is_trainable
+from spectracles.model.share_module import ShareModule
 
 
 def get_opt_filter_spec(model: ShareModule) -> Callable:
@@ -75,7 +75,9 @@ class OptimiserFrame:
             # Split varying and constant parts of model
             vary_model, fixed_model = partition(model, filter_spec)
             # Calculate the loss and gradients
-            loss, grad = get_loss(vary_model, fixed_model, loss_fn, *loss_args, **loss_kwargs)
+            loss, grad = get_loss(
+                vary_model, fixed_model, loss_fn, *loss_args, **loss_kwargs
+            )
             # Optimiser updates step
             updates, opt_state = optimiser.update(
                 grad,
@@ -155,7 +157,9 @@ class OptimiserFrame:
         try:
             loss_output = self.loss_fn(self.model, *loss_args, **loss_kwargs)
         except Exception as e:
-            raise ValueError("Evaluating provided loss function causes an Exception.") from e
+            raise ValueError(
+                "Evaluating provided loss function causes an Exception."
+            ) from e
         if jnp.any(jnp.isnan(loss_output)):
             raise ValueError("Loss function outputs NaN.")
 

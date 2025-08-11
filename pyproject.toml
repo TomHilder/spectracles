@@ -1,12 +1,37 @@
 [project]
-name = "modelling-lib"
-version = "0.1.0"
-description = "Add your description here"
+name = "spectracles"
+version = "0.5.0"
+description = "Unified spectrospatial models: glasses for your spectra."
 readme = "README.md"
-authors = [{ name = "Tom Hilder", email = "tom.hilder.dlhp@gmail.com" }]
+authors = [
+    { name = "Thomas Hilder", email = "Thomas.Hilder@monash.edu" },
+    { name = "Andrew R. Casey", email = "Andrew.Casey@monash.edu" },
+]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "equinox>=0.13.0",
+    "jax-finufft",
+    "jax[cpu]>=0.7.0",
+    "matplotlib>=3.10.5",
+    "networkx>=3.5",
+    "tqdm>=4.67.1",
+]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 99 # Sorry PEP8 I'm a rebel
+
+[tool.uv.sources]
+jax-finufft = { git = "https://github.com/flatironinstitute/jax-finufft.git" }
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.1",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.8",
+    "types-tqdm>=4.67.0.20250809",
+]

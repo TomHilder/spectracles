@@ -10,14 +10,9 @@ from jaxtyping import Array, PyTree
 from matplotlib.axes import Axes
 from networkx import DiGraph, draw
 
-from modelling_lib.model.graph import (
-    DEFAULT_NX_KWDS,
-    layered_hierarchy_pos,
-    print_graph,
-    # temporarily_disable_tex,
-)
-from modelling_lib.model.parameter import AnyParameter, is_constrained, is_parameter
-from modelling_lib.tree.path_utils import (
+from spectracles.model.graph import DEFAULT_NX_KWDS, layered_hierarchy_pos, print_graph
+from spectracles.model.parameter import AnyParameter, is_constrained, is_parameter
+from spectracles.tree.path_utils import (
     GetAttrKey,
     LeafPath,
     get_duplicated_leaves,
