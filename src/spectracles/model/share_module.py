@@ -294,7 +294,10 @@ class ShareModule(Module):
             labels = {n: f"{d['name']}\n({d['type']})" for n, d in graph.nodes(data=True)}
         else:
             labels = label_func(graph)
-        # draw(graph, pos, ax=ax, labels=labels, **nx_draw_kwds)
+
+        NODES = list(graph.nodes())
+        NODE_SIZE = nx_draw_kwds.get("node_size", 8000)
+
         # draw nodes & labels first (same kwargs you already pass)
         draw_networkx_nodes(
             graph,
@@ -331,7 +334,10 @@ class ShareModule(Module):
             arrows=True,
             arrowsize=nx_draw_kwds.get("arrowsize", 20),
             width=1.5,
-            # zorder=1,
+            nodelist=NODES,
+            node_size=NODE_SIZE,
+            min_target_margin=2.0,
+            min_source_margin=2.0,
         )
 
         # curved same-level edges (stagger radii so parallel arcs don’t overlap)
@@ -348,7 +354,10 @@ class ShareModule(Module):
                 style="dashed",
                 alpha=0.85,
                 width=1.2,
-                # zorder=0,
+                nodelist=NODES,
+                node_size=NODE_SIZE,
+                min_target_margin=2.0,
+                min_source_margin=2.0,
             )
         if show:
             plt.show()
