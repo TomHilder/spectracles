@@ -10,7 +10,7 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "equinox>=0.13.0",
-    "jax>=0.7.0",
+    "jax==0.5.3",
     "jax-finufft",
     "matplotlib>=3.10.5",
     "networkx>=3.5",
