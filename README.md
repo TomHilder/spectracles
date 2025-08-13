@@ -17,7 +17,7 @@
 <!--  <h3 align="center">Wakeflow</h3> -->
 
   <p align="center">
-    Glasses for your spectra: unified spectrospatial models in jax
+    Unified spectrospatial models for integral field spectroscopy in jax
   </p>
 </div>
 
@@ -25,9 +25,29 @@
 <img src="https://raw.githubusercontent.com/TomHilder/spectracles/main/logo.png" alt="spectracles" width="420"></img>
 </div> -->
 
-# Glasses for your spectra
+## Glasses for your spectra
 
-## TODO
+Spectracles is a Python library for inferring properties of IFU/IFS spectra as continuous functions of sky position.
+
+It can also be used as a general-purpose statistical model library that extends [`equinox`](https://github.com/patrick-kidger/equinox) to allow for composable models that may have *coupled* parameters. It also implements some other nice features that are a bit awkward in `equinox` out of the box, like easily updating model parameters between fixed and varying.
+
+## Installation
+
+TODO
+
+## Usage
+
+TODO
+
+## Citation
+
+TODO
+
+## Help
+
+TODO
+
+### TODO
 
 - [x] Instead of replacing shared leaves with `0`, replace with some class/object instead
 - [ ] Nicer `__repr__` for `ShareModule` that actually says the memory address
