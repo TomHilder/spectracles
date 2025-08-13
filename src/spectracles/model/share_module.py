@@ -348,7 +348,7 @@ class ShareModule(Module):
                 style="dashed",
                 alpha=0.85,
                 width=1.2,
-                zorder=0,
+                # zorder=0,
             )
         if show:
             plt.show()
