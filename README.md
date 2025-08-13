@@ -53,6 +53,8 @@ cd spectracles
 pip install -e .
 ```
 
+**Important:** `fftw` must be installed or the required dependency`jax-finufft` will fail to build.
+
 ## Usage
 
 TODO
