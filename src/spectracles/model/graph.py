@@ -52,40 +52,9 @@ def print_graph(graph: DiGraph, root_id: int, indent: str = "", is_last: bool = 
         print_graph(graph, child_id, new_indent, is_last_child)
 
 
-# def layered_hierarchy_pos(G, root, total_width=1.0, vert_gap=0.2):
-#     """NOTE: AI generated function"""
-#     from collections import defaultdict, deque
-
-#     levels = defaultdict(list)
-#     visited = set()
-#     queue = deque([(root, 0)])
-#     max_level = 0
-
-#     while queue:
-#         node, level = queue.popleft()
-#         if node in visited:
-#             continue
-#         visited.add(node)
-#         levels[level].append(node)
-#         max_level = max(max_level, level)
-#         for child in G.successors(node):
-#             queue.append((child, level + 1))
-
-#     pos = {}
-#     for level in range(max_level + 1):
-#         nodes = levels[level]
-#         n = len(nodes)
-#         gap = total_width / (n + 1)
-#         for i, node in enumerate(nodes):
-#             x = (i + 1) * gap
-#             y = -level * vert_gap
-#             pos[node] = (x, y)
-
-#     return pos
-
-
 def layered_hierarchy_pos(G: DiGraph, root, total_width: float = 1.0, vert_gap: float = 0.8):
     """
+    NOTE: AI generated function.
     Layered layout rooted at `root`.
     - Levels by BFS distance from root.
     - Within each level, order nodes by the barycenter of their parents'
