@@ -196,8 +196,8 @@ wheels = [
 
 [[package]]
 name = "jax-finufft"
-version = "1.0.2.dev7+gfd97784"
-source = { git = "https://github.com/flatironinstitute/jax-finufft.git#fd9778497db0d410416b250ec6d6b43cbe611230" }
+version = "1.0.2.dev11+gccf3309"
+source = { git = "https://github.com/flatironinstitute/jax-finufft.git#ccf3309eb388046940adf2689e3e19f5a6b3d663" }
 dependencies = [
     { name = "jax" },
     { name = "numpy" },
@@ -763,7 +763,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "equinox", specifier = ">=0.13.0" },
-    { name = "jax", extras = ["cpu"], specifier = ">=0.7.0" },
+    { name = "jax", specifier = ">=0.7.0" },
     { name = "jax-finufft", git = "https://github.com/flatironinstitute/jax-finufft.git" },
     { name = "matplotlib", specifier = ">=3.10.5" },
     { name = "networkx", specifier = ">=3.5" },
