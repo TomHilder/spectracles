@@ -70,6 +70,7 @@ TODO
 ### TODO
 
 - [ ] Relax version requirements from being strictly my environment (which is very up-to-date)
+- [ ] Migrate some stuff from the `model` subpackage to a new subpackage called `spectroscopy` or something, idea to separate generic modelling stuff from applied spectrospatial models stuff
 - [x] Instead of replacing shared leaves with `0`, replace with some class/object instead
 - [ ] Nicer `__repr__` for `ShareModule` that actually says the memory address
 - [ ] Add memory address to the top of `print_model_tree`
