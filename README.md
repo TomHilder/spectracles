@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/TomHilder/spectracles/main/transparent_logo_3.png" alt="spectracles" width="420"></img>
+<img src="https://raw.githubusercontent.com/TomHilder/spectracles/main/transparent_logo_4.png" alt="spectracles" width="420"></img>
 </div>
 
 # Glasses for your spectra
