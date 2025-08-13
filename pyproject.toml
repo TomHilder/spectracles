@@ -21,6 +21,16 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+include = ["src/spectracles/py.typed"]
+exclude = ["**/__pycache__/**"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/**", "README.md", "LICENSE"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spectracles"]
+
 [tool.ruff]
 line-length = 99 # Sorry PEP8 I'm a rebel
 
