@@ -33,7 +33,25 @@ It can also be used as a general-purpose statistical model library that extends 
 
 ## Installation
 
-TODO
+Easiest is from PyPI either with `pip`
+
+```sh
+pip install spectracles
+```
+
+or `uv` (recommended)
+
+```sh
+uv add spectracles
+```
+
+Or, you can clone and build from source
+
+```sh
+git clone git@github.com:TomHilder/spectracles.git
+cd spectracles
+pip install -e .
+```
 
 ## Usage
 
