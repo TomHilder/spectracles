@@ -8,7 +8,7 @@ from jax.tree import leaves_with_path
 from jax.tree_util import tree_map
 from jaxtyping import Array, PyTree
 from matplotlib.axes import Axes
-from networkx import DiGraph, draw
+from networkx import DiGraph, draw, draw_networkx_edges, draw_networkx_labels, draw_networkx_nodes
 
 from spectracles.model.graph import DEFAULT_NX_KWDS, layered_hierarchy_pos, print_graph
 from spectracles.model.parameter import AnyParameter, is_constrained, is_parameter
@@ -294,7 +294,62 @@ class ShareModule(Module):
             labels = {n: f"{d['name']}\n({d['type']})" for n, d in graph.nodes(data=True)}
         else:
             labels = label_func(graph)
-        draw(graph, pos, ax=ax, labels=labels, **nx_draw_kwds)
+        # draw(graph, pos, ax=ax, labels=labels, **nx_draw_kwds)
+        # draw nodes & labels first (same kwargs you already pass)
+        draw_networkx_nodes(
+            graph,
+            pos,
+            ax=ax,
+            node_size=nx_draw_kwds["node_size"],
+            node_color=nx_draw_kwds["node_color"],
+            edgecolors=nx_draw_kwds["edgecolors"],
+            linewidths=nx_draw_kwds["linewidths"],
+        )
+        draw_networkx_labels(
+            graph,
+            pos,
+            labels=labels,
+            ax=ax,
+            font_size=nx_draw_kwds.get("font_size", 8),
+            font_color=nx_draw_kwds.get("font_color", "black"),
+        )
+
+        # split edges into cross-level vs same-level
+        same_level, cross_level = [], []
+        for u, v in graph.edges():
+            if abs(pos[u][1] - pos[v][1]) < 1e-12:
+                same_level.append((u, v))
+            else:
+                cross_level.append((u, v))
+
+        # straight cross-level edges
+        draw_networkx_edges(
+            graph,
+            pos,
+            edgelist=cross_level,
+            ax=ax,
+            arrows=True,
+            arrowsize=nx_draw_kwds.get("arrowsize", 20),
+            width=1.5,
+            zorder=1,
+        )
+
+        # curved same-level edges (stagger radii so parallel arcs don’t overlap)
+        arc_rads = (0.25, 0.37, 0.49)
+        for i, e in enumerate(same_level):
+            draw_networkx_edges(
+                graph,
+                pos,
+                edgelist=[e],
+                ax=ax,
+                arrows=True,
+                arrowsize=nx_draw_kwds.get("arrowsize", 20),
+                connectionstyle=f"arc3,rad={arc_rads[i % len(arc_rads)]}",
+                style="dashed",
+                alpha=0.85,
+                width=1.2,
+                zorder=0,
+            )
         if show:
             plt.show()
 
