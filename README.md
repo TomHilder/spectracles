@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/TomHilder/spectracles/main/logo.png" alt="spectracles" width="500"></img>
 </div>
 
-Unified spectrospatial models in JAX.
+# Glasses for your spectra
 
 ## TODO
 
