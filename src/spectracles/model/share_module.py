@@ -331,7 +331,7 @@ class ShareModule(Module):
             arrows=True,
             arrowsize=nx_draw_kwds.get("arrowsize", 20),
             width=1.5,
-            zorder=1,
+            # zorder=1,
         )
 
         # curved same-level edges (stagger radii so parallel arcs don’t overlap)
