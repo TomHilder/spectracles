@@ -13,7 +13,7 @@ dependencies = [
     "jax>=0.5.3",
     "jax-finufft",
     "matplotlib>=3.10.5",
-    "networkx>=3.5",
+    "networkx>=3.4.2",
     "tqdm>=4.67.1",
 ]
 
