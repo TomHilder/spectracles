@@ -1,4 +1,4 @@
-from spectracles.model.data import SpatialDataGeneric, SpatialDataLVM
+from spectracles.model.data import SpatialData, SpatialDataGeneric, SpatialDataLVM
 from spectracles.model.io import load_model, save_model
 from spectracles.model.kernels import Kernel, Matern12, Matern32, Matern52, SquaredExponential
 from spectracles.model.parameter import AnyParameter, ConstrainedParameter, Parameter, l_bounded
@@ -11,6 +11,7 @@ from spectracles.optimise.opt_schedule import OptimiserSchedule, PhaseConfig
 __all__ = [
     "FourierGP",
     "Gaussian",
+    "SpatialData",
     "SpatialDataGeneric",
     "SpatialDataLVM",
     "PerSpaxel",
