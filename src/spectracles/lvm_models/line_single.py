@@ -24,6 +24,8 @@ A_LOWER = 0.0
 
 
 class WaveCalVelocity(SpatialModel):
+    """Per-IFU velocity calibration model based on line centre shifts."""
+
     # Model parameters
     C_v_cal: Parameter  # 2 value model parameter
     # Constants
@@ -37,16 +39,50 @@ class WaveCalVelocity(SpatialModel):
         return v_ifu_vals[data.ifu_idx]
 
 
+class EmissionLine(SpectralSpatialModel):
+    """Simple emission line model with no systematics or calibration."""
+
+    # Line centre in Angstroms
+    μ: Parameter
+
+    # Model components
+    A: SpatialModel  # Line flux
+    v: SpatialModel  # Radial velocity in rest frame in km/s
+    vσ: SpatialModel  # Broadening velocity in km/s
+
+    # Measured line quantities
+    σ_lsf: SpatialModel  # LSF width (std dev) in Angstroms
+    v_bary: SpatialModel  # Barycentric velocity correction in km/s
+
+    # Global parameters
+    v_syst: Parameter  # Systematic velocity offset in km/s
+
+    def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> Array:
+        μ_obs = self.μ_obs(spatial_data)
+        σ2_obs = self.σ2_obs(spatial_data)
+        peak = self.A(spatial_data) / jnp.sqrt(2 * jnp.pi * σ2_obs)
+        return peak * jnp.exp(-0.5 * (λ - μ_obs) ** 2 / σ2_obs)
+
+    def v_obs(self, s) -> Array:
+        return self.v(s) + self.v_syst.val - self.v_bary(s)
+
+    def μ_obs(self, s) -> Array:
+        return self.μ.val * (1 + self.v_obs(s) / C_KMS)
+
+    def σ2_obs(self, s) -> Array:
+        return (self.vσ(s) * self.μ_obs(s) / C_KMS) ** 2 + self.σ_lsf(s) ** 2
+
+
 class EmissionLineProduction(SpectralSpatialModel):
     # Line centre in Angstroms
     μ: Parameter
     # Model components / line quantities
-    A_raw: SpatialModel  # Unconstrained line flux
+    A_raw: SpatialModel  # Unconstrained line flux # TODO: refactor to A and move contraint to a positive GP class
     v: SpatialModel  # Radial velocity in rest frame in km/s
     vσ_raw: SpatialModel  # Broadening velocity in km/s before constraint
     # Measured line quantities
     σ_lsf: SpatialModel  # LSF width (std dev) in Angstroms
-    v_bary: SpatialModel  # Barycentric velocity CORRECTION in km/s
+    v_bary: SpatialModel  # Barycentric velocity correction in km/s
     # Systematics
     v_syst: Parameter  # Systematic velocity offset in km/s
     v_cal: WaveCalVelocity  # Per-IFU Velocity calibration offset in km/s
