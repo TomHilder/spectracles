@@ -73,6 +73,40 @@ class EmissionLine(SpectralSpatialModel):
         return (self.vσ(s) * self.μ_obs(s) / C_KMS) ** 2 + self.σ_lsf(s) ** 2
 
 
+class LinkedEmissionLine(SpectralSpatialModel):
+    """Emission line where the velocity and broadening are linked to another line."""
+
+    # Line centre in Angstroms
+    μ: Parameter
+
+    # Model components
+    A: SpatialModel  # Line flux
+
+    # Parent line
+    parent_line: EmissionLine
+
+    # Measured line quantities
+    σ_lsf: SpatialModel  # LSF width (std dev) in Angstrom
+    v_bary: SpatialModel  # Barycentric velocity correction in km/s
+
+    # Global parameters
+    v_syst: Parameter  # Systematic velocity offset in km/s
+
+    def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> Array:
+        μ_obs = self.μ_obs(spatial_data)
+        σ2_obs = self.σ2_obs(spatial_data)
+        peak = self.A(spatial_data) / jnp.sqrt(2 * jnp.pi * σ2_obs)
+        return peak * jnp.exp(-0.5 * (λ - μ_obs) ** 2 / σ2_obs)
+
+    def μ_obs(self, s) -> Array:
+        v_parent = self.parent_line.v_obs(s)
+        return self.μ.val * (1 + v_parent / C_KMS)
+
+    def σ2_obs(self, s) -> Array:
+        vσ_parent = self.parent_line.vσ(s)
+        return (vσ_parent * self.μ_obs(s) / C_KMS) ** 2 + self.σ_lsf(s) ** 2
+
+
 class EmissionLineProduction(SpectralSpatialModel):
     # Line centre in Angstroms
     μ: Parameter
