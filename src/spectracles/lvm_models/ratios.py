@@ -2,7 +2,7 @@
 
 from jaxtyping import Array
 
-from spectracles import AnyParameter, Parameter, PerSpaxel, SpatialDataLVM, SpatialModel
+from spectracles import AnyParameter, PerSpaxel, SpatialDataLVM, SpatialModel
 from spectracles.model.kernels import Kernel
 
 from .fields import FieldFromRatio, GPField, PositiveGPField
@@ -33,15 +33,23 @@ class LineRatioModel(SpatialModel):
         v_kernel: Kernel,
         vσ_kernel: Kernel,
         r_kernel: Kernel,
+        r_mean_log10: AnyParameter,
     ):
+        # Barycentric correction and LSF as per-spaxel sub-models
+        # Very likely these will be fixed (σ_lsf_1, σ_lsf_2v_bary as Known)
+        # But we leave it general
+        v_bary_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=v_bary)
+        σ_lsf_1_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_1)
+        σ_lsf_2_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_2)
+
         # Emission lines
         self.line_1 = EmissionLine(
             μ=μ_1,
             A=PositiveGPField(kernel=A_kernel, n_modes=n_modes),
             v=GPField(kernel=v_kernel, n_modes=n_modes),
             vσ=PositiveGPField(kernel=vσ_kernel, n_modes=n_modes),
-            σ_lsf=σ_lsf_1,
-            v_bary=v_bary,
+            σ_lsf=σ_lsf_1_,
+            v_bary=v_bary_,
             v_syst=v_syst,
         )
         self.line_2 = EmissionLine(
@@ -49,11 +57,12 @@ class LineRatioModel(SpatialModel):
             A=FieldFromRatio(
                 base_field=self.line_1.A,
                 log10_ratio_field=GPField(kernel=r_kernel, n_modes=n_modes),
+                log10_ratio_mean=r_mean_log10,
             ),
             v=self.line_1.v,
             vσ=self.line_1.vσ,
-            σ_lsf=σ_lsf_2,
-            v_bary=v_bary,
+            σ_lsf=σ_lsf_2_,
+            v_bary=v_bary_,
             v_syst=v_syst,
         )
         # Local continuum to each line
