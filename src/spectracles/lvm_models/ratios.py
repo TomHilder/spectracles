@@ -3,7 +3,7 @@
 from jaxtyping import Array
 
 from spectracles import Parameter, PerSpaxel, SpatialDataLVM, SpatialModel
-from spectracles.model.spatial import PerTile
+from spectracles.model.kernels import Kernel
 
 from .fields import FieldFromRatio, GPField, PositiveGPField
 from .line_single import EmissionLine, LinkedEmissionLine
@@ -21,39 +21,34 @@ class LineRatioModel(SpatialModel):
 
     def __init__(
         self,
+        n_spaxels: int,
+        n_modes: tuple[int, int],
         μ_1: Parameter,
         μ_2: Parameter,
         σ_lsf_1: Parameter,
         σ_lsf_2: Parameter,
         v_bary: Parameter,
         v_syst: Parameter,
+        A_kernel: Kernel,
+        v_kernel: Kernel,
+        vσ_kernel: Kernel,
+        r_kernel: Kernel,
     ):
         # Emission lines
         self.line_1 = EmissionLine(
             μ=μ_1,
-            A=PositiveGPField(...),
-            v=GPField(...),
-            vσ=PositiveGPField(...),
+            A=PositiveGPField(kernel=A_kernel, n_modes=n_modes),
+            v=GPField(kernel=v_kernel, n_modes=n_modes),
+            vσ=PositiveGPField(kernel=vσ_kernel, n_modes=n_modes),
             σ_lsf=σ_lsf_1,
             v_bary=v_bary,
             v_syst=v_syst,
         )
-        # self.line_2 = LinkedEmissionLine(
-        #     μ=μ_2,
-        #     A=FieldFromRatio(
-        #         base_field=self.line_1.A,
-        #         log10_ratio_field=GPField(...),
-        #     ),
-        #     parent_line=self.line_1,
-        #     σ_lsf=σ_lsf_2,
-        #     v_bary=v_bary,
-        #     v_syst=v_syst,
-        # )
         self.line_2 = EmissionLine(
             μ=μ_2,
             A=FieldFromRatio(
                 base_field=self.line_1.A,
-                log10_ratio_field=GPField(...),
+                log10_ratio_field=GPField(kernel=r_kernel, n_modes=n_modes),
             ),
             v=self.line_1.v,
             vσ=self.line_1.vσ,
@@ -62,7 +57,11 @@ class LineRatioModel(SpatialModel):
             v_syst=v_syst,
         )
         # Local continuum to each line
-        self.cont = PerSpaxel(...)
+        self.cont = PerSpaxel(n_spaxels=n_spaxels)
+
+    # Convenience function
+    def log10_ratio(self, spatial_data: SpatialDataLVM):
+        return self.line_2.A.log10_ratio_field(spatial_data)
 
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> tuple[Array, Array]:
         """Return the model flux for both lines at the given wavelengths and spatial data."""

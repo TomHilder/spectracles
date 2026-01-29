@@ -29,6 +29,7 @@ class PositiveGPField(SpatialModel):
     """A spatial field model represented by an underlying Gaussian Process constrained to be positive with a zero or tiny lower bound. Uses the softplus transformation to ensure positivity."""
 
     gp: FourierGP
+    lower: float
 
     def __init__(
         self,
