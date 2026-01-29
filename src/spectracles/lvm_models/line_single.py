@@ -5,6 +5,7 @@ import jax.numpy as jnp
 from jaxtyping import Array
 
 from spectracles import (
+    AnyParameter,
     Constant,
     FourierGP,
     Kernel,
@@ -27,9 +28,9 @@ class WaveCalVelocity(SpatialModel):
     """Per-IFU velocity calibration model based on line centre shifts."""
 
     # Model parameters
-    C_v_cal: Parameter  # 2 value model parameter
+    C_v_cal: AnyParameter  # 2 value model parameter
     # Constants
-    μ: Parameter  # line centre in Angstroms
+    μ: AnyParameter  # line centre in Angstroms
 
     def __call__(self, data: SpatialData) -> Array:
         v0 = 0.0  # effectively pinned to v_syst
@@ -43,7 +44,7 @@ class EmissionLine(SpectralSpatialModel):
     """Simple emission line model with no systematics or calibration."""
 
     # Line centre in Angstroms
-    μ: Parameter
+    μ: AnyParameter
 
     # Model components
     A: SpatialModel  # Line flux
@@ -55,7 +56,7 @@ class EmissionLine(SpectralSpatialModel):
     v_bary: SpatialModel  # Barycentric velocity correction in km/s
 
     # Global parameters
-    v_syst: Parameter  # Systematic velocity offset in km/s
+    v_syst: AnyParameter  # Systematic velocity offset in km/s
 
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> Array:
         μ_obs = self.μ_obs(spatial_data)
@@ -77,7 +78,7 @@ class LinkedEmissionLine(SpectralSpatialModel):
     """Emission line where the velocity and broadening are linked to another line."""
 
     # Line centre in Angstroms
-    μ: Parameter
+    μ: AnyParameter
 
     # Model components
     A: SpatialModel  # Line flux
@@ -90,7 +91,7 @@ class LinkedEmissionLine(SpectralSpatialModel):
     v_bary: SpatialModel  # Barycentric velocity correction in km/s
 
     # Global parameters
-    v_syst: Parameter  # Systematic velocity offset in km/s
+    v_syst: AnyParameter  # Systematic velocity offset in km/s
 
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> Array:
         μ_obs = self.μ_obs(spatial_data)
@@ -109,7 +110,7 @@ class LinkedEmissionLine(SpectralSpatialModel):
 
 class EmissionLineProduction(SpectralSpatialModel):
     # Line centre in Angstroms
-    μ: Parameter
+    μ: AnyParameter
     # Model components / line quantities
     A_raw: SpatialModel  # Unconstrained line flux # TODO: refactor to A and move contraint to a positive GP class
     v: SpatialModel  # Radial velocity in rest frame in km/s
@@ -118,7 +119,7 @@ class EmissionLineProduction(SpectralSpatialModel):
     σ_lsf: SpatialModel  # LSF width (std dev) in Angstroms
     v_bary: SpatialModel  # Barycentric velocity correction in km/s
     # Systematics
-    v_syst: Parameter  # Systematic velocity offset in km/s
+    v_syst: AnyParameter  # Systematic velocity offset in km/s
     v_cal: WaveCalVelocity  # Per-IFU Velocity calibration offset in km/s
     f_cal_raw: SpatialModel  # Flux calibration factor per tile
 
@@ -157,17 +158,17 @@ class LVMModelSingle(SpectralSpatialModel):
         self,
         n_tiles: int,
         n_spaxels: int,
-        offsets: Parameter,
-        line_centre: Parameter,
+        offsets: AnyParameter,
+        line_centre: AnyParameter,
         n_modes: tuple[int, int],
         A_kernel: Kernel,
         v_kernel: Kernel,
         σ_kernel: Kernel,
-        σ_lsf: Parameter,
-        v_bary: Parameter,
-        v_syst: Parameter,
-        C_v_cal: Parameter,  # MUST be 2 values i.e. shape is (2,)
-        f_cal_unconstrained: Parameter,
+        σ_lsf: AnyParameter,
+        v_bary: AnyParameter,
+        v_syst: AnyParameter,
+        C_v_cal: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
+        f_cal_unconstrained: AnyParameter,
     ):
         self.offs = Constant(const=PerSpaxel(n_spaxels=n_spaxels, spaxel_values=offsets))
         self.line = EmissionLineProduction(

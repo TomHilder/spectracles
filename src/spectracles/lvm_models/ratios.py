@@ -2,7 +2,7 @@
 
 from jaxtyping import Array
 
-from spectracles import Parameter, PerSpaxel, SpatialDataLVM, SpatialModel
+from spectracles import AnyParameter, Parameter, PerSpaxel, SpatialDataLVM, SpatialModel
 from spectracles.model.kernels import Kernel
 
 from .fields import FieldFromRatio, GPField, PositiveGPField
@@ -23,12 +23,12 @@ class LineRatioModel(SpatialModel):
         self,
         n_spaxels: int,
         n_modes: tuple[int, int],
-        μ_1: Parameter,
-        μ_2: Parameter,
-        σ_lsf_1: Parameter,
-        σ_lsf_2: Parameter,
-        v_bary: Parameter,
-        v_syst: Parameter,
+        μ_1: AnyParameter,
+        μ_2: AnyParameter,
+        σ_lsf_1: AnyParameter,
+        σ_lsf_2: AnyParameter,
+        v_bary: AnyParameter,
+        v_syst: AnyParameter,
         A_kernel: Kernel,
         v_kernel: Kernel,
         vσ_kernel: Kernel,

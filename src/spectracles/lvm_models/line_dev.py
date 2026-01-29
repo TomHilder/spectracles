@@ -6,9 +6,9 @@ import jax.numpy as jnp
 from jaxtyping import Array
 
 from spectracles import (
+    AnyParameter,
     FourierGP,
     Kernel,
-    Parameter,
     PerSpaxel,
     SpatialDataLVM,
     SpatialModel,
@@ -61,9 +61,9 @@ def hermite6(x: Array) -> Array:
 
 class WaveCalVelocity(SpatialModel):
     # Model parameters
-    C_v_cal: Parameter  # 2 value model parameter
+    C_v_cal: AnyParameter  # 2 value model parameter
     # Constants
-    μ: Parameter  # line centre in Angstroms
+    μ: AnyParameter  # line centre in Angstroms
 
     def __call__(self, s: SpatialData) -> Array:
         v0 = 0.0  # effectively pinned to v_syst
@@ -104,7 +104,7 @@ class FluxCalFactor(SpatialModel):
 class StellarContinuum(SpatialModel):
     offs: PerSpaxel
 
-    def __init__(self, n_spaxels: int, offs: Parameter):
+    def __init__(self, n_spaxels: int, offs: AnyParameter):
         self.offs = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=offs)
 
     def __call__(self, s: SpatialDataLVM) -> Array:
@@ -114,7 +114,7 @@ class StellarContinuum(SpatialModel):
 class LSFScatter(SpatialModel):
     Δσ_lsf: PerSpaxel
 
-    def __init__(self, n_spaxels: int, delta_sigma_lsf: Parameter):
+    def __init__(self, n_spaxels: int, delta_sigma_lsf: AnyParameter):
         self.Δσ_lsf = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=delta_sigma_lsf)
 
     def __call__(self, s: SpatialDataLVM) -> Array:
@@ -124,7 +124,7 @@ class LSFScatter(SpatialModel):
 class LineFluxScatter(SpatialModel):
     ΔA: PerSpaxel
 
-    def __init__(self, n_spaxels: int, delta_A: Parameter):
+    def __init__(self, n_spaxels: int, delta_A: AnyParameter):
         self.ΔA = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=delta_A)
 
     def __call__(self, s: SpatialDataLVM) -> Array:
@@ -134,7 +134,7 @@ class LineFluxScatter(SpatialModel):
 class VelocityScatter(SpatialModel):
     Δv: PerSpaxel
 
-    def __init__(self, n_spaxels: int, delta_v: Parameter):
+    def __init__(self, n_spaxels: int, delta_v: AnyParameter):
         self.Δv = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=delta_v)
 
     def __call__(self, s: SpatialDataLVM) -> Array:
@@ -145,8 +145,8 @@ class SmoothContinuum(SpatialModel):
     # Model components
     A_raw: SpatialModel  # Unconstrained line flux, shared with the emission line
     cont_residual_raw: SpatialModel  # "residual" GP part of the continuum
-    eps_1: Parameter  # Continuum level as a fraction of line peak
-    eps_2: Parameter  # Continuum level for residual GP (as a fraction of line peak if sharing kernel with A_raw, effectively scales down the variance)
+    eps_1: AnyParameter  # Continuum level as a fraction of line peak
+    eps_2: AnyParameter  # Continuum level for residual GP (as a fraction of line peak if sharing kernel with A_raw, effectively scales down the variance)
 
     def __call__(self, s: SpatialDataLVM) -> Array:
         return self.eps_1.val * self.A(s) + self.eps_2.val * self.cont_residual(s)
@@ -185,7 +185,7 @@ class SkyBackground(SpatialModel):
 
 
 class CrossTalk(eqx.Module):
-    η: Parameter  # Amount of cross-talk
+    η: AnyParameter  # Amount of cross-talk
 
     n_tiles: int  # Number of tiles/pointings
     n_fibres: int  # Number of fibres per pointing (MORE than 1801)
@@ -240,12 +240,12 @@ class CrossTalk(eqx.Module):
 
 class EmissionLine(SpectralSpatialModel):
     # Line centre in Angstroms
-    μ: Parameter
+    μ: AnyParameter
     # Model components / line quantities
     A_raw: SpatialModel  # Unconstrained line flux
     v: SpatialModel  # Radial velocity in rest frame in km/s
     vσ_raw: SpatialModel  # Broadening velocity in km/s before constraint
-    vσ_raw_mean: Parameter  # Mean of vσ_raw GP
+    vσ_raw_mean: AnyParameter  # Mean of vσ_raw GP
     # Scatter in line quantities
     ΔA: SpatialModel  # Line flux scatter
     Δv: SpatialModel  # Velocity scatter
@@ -253,17 +253,17 @@ class EmissionLine(SpectralSpatialModel):
     σ_lsf: SpatialModel  # LSF width (std dev) in Angstroms
     v_bary: SpatialModel  # Barycentric velocity CORRECTION in km/s
     # Systematics
-    v_syst: Parameter  # Systematic velocity offset in km/s
+    v_syst: AnyParameter  # Systematic velocity offset in km/s
     v_cal: WaveCalVelocity  # Per-IFU Velocity calibration offset in km/s
     Δσ_lsf: SpatialModel  # LSF scatter in Angstroms
     h3_raw: SpatialModel  # Skewness per-spaxel
-    h3_max: Parameter  # max h3
+    h3_max: AnyParameter  # max h3
     h4_raw: SpatialModel  # Kurtosis per-spaxel
-    h4_max: Parameter  # max h4
+    h4_max: AnyParameter  # max h4
     h5_raw: SpatialModel
-    h5_max: Parameter
-    h6_raw: Parameter
-    h6_max: Parameter
+    h5_max: AnyParameter
+    h6_raw: AnyParameter
+    h6_max: AnyParameter
 
     def __call__(self, λ: Array, s: SpatialDataLVM) -> Array:
         μ_obs = self.μ_obs(s)
@@ -333,35 +333,35 @@ class LVMModelSingle(SpectralSpatialModel):
         self,
         n_tiles: int,
         n_spaxels: int,
-        offsets: Parameter,
-        line_centre: Parameter,
+        offsets: AnyParameter,
+        line_centre: AnyParameter,
         n_modes: tuple[int, int],
         A_kernel: Kernel,
         v_kernel: Kernel,
         σ_kernel: Kernel,
-        σ_lsf: Parameter,
-        v_bary: Parameter,
-        v_syst: Parameter,
-        C_v_cal: Parameter,  # MUST be 2 values i.e. shape is (2,)
-        f_cal_unconstrained: Parameter,
-        delta_f_cal_unconstrained: Parameter,
-        eps_1: Parameter,  # Continuum level as a fraction of line peak
-        eps_2: Parameter,  # Continuum residual GP level as a fraction of line peak level
-        sky_level: Parameter,
-        delta_sky_level: Parameter,
-        Δσ_lsf: Parameter,
-        ΔA: Parameter,
-        Δv: Parameter,
-        vσ_raw_mean: Parameter,
-        h3_raw: Parameter,
-        h3_max: Parameter,
-        h4_raw: Parameter,
-        h4_max: Parameter,
-        h5_raw: Parameter,
-        h5_max: Parameter,
-        h6_raw: Parameter,
-        h6_max: Parameter,
-        η_ct: Parameter,
+        σ_lsf: AnyParameter,
+        v_bary: AnyParameter,
+        v_syst: AnyParameter,
+        C_v_cal: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
+        f_cal_unconstrained: AnyParameter,
+        delta_f_cal_unconstrained: AnyParameter,
+        eps_1: AnyParameter,  # Continuum level as a fraction of line peak
+        eps_2: AnyParameter,  # Continuum residual GP level as a fraction of line peak level
+        sky_level: AnyParameter,
+        delta_sky_level: AnyParameter,
+        Δσ_lsf: AnyParameter,
+        ΔA: AnyParameter,
+        Δv: AnyParameter,
+        vσ_raw_mean: AnyParameter,
+        h3_raw: AnyParameter,
+        h3_max: AnyParameter,
+        h4_raw: AnyParameter,
+        h4_max: AnyParameter,
+        h5_raw: AnyParameter,
+        h5_max: AnyParameter,
+        h6_raw: AnyParameter,
+        h6_max: AnyParameter,
+        η_ct: AnyParameter,
     ):
         # Latent GPs for line properties
         A_raw_ = FourierGP(n_modes=n_modes, kernel=A_kernel)

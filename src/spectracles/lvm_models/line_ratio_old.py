@@ -5,6 +5,7 @@ import jax.numpy as jnp
 from jaxtyping import Array
 
 from spectracles import (
+    AnyParameter,
     Constant,
     FourierGP,
     Kernel,
@@ -25,8 +26,8 @@ A_LOWER = 0.0
 
 class TwoLinesByRatio(SpectralSpatialModel):
     # Line centre in Angstroms
-    μ_1: Parameter
-    μ_2: Parameter
+    μ_1: AnyParameter
+    μ_2: AnyParameter
     # Model components for line 1
     A_raw_1: SpatialModel
     v_1: SpatialModel
@@ -41,8 +42,8 @@ class TwoLinesByRatio(SpectralSpatialModel):
     σ_lsf_2: SpatialModel
     v_bary: SpatialModel
     # Systematics
-    v_syst_1: Parameter
-    v_syst_2: Parameter
+    v_syst_1: AnyParameter
+    v_syst_2: AnyParameter
     v_cal_1: WaveCalVelocity
     v_cal_2: WaveCalVelocity
     f_cal_raw: SpatialModel
@@ -106,10 +107,10 @@ class LVMModelRatio(SpectralSpatialModel):
         self,
         n_tiles: int,
         n_spaxels: int,
-        offsets: Parameter,
-        ratio_offsets: Parameter,
-        line_centre_1: Parameter,
-        line_centre_2: Parameter,
+        offsets: AnyParameter,
+        ratio_offsets: AnyParameter,
+        line_centre_1: AnyParameter,
+        line_centre_2: AnyParameter,
         n_modes: tuple[int, int],
         A_1_kernel: Kernel,
         r_2_kernel: Kernel,
@@ -117,13 +118,13 @@ class LVMModelRatio(SpectralSpatialModel):
         v_2_kernel: Kernel,
         σ_1_kernel: Kernel,
         σ_2_kernel: Kernel,
-        σ_lsf_1: Parameter,
-        σ_lsf_2: Parameter,
-        v_bary: Parameter,
-        v_syst_1: Parameter,
-        v_syst_2: Parameter,
-        C_v_cal: Parameter,  # MUST be 2 values i.e. shape is (2,)
-        f_cal_unconstrained: Parameter,
+        σ_lsf_1: AnyParameter,
+        σ_lsf_2: AnyParameter,
+        v_bary: AnyParameter,
+        v_syst_1: AnyParameter,
+        v_syst_2: AnyParameter,
+        C_v_cal: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
+        f_cal_unconstrained: AnyParameter,
     ):
         self.offs = Constant(const=PerSpaxel(n_spaxels=n_spaxels, spaxel_values=offsets))
         self.lines = TwoLinesByRatio(

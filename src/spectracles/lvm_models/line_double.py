@@ -5,6 +5,7 @@ import jax.numpy as jnp
 from jaxtyping import Array
 
 from spectracles import (
+    AnyParameter,
     Constant,
     FourierGP,
     Kernel,
@@ -25,8 +26,8 @@ A_LOWER = 0.0
 
 class EmissionLineDouble(SpectralSpatialModel):
     # Line centre in Angstroms
-    μ_1: Parameter
-    μ_2: Parameter
+    μ_1: AnyParameter
+    μ_2: AnyParameter
     # Model components / line quantities
     A_raw_1: SpatialModel
     A_raw_2: SpatialModel
@@ -37,7 +38,7 @@ class EmissionLineDouble(SpectralSpatialModel):
     σ_lsf_2: SpatialModel
     v_bary: SpatialModel
     # Systematics
-    v_syst: Parameter
+    v_syst: AnyParameter
     v_cal_1: WaveCalVelocity
     v_cal_2: WaveCalVelocity
     f_cal_raw: SpatialModel
@@ -94,20 +95,20 @@ class LVMModelDouble(SpectralSpatialModel):
         self,
         n_tiles: int,
         n_spaxels: int,
-        offsets: Parameter,
-        line_centre_1: Parameter,
-        line_centre_2: Parameter,
+        offsets: AnyParameter,
+        line_centre_1: AnyParameter,
+        line_centre_2: AnyParameter,
         n_modes: tuple[int, int],
         A_kernel_1: Kernel,
         A_kernel_2: Kernel,
         v_kernel: Kernel,
         σ_kernel: Kernel,
-        σ_lsf_1: Parameter,
-        σ_lsf_2: Parameter,
-        v_bary: Parameter,
-        v_syst: Parameter,
-        C_v_cal: Parameter,  # MUST be 2 values i.e. shape is (2,)
-        f_cal_unconstrained: Parameter,
+        σ_lsf_1: AnyParameter,
+        σ_lsf_2: AnyParameter,
+        v_bary: AnyParameter,
+        v_syst: AnyParameter,
+        C_v_cal: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
+        f_cal_unconstrained: AnyParameter,
     ):
         self.offs = Constant(const=PerSpaxel(n_spaxels=n_spaxels, spaxel_values=offsets))
         self.line = EmissionLineDouble(
