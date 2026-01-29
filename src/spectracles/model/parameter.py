@@ -45,8 +45,8 @@ class Parameter(Module):
 
     def __init__(
         self,
-        dims: int | tuple | None = None,
         initial: Array | None = None,
+        dims: int | tuple | None = None,
         fixed: bool = False,
     ):
         self.fix = fixed
@@ -63,8 +63,8 @@ class ConstrainedParameter(Module):
 
     def __init__(
         self,
-        dims: int | tuple | None = None,
         initial: Array | None = None,
+        dims: int | tuple | None = None,
         fixed: bool = False,
         lower: float | None = None,
         upper: float | None = None,
@@ -142,6 +142,17 @@ class ConstrainedParameter(Module):
 
 
 AnyParameter = Parameter | ConstrainedParameter
+
+
+class Known(Parameter):
+    """A known value that will never be optimised."""
+
+    def __init__(
+        self,
+        value: float | Array | None = None,
+        dims: int | tuple | None = None,
+    ):
+        super().__init__(initial=value, dims=dims, fixed=True)
 
 
 def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:
