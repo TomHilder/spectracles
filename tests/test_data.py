@@ -1,8 +1,8 @@
-"""test_data.py - tests for the modelling_lib.model.data module."""
+"""test_data.py - tests for the spectracles.model.data module."""
 
 import jax.numpy as jnp
 import numpy as np
-from modelling_lib.model.data import SpatialDataGeneric, convert_to_flat_array
+from spectracles.model.data import SpatialDataGeneric, convert_to_flat_array
 
 
 class TestConvertToFlatArray:

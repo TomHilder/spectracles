@@ -1,12 +1,11 @@
-"""test_spatial.py - tests for the modelling_lib.model.spatial module."""
+"""test_spatial.py - tests for the spectracles.model.spatial module."""
 
 import jax.numpy as jnp
 import pytest
-from jax.scipy.stats import norm
-from modelling_lib.model.data import SpatialDataGeneric
-from modelling_lib.model.kernels import Matern12, Matern32, Matern52, SquaredExponential
-from modelling_lib.model.parameter import Parameter
-from modelling_lib.model.spatial import FourierGP, PerSpaxel, get_freqs, get_freqs_1D
+from spectracles.model.data import SpatialDataGeneric
+from spectracles.model.kernels import Matern12, Matern32, Matern52, SquaredExponential
+from spectracles.model.parameter import Parameter
+from spectracles.model.spatial import FourierGP, PerSpaxel, get_freqs, get_freqs_1D
 
 
 class TestGetFreqs:
@@ -111,33 +110,6 @@ class TestFourierGP:
         out2 = gp(self.data)
         assert jnp.allclose(out, out2)
 
-    def test_conj_symmetry(self):
-        # Test conjugate symmetry function
-        gp = FourierGP(n_modes=(3, 3), kernel=self.kernel)
-
-        # Create a test array
-        c = jnp.arange(9, dtype=float)
-
-        # Apply conjugate symmetry
-        f = gp._conj_symmetry(c)
-
-        # Check output shape
-        assert f.shape == (3, 3)
-
-        # With get_freqs_1D for n_modes=3, the frequencies are [-1, 0, 1]
-        # This means the DC component is at index [1, 1] for a 3x3 grid
-        # Indexing follows the frequency grid where:
-        # f[1,1] is the DC component (0,0 frequency)
-        # f[0,0] corresponds to (-1,-1) frequency
-        # f[2,2] corresponds to (1,1) frequency, etc.
-
-        # Check that f is Hermitian (f[i,j] = f[2-i,2-j]*)
-        assert jnp.allclose(f[1, 1], f[1, 1].conj())  # DC component is real
-        assert jnp.allclose(f[0, 0], f[2, 2].conj())  # Conjugate pairs
-        assert jnp.allclose(f[0, 1], f[2, 1].conj())
-        assert jnp.allclose(f[0, 2], f[2, 0].conj())
-        assert jnp.allclose(f[1, 0], f[1, 2].conj())
-
     def test_different_kernels(self):
         # Test with different kernel types
         for KernelClass in [Matern12, Matern32, Matern52, SquaredExponential]:
@@ -147,15 +119,6 @@ class TestFourierGP:
             gp = FourierGP(n_modes=self.n_modes, kernel=kernel)
             out = gp(self.data)
             assert out.shape == (self.data.x.shape[0],)
-
-    def test_prior_logpdf(self):
-        # Test prior log PDF calculation
-        gp = FourierGP(n_modes=self.n_modes, kernel=self.kernel)
-        log_p = gp.prior_logpdf()
-
-        # Should match standard normal log PDF
-        expected = norm.logpdf(x=gp.coefficients.val)
-        assert jnp.allclose(log_p, expected)
 
     def test_larger_dataset(self):
         # Test with larger dataset

@@ -1,9 +1,9 @@
-"""test_parameters.py - tests for the modelling_lib.model.parameter module."""
+"""test_parameters.py - tests for the spectracles.model.parameter module."""
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from modelling_lib.model.parameter import (
+from spectracles.model.parameter import (
     BoundsError,
     ConstrainedParameter,
     Parameter,

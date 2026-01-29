@@ -1,8 +1,8 @@
-"""test.io - tests for the modelling_lib.model.io module."""
+"""test.io - tests for the spectracles.model.io module."""
 
 import pytest
-from modelling_lib.model.io import MODELFILE_EXT, load_model, save_model
-from modelling_lib.model.share_module import ShareModule, build_model
+from spectracles.model.io import MODELFILE_EXT, load_model, save_model
+from spectracles.model.share_module import ShareModule, build_model
 
 from .test_models import ComplexSharedModel, SimpleModel
 

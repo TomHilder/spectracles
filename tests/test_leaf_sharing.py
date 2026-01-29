@@ -1,12 +1,12 @@
-"""test_leaf_sharing.py - tests for the modelling_lib.model.share_module module. (share_module refers to Equinox Module objects not Python modules)"""
+"""test_leaf_sharing.py - tests for the spectracles.model.share_module module. (share_module refers to Equinox Module objects not Python modules)"""
 
 import equinox as eqx
 import jax.numpy as jnp
 import pytest
 from equinox import is_array
 from jax.tree_util import tree_map
-from modelling_lib.model.parameter import Parameter
-from modelling_lib.model.share_module import (
+from spectracles.model.parameter import Parameter
+from spectracles.model.share_module import (
     Shared,
     ShareModule,
     build_model,
@@ -15,7 +15,7 @@ from modelling_lib.model.share_module import (
     parent_model,
     use_paths_get_leaves,
 )
-from modelling_lib.tree.path_utils import (
+from spectracles.tree.path_utils import (
     use_path_get_leaf,  # TODO: this test should be in test_path_utils.py
 )
 
