@@ -253,6 +253,32 @@ class ShareModule(Module):
         cls = type(self)
         return cls(copied_model, locked=self._locked)
 
+    def get_sharing_summary(self) -> dict[str, list[str]]:
+        """
+        Get a summary of which parameters are shared with which.
+
+        Returns:
+            A dictionary mapping parent parameter paths (strings) to lists of
+            child parameter paths that share the same value. Only parameters
+            that are actually shared (have duplicates) are included.
+
+        Example:
+            >>> model.get_sharing_summary()
+            {'line_1.v.coefficients.val': ['line_2.v.coefficients.val']}
+        """
+        from collections import defaultdict
+
+        # Build a mapping from parent path to list of duplicate paths
+        summary: dict[str, list[str]] = defaultdict(list)
+
+        for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
+            parent_path = self._parent_leaf_paths[dupl_id]
+            parent_path_str = leafpath_to_str(parent_path)
+            dupl_path_str = leafpath_to_str(dupl_path)
+            summary[parent_path_str].append(dupl_path_str)
+
+        return dict(summary)
+
     def set(self, params: list[str], values: list[Array]) -> Self:
         """
         Return a new model with updated parameter values. Can only be used to update values of Parameters or ConstrainedParameters. The model must not be locked.

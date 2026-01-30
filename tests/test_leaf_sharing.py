@@ -260,6 +260,49 @@ def assert_array_equal_but_different(x, y):
     pass
 
 
+class TestSharingSummary:
+    def test_get_sharing_summary_simple(self):
+        # Simple model with one shared parameter
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        summary = shared_model.get_sharing_summary()
+
+        # Should have one parent with one duplicate
+        assert len(summary) == 1
+        assert "a.val" in summary
+        assert summary["a.val"] == ["b.val"]
+
+    def test_get_sharing_summary_complex(self):
+        # Complex model with multiple shared parameters
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+
+        summary = shared_model.get_sharing_summary()
+
+        # Should have one parent (inner1.param.val) with multiple duplicates
+        assert len(summary) == 1
+        parent_path = list(summary.keys())[0]
+        assert "inner1.param.val" == parent_path
+
+        # Should have 3 duplicates: param.val, inner2.param.val, inner3.inner1.param.val
+        duplicates = summary[parent_path]
+        assert len(duplicates) == 3
+        assert "param.val" in duplicates
+        assert "inner2.param.val" in duplicates
+        assert "inner3.inner1.param.val" in duplicates
+
+    def test_get_sharing_summary_no_sharing(self):
+        # Model with no shared parameters
+        model = SimpleModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        summary = shared_model.get_sharing_summary()
+
+        # Should be empty
+        assert summary == {}
+
+
 class TestBuildAndParentModel:
     def test_build_model(self):
         # Test building a model

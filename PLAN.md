@@ -101,6 +101,11 @@ Improvements to make designing, implementing, and debugging models easier withou
 - Test both positive cases and edge cases
 - Ensure backwards compatibility
 
+## Documentation
+
+- Update README.md with relevant usage examples as features are added
+- Keep documentation minimal but useful
+
 ## Commit Strategy
 
 Each phase should be a separate commit with clear message:
