@@ -53,49 +53,6 @@ pip install -e .
 
 **Note:** `fftw` must be installed or the dependency `jax-finufft` will fail to build.
 
-## Quick Start
-
-```python
-import spectracles as sp
-import jax.numpy as jnp
-
-# Define your model as an equinox Module with Parameters
-class MyModel(eqx.Module):
-    amplitude: sp.Parameter
-    scale: sp.Parameter
-
-    def __init__(self):
-        self.amplitude = sp.Parameter(initial=1.0)
-        self.scale = sp.Parameter(initial=1.0)
-
-    def __call__(self, x):
-        return self.amplitude.val * jnp.sin(self.scale.val * x)
-
-# Build a ShareModule that handles parameter sharing
-model = sp.build_model(MyModel)
-
-# Define a loss function
-def loss_fn(model, x, y):
-    return jnp.mean((model(x) - y) ** 2)
-
-# Create an optimization schedule
-schedule = sp.build_schedule(
-    model, loss_fn,
-    phases=[
-        (100, 0.1),   # 100 steps at lr=0.1
-        (50, 0.01),   # 50 steps at lr=0.01
-    ],
-    params={
-        "amplitude": sp.free_in(0, 1),  # Free in both phases
-        "scale": sp.free_after(1),       # Free only in phase 1
-    },
-)
-
-# Run optimization
-schedule.run_all(x=x_data, y=y_data)
-final_model = schedule.model_history[-1]
-```
-
 ## Features
 
 - **Parameter sharing** - Couple parameters across model components
