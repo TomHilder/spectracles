@@ -610,6 +610,31 @@ class ShareModule(Module):
                     f"parent id {dupl_id}."
                 )
 
+        # Check that shared parameters have matching fixed states
+        for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
+            parent_path = self._parent_leaf_paths.get(dupl_id)
+            if parent_path is None:
+                continue
+
+            # Get the Parameter objects (strip .val/.unconstrained_val)
+            try:
+                parent_param = use_path_get_leaf(self.model, parent_path[:-1])
+                dupl_param = use_path_get_leaf(self.model, dupl_path[:-1])
+
+                if is_parameter(parent_param) and is_parameter(dupl_param):
+                    if parent_param.fix != dupl_param.fix:
+                        parent_path_str = leafpath_to_str(parent_path[:-1])
+                        dupl_path_str = leafpath_to_str(dupl_path[:-1])
+                        parent_status = "fixed" if parent_param.fix else "free"
+                        dupl_status = "fixed" if dupl_param.fix else "free"
+                        errors.append(
+                            f"Shared parameters have mismatched fixed states: "
+                            f"'{parent_path_str}' is {parent_status} but "
+                            f"'{dupl_path_str}' is {dupl_status}."
+                        )
+            except (AttributeError, KeyError):
+                pass  # Already caught by earlier checks
+
         result = {
             "valid": len(errors) == 0,
             "n_shared_params": len(self._dupl_leaf_ids),
@@ -660,6 +685,53 @@ class ShareModule(Module):
                 fix_paths.append(self._dupl_leaf_paths[ii][:-1] + (GetAttrKey("fix"),))
                 new_fix.append(ff)
         return tree_at(lambda x: use_paths_get_leaves(x, fix_paths), self, new_fix)  # type: ignore[no-any-return]
+
+    def fix_all(self) -> Self:
+        """
+        Return a new model with all parameters set to fixed.
+
+        This is useful for freezing all parameters, e.g., when you want to
+        use the model for inference only without any further optimization.
+
+        Returns:
+            A new ShareModule with all parameters fixed.
+
+        Example:
+            >>> model = build_model(MyModel, ...)
+            >>> frozen_model = model.fix_all()
+            >>> # All parameters are now fixed
+        """
+        if self._locked:
+            raise ValueError("Cannot modify parameters on a locked model.")
+
+        # Get all parameter paths (including shared ones)
+        all_paths = self.get_parameter_paths(show_shared=True)
+
+        # Set all to fixed
+        return self.set_fixed_status(all_paths, [True] * len(all_paths))
+
+    def free_all(self) -> Self:
+        """
+        Return a new model with all parameters set to free (not fixed).
+
+        This is useful for unfreezing all parameters for optimization.
+
+        Returns:
+            A new ShareModule with all parameters free.
+
+        Example:
+            >>> frozen_model = model.fix_all()
+            >>> unfrozen_model = frozen_model.free_all()
+            >>> # All parameters are now free
+        """
+        if self._locked:
+            raise ValueError("Cannot modify parameters on a locked model.")
+
+        # Get all parameter paths (including shared ones)
+        all_paths = self.get_parameter_paths(show_shared=True)
+
+        # Set all to free
+        return self.set_fixed_status(all_paths, [False] * len(all_paths))
 
     def print_model_tree(self, show_sharing: bool = False) -> None:
         """
