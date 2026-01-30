@@ -1,7 +1,7 @@
 """opt_frame.py - Frame for optimising a model using an optimiser and a loss function."""
 # TODO: typing!
 
-from typing import Callable
+from typing import Any, Callable
 
 import jax.numpy as jnp
 from equinox import (
@@ -15,6 +15,8 @@ from equinox import (
 )
 from jax import lax
 from jax.tree_util import tree_map
+
+from spectracles.tree.path_utils import leafpath_to_str, leaves_with_path
 from optax import GradientTransformation  # type: ignore[import]
 from tqdm import tqdm
 
