@@ -6,7 +6,17 @@ from spectracles.model.share_module import ShareModule, build_model, contains_sh
 from spectracles.model.spatial import FourierGP, PerSpaxel, SpatialModel
 from spectracles.model.spectral import Constant, Gaussian, SpectralSpatialModel
 from spectracles.optimise.opt_frame import OptimiserFrame
-from spectracles.optimise.opt_schedule import OptimiserSchedule, PhaseConfig
+from spectracles.optimise.opt_schedule import ManagedOptimiserSchedule, OptimiserSchedule, PhaseConfig
+from spectracles.optimise.schedule_builder import (
+    build_schedule,
+    fixed_in,
+    free_after,
+    free_in,
+    free_until,
+    init_normal,
+    init_uniform,
+    init_value,
+)
 
 __all__ = [
     "FourierGP",
@@ -36,6 +46,15 @@ __all__ = [
     "load_model",
     "PhaseConfig",
     "OptimiserSchedule",
+    "ManagedOptimiserSchedule",
+    "build_schedule",
+    "free_in",
+    "free_after",
+    "free_until",
+    "fixed_in",
+    "init_normal",
+    "init_value",
+    "init_uniform",
 ]
 
 try:
