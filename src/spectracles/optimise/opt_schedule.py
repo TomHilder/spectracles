@@ -16,6 +16,29 @@ ExitStrategy = Literal[None, "placeholder"]
 
 @dataclass(frozen=True)
 class PhaseConfig:
+    """Configuration for a single optimization phase.
+
+    Defines the number of steps, optimizer, and any parameter updates to apply
+    at the start of the phase.
+
+    Attributes:
+        n_steps: Number of optimization steps to run in this phase.
+        optimiser: An optax optimizer (e.g., `optax.adam(0.01)`).
+        Δloss_criterion: Convergence criterion for loss change (default 1e2).
+        fix_status_updates: Dict mapping parameter paths to their fixed status.
+            True means fixed (not optimized), False means free.
+        param_val_updates: Dict mapping parameter paths to new values to set
+            at the start of this phase.
+
+    Example:
+        >>> config = PhaseConfig(
+        ...     n_steps=100,
+        ...     optimiser=optax.adam(0.01),
+        ...     fix_status_updates={"gp.kernel.lengthscale": True},
+        ...     param_val_updates={"gp.coefficients": jnp.zeros(10)},
+        ... )
+    """
+
     n_steps: int
     optimiser: GradientTransformation
     # exit_strategy: ExitStrategy = field(default=None)
@@ -47,6 +70,15 @@ class PhaseConfig:
 
 @dataclass
 class Phase:
+    """A single phase combining configuration with an optimizer frame.
+
+    Internal class used by OptimiserSchedule. Not typically instantiated directly.
+
+    Attributes:
+        config: The PhaseConfig defining this phase's behavior.
+        frame: The OptimiserFrame that runs the actual optimization.
+    """
+
     config: PhaseConfig
     frame: OptimiserFrame
 
@@ -68,6 +100,33 @@ class Phase:
 
 
 class OptimiserSchedule:
+    """Multi-phase optimization schedule for ShareModule models.
+
+    Runs a sequence of optimization phases, each with its own optimizer,
+    learning rate, and parameter configuration. Tracks model history across
+    phases.
+
+    Attributes:
+        phases: List of Phase objects defining the schedule.
+        model_history: List of models, one for initial state plus one after
+            each completed phase.
+
+    Example:
+        >>> schedule = OptimiserSchedule(
+        ...     model, loss_fn,
+        ...     phase_configs=[
+        ...         PhaseConfig(n_steps=100, optimiser=optax.adam(0.1)),
+        ...         PhaseConfig(n_steps=50, optimiser=optax.adam(0.01)),
+        ...     ],
+        ... )
+        >>> schedule.run_all(x=data_x, y=data_y)
+        >>> final_model = schedule.model_history[-1]
+
+    See Also:
+        ManagedOptimiserSchedule: Version with state tracking, skip, and reset.
+        build_schedule: Declarative API for building schedules.
+    """
+
     def __init__(
         self,
         model: ShareModule,
@@ -134,6 +193,15 @@ class OptimiserSchedule:
 
 
 class PhaseState(Enum):
+    """State of a phase in ManagedOptimiserSchedule.
+
+    Attributes:
+        PENDING: Phase has not been run yet.
+        RUNNING: Phase is currently executing.
+        COMPLETED: Phase finished successfully.
+        SKIPPED: Phase was skipped via skip_phase().
+    """
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -141,6 +209,51 @@ class PhaseState(Enum):
 
 
 class ManagedOptimiserSchedule:
+    """Multi-phase optimization schedule with state tracking and control.
+
+    Extends OptimiserSchedule with phase state management, allowing you to:
+    - Run phases one at a time with `run_next_phase()`
+    - Skip phases with `skip_phase()`
+    - Reset and re-run with `reset()` or `reset_from_phase()`
+    - Inspect progress with `get_phase_status()`, `is_complete()`, etc.
+
+    Phases must be run in order. The schedule tracks which phases are pending,
+    running, completed, or skipped.
+
+    Attributes:
+        phases: List of Phase objects defining the schedule.
+        model_history: List of models, one for initial state plus one after
+            each completed phase.
+        phase_states: List of PhaseState values tracking each phase's status.
+        current_phase_index: Index of the next phase to run.
+        initial_model: The original model (kept for reset functionality).
+
+    Example:
+        >>> schedule = ManagedOptimiserSchedule(model, loss_fn, phase_configs)
+        >>>
+        >>> # Run phases one at a time
+        >>> schedule.run_next_phase(x=x, y=y)
+        >>> print(f"Phase 0 loss: {schedule.loss_history[-1]:.4f}")
+        >>>
+        >>> # Check status
+        >>> print(schedule.get_phase_status())
+        {'current_phase': 1, 'total_phases': 3, 'completed_phases': 1, ...}
+        >>>
+        >>> # Skip a phase if needed
+        >>> schedule.skip_phase(1)
+        >>>
+        >>> # Run remaining phases
+        >>> schedule.run_all(x=x, y=y)
+        >>>
+        >>> # Reset and try again
+        >>> schedule.reset()
+        >>> schedule.run_all(x=x, y=y)
+
+    See Also:
+        OptimiserSchedule: Simpler version without state tracking.
+        build_schedule: Declarative API with `managed=True` option.
+    """
+
     def __init__(
         self,
         model: ShareModule,

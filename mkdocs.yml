@@ -42,6 +42,7 @@ nav:
   - Examples:
     - examples/schedule_builder.md
   - API Reference:
+    - api/opt_schedule.md
     - api/schedule_builder.md
 
 plugins:
