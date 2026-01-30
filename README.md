@@ -1,11 +1,15 @@
 <div id="top"></div>
 
 <!-- PROJECT SHIELDS -->
-<!-- [![PyPI Package][pypi-shield]][pypi-url] -
-<!-- [![JOSS][JOSS-shield]][JOSS-url] -->
+<div align="center">
 
-<!-- ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/TomHilder/wakeflow/Tests.yml?label=tests&style=flat-square)
-[![Docs][docs-status-shield]][docs-status-url] -->
+[![Tests](https://img.shields.io/github/actions/workflow/status/TomHilder/spectracles/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/TomHilder/spectracles/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/TomHilder/spectracles?style=flat-square)](https://codecov.io/gh/TomHilder/spectracles)
+[![PyPI](https://img.shields.io/pypi/v/spectracles?style=flat-square)](https://pypi.org/project/spectracles/)
+[![Python](https://img.shields.io/pypi/pyversions/spectracles?style=flat-square)](https://pypi.org/project/spectracles/)
+[![Docs](https://img.shields.io/github/actions/workflow/status/TomHilder/spectracles/docs.yml?branch=main&label=docs&style=flat-square)](https://tomhilder.github.io/spectracles/)
+
+</div>
 
 <!-- PROJECT LOGO -->
 <br />
