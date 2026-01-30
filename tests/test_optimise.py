@@ -80,9 +80,14 @@ class TestOptimiserFrame:
 
         optimiser = optax.sgd(learning_rate=0.1)
 
-        # Should raise an error
-        with pytest.raises(ValueError):
+        # Should raise a TypeError with helpful message
+        with pytest.raises(TypeError) as exc_info:
             OptimiserFrame(model, loss_fn, optimiser)
+
+        error_msg = str(exc_info.value)
+        assert "ShareModule" in error_msg
+        assert "build_model" in error_msg
+        assert "SimpleModel" in error_msg
 
     def test_initialization_with_locked_model(self):
         # Create a locked model

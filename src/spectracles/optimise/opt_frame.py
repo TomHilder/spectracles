@@ -37,8 +37,15 @@ class OptimiserFrame:
     ):
         # Check sensible input first
         if not isinstance(model, ShareModule):
-            raise ValueError(
-                "Model is not of required type ShareModule. Likely you forgot to build the model with the build_model function."
+            raise TypeError(
+                f"OptimiserFrame requires a ShareModule, but got {type(model).__name__}.\n\n"
+                f"To fix this, wrap your model with build_model():\n\n"
+                f"    # Instead of:\n"
+                f"    model = {type(model).__name__}(...)\n\n"
+                f"    # Use:\n"
+                f"    model = build_model({type(model).__name__}, ...)\n\n"
+                f"Or wrap an existing model:\n"
+                f"    model = ShareModule(model)"
             )
         elif model._locked:
             raise ValueError("Cannot optimise a locked model.")

@@ -2,12 +2,7 @@ from spectracles.model.data import SpatialData, SpatialDataGeneric, SpatialDataL
 from spectracles.model.io import load_model, save_model
 from spectracles.model.kernels import Kernel, Matern12, Matern32, Matern52, SquaredExponential
 from spectracles.model.parameter import AnyParameter, ConstrainedParameter, Known, Parameter, l_bounded
-from spectracles.model.share_module import (
-    ShareModule,
-    build_model,
-    check_for_unmanaged_sharing,
-    contains_shared,
-)
+from spectracles.model.share_module import ShareModule, build_model, contains_shared
 from spectracles.model.spatial import FourierGP, PerSpaxel, SpatialModel
 from spectracles.model.spectral import Constant, Gaussian, SpectralSpatialModel
 from spectracles.optimise.opt_frame import OptimiserFrame
@@ -27,7 +22,6 @@ __all__ = [
     "Matern52",
     "SquaredExponential",
     "build_model",
-    "check_for_unmanaged_sharing",
     "contains_shared",
     "ShareModule",
     "SpatialModel",

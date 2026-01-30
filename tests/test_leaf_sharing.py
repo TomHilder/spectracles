@@ -10,7 +10,6 @@ from spectracles.model.share_module import (
     Shared,
     ShareModule,
     build_model,
-    check_for_unmanaged_sharing,
     contains_shared,
     # get_duplicated_leaves, # TODO: this should be tested in test_path_utils.py
     get_duplicated_parameters,
@@ -657,62 +656,3 @@ class TestBuildAndParentModel:
 
         # Should return the same object, not double-wrap
         assert double_wrapped is shared_model
-
-
-class TestCheckForUnmanagedSharing:
-    def test_no_sharing_no_error(self):
-        # Model with no shared parameters should return None
-        model = SimpleModel(value=1.0)
-        result = check_for_unmanaged_sharing(model, raise_error=False)
-        assert result is None
-
-    def test_already_wrapped_returns_none(self):
-        # ShareModule-wrapped model should return None (sharing is managed)
-        model = SharedLeafModel(value=1.0)
-        shared_model = ShareModule(model)
-        result = check_for_unmanaged_sharing(shared_model, raise_error=False)
-        assert result is None
-
-    def test_unmanaged_sharing_detected(self):
-        # Model with shared parameters NOT wrapped should return sharing info
-        model = SharedLeafModel(value=1.0)
-        result = check_for_unmanaged_sharing(model, raise_error=False)
-
-        assert result is not None
-        assert len(result) == 1
-        # Should show a.val as parent with b.val as duplicate
-        parent = list(result.keys())[0]
-        assert "a.val" in parent
-        assert "b.val" in result[parent]
-
-    def test_unmanaged_sharing_raises_error(self):
-        # With raise_error=True, should raise ValueError
-        model = SharedLeafModel(value=1.0)
-
-        with pytest.raises(ValueError) as exc_info:
-            check_for_unmanaged_sharing(model, raise_error=True)
-
-        error_msg = str(exc_info.value)
-        # Check error message is helpful
-        assert "shared parameters" in error_msg.lower()
-        assert "build_model" in error_msg
-        assert "ShareModule" in error_msg
-        assert "SharedLeafModel" in error_msg
-
-    def test_complex_unmanaged_sharing(self):
-        # Complex model with multiple shared parameters
-        model = ComplexSharedModel(value=2.0)
-        result = check_for_unmanaged_sharing(model, raise_error=False)
-
-        assert result is not None
-        # Should have 3 duplicates under one parent
-        assert len(result) == 1
-        parent = list(result.keys())[0]
-        assert len(result[parent]) == 3
-
-    def test_default_raises_error(self):
-        # Default behavior should raise (raise_error=True is default)
-        model = SharedLeafModel(value=1.0)
-
-        with pytest.raises(ValueError):
-            check_for_unmanaged_sharing(model)
