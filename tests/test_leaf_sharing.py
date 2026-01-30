@@ -656,3 +656,117 @@ class TestBuildAndParentModel:
 
         # Should return the same object, not double-wrap
         assert double_wrapped is shared_model
+
+
+class TestFixAllFreeAll:
+    def test_fix_all_simple(self):
+        # Test fix_all on a simple model
+        model = build_model(SimpleModel, value=1.0)
+
+        # Initially the parameter is free
+        assert not model.param.fix
+
+        # Fix all parameters
+        fixed_model = model.fix_all()
+
+        # Parameter should now be fixed
+        assert fixed_model.param.fix
+
+        # Original model should be unchanged
+        assert not model.param.fix
+
+    def test_fix_all_shared_params(self):
+        # Test fix_all with shared parameters
+        model = build_model(SharedLeafModel, value=1.0)
+
+        # Fix all parameters
+        fixed_model = model.fix_all()
+
+        # Both shared parameters should be fixed
+        locked = fixed_model.get_locked_model()
+        assert locked.a.fix
+        assert locked.b.fix
+
+    def test_free_all_simple(self):
+        # Test free_all on a model with fixed parameters
+        class FixedModel(eqx.Module):
+            param: Parameter
+
+            def __init__(self):
+                self.param = Parameter(initial=1.0, fixed=True)
+
+            def __call__(self, x):
+                return self.param.val * x
+
+        model = build_model(FixedModel)
+
+        # Initially the parameter is fixed
+        assert model.param.fix
+
+        # Free all parameters
+        freed_model = model.free_all()
+
+        # Parameter should now be free
+        assert not freed_model.param.fix
+
+    def test_fix_all_then_free_all(self):
+        # Test round-trip fix_all -> free_all
+        model = build_model(SimpleModel, value=1.0)
+
+        # Fix all, then free all
+        fixed_model = model.fix_all()
+        freed_model = fixed_model.free_all()
+
+        # Should be back to free
+        assert not freed_model.param.fix
+
+    def test_fix_all_on_locked_model_raises(self):
+        # Test that fix_all raises on a locked model
+        model = build_model(SimpleModel, value=1.0)
+        locked_model = model.get_locked_model()
+
+        # Wrap in ShareModule with locked=True
+        locked_share = ShareModule(locked_model.model, locked=True)
+
+        with pytest.raises(ValueError, match="locked"):
+            locked_share.fix_all()
+
+    def test_free_all_on_locked_model_raises(self):
+        # Test that free_all raises on a locked model
+        model = build_model(SimpleModel, value=1.0)
+        locked_share = ShareModule(model.model, locked=True)
+
+        with pytest.raises(ValueError, match="locked"):
+            locked_share.free_all()
+
+    def test_fix_all_with_nested_model(self):
+        # Test fix_all with nested models
+        model = build_model(NestedModel, value=1.0)
+
+        fixed_model = model.fix_all()
+        locked = fixed_model.get_locked_model()
+
+        # All parameters should be fixed
+        assert locked.inner1.param.fix
+        assert locked.inner2.param.fix
+        assert locked.shared.fix
+
+    def test_free_all_with_complex_shared_model(self):
+        # Test free_all with complex shared model
+        model = build_model(ComplexSharedModel, value=1.0)
+
+        # First fix all
+        fixed_model = model.fix_all()
+
+        # Verify all are fixed
+        locked = fixed_model.get_locked_model()
+        assert locked.param.fix
+        assert locked.inner1.param.fix
+
+        # Then free all
+        freed_model = fixed_model.free_all()
+        locked_freed = freed_model.get_locked_model()
+
+        # All should be free
+        assert not locked_freed.param.fix
+        assert not locked_freed.inner1.param.fix
