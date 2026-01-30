@@ -7,13 +7,16 @@ authors = [
     { name = "Thomas Hilder", email = "Thomas.Hilder@monash.edu" },
     { name = "Andrew R. Casey", email = "Andrew.Casey@monash.edu" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
+    "dill>=0.3.8",
     "equinox>=0.13.0",
     "jax>=0.5.3",
     "jax-finufft",
+    "jaxtyping>=0.3.0",
     "matplotlib>=3.10.5",
     "networkx>=3.5",
+    "optax>=0.2.0",
     "tqdm>=4.67.1",
 ]
 

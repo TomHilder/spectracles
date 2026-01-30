@@ -88,17 +88,26 @@ class TestLeafHelperFunctions:
 
 class TestSharedClass:
     def test_shared_initialization(self):
-        # Create a Shared object
+        # Create a Shared object without parent_path
         shared = Shared(id=123)
-
-        # Check attributes
         assert shared.id == 123
+        assert shared.parent_path == ""
+
+        # Create a Shared object with parent_path
+        shared_with_path = Shared(id=456, parent_path="model.param.val")
+        assert shared_with_path.id == 456
+        assert shared_with_path.parent_path == "model.param.val"
 
     def test_shared_representation(self):
-        # Check string representation
+        # Check string representation without parent_path (fallback to id)
         shared = Shared(id=123)
         assert repr(shared) == "Shared(123)"
         assert str(shared) == "Shared(123)"
+
+        # Check string representation with parent_path (shows path)
+        shared_with_path = Shared(id=456, parent_path="model.param.val")
+        assert repr(shared_with_path) == "Shared → model.param.val"
+        assert str(shared_with_path) == "Shared → model.param.val"
 
 
 class TestShareModule:
@@ -127,6 +136,10 @@ class TestShareModule:
         assert shared_model.b.val.id == id(
             model.a.val
         )  # Changed: check .val.id and id(model.a.val)
+
+        # Check that Shared.parent_path is set correctly
+        assert shared_model.b.val.parent_path == "a.val"
+        assert "Shared → a.val" in repr(shared_model.b.val)
 
     def test_locked_model(self):
         # Create a locked model

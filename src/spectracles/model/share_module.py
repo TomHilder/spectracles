@@ -51,18 +51,27 @@ def get_duplicated_parameters(
 
 
 class Shared:
-    """A sentinel object used to indicate a parameter is shared."""
+    """A sentinel object used to indicate a parameter is shared.
+
+    Attributes:
+        id: The Python object id of the original (parent) parameter value.
+        parent_path: String representation of the path to the parent parameter.
+    """
 
     id: int
+    parent_path: str
 
-    def __init__(self, id: int):
+    def __init__(self, id: int, parent_path: str = ""):
         self.id = id
+        self.parent_path = parent_path
 
     def __repr__(self) -> str:
+        if self.parent_path:
+            return f"Shared → {self.parent_path}"
         return f"Shared({self.id})"
 
     def __str__(self) -> str:
-        return f"Shared({self.id})"
+        return self.__repr__()
 
 
 def is_shared(x: Any) -> bool:
@@ -95,7 +104,13 @@ class ShareModule(Module):
 
         # Remove leaves that are coupled to other leaves
         def replace_fn(leaf):
-            return Shared(id(leaf))
+            leaf_id = id(leaf)
+            parent_path = self._parent_leaf_paths.get(leaf_id)
+            if parent_path is not None:
+                parent_path_str = leafpath_to_str(parent_path)
+            else:
+                parent_path_str = ""
+            return Shared(leaf_id, parent_path_str)
 
         # If locked, we don't want Shared() objects because all sub-models need to be callable
         # and if we replace some leaves with Shared() objects, they won't be
