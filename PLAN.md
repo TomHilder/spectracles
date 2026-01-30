@@ -5,7 +5,7 @@
 This project uses `uv` for dependency management. To set up:
 
 ```bash
-# Sync the environment (uses Python 3.12+)
+# Sync the environment (uses Python 3.10+)
 uv sync
 
 # Run tests
@@ -15,7 +15,7 @@ uv run pytest tests/
 uv run pytest tests/test_leaf_sharing.py -v
 ```
 
-**Note**: The project requires Python 3.12+ due to the `type` statement syntax in `path_utils.py`.
+**Note**: The project requires Python 3.10+.
 
 ## Completed Features
 
@@ -29,10 +29,10 @@ All planned UX improvements have been implemented:
 6. ✅ **`print_model_tree(show_sharing=True)` option** - Shows sharing relationships after tree
 7. ✅ **Gradient diagnostics in OptimiserFrame** - `get_gradient_summary()` and `print_gradient_summary()`
 8. ✅ **`get_shared_components()` method** - Detects module-level (branch) sharing for visualization
+9. ✅ **Python 3.10+ support** - Replaced `type` statement with TypeAlias, lowered networkx to >=3.4
 
 ## Future Work (Deferred)
 
-- **Python 3.10/3.11 support**: The `type LeafPath = ...` syntax in `path_utils.py` requires Python 3.12+. To support older versions, this could be replaced with `from typing import TypeAlias` and `LeafPath: TypeAlias = tuple[GetAttrKey, ...]`.
 - **GitHub Actions CI**: Set up workflows to run tests on different Python versions/environments.
 - **Static type checking**: Ensure mypy/pyright coverage is comprehensive across the codebase.
 - **Docstrings**: Add docstrings for all user-facing functionality (public methods, classes, modules).
