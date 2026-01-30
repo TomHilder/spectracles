@@ -1,13 +1,13 @@
 """path_utils.py - utilities for handling paths in PyTree structures."""
 
-from typing import Any
+from typing import Any, TypeAlias
 
 from equinox import filter
 from jax.tree import leaves_with_path
 from jax.tree_util import GetAttrKey
 from jaxtyping import PyTree
 
-type LeafPath = tuple[GetAttrKey, ...]  # type: ignore
+LeafPath: TypeAlias = tuple[GetAttrKey, ...]
 
 
 def str_to_leafpath(str_path: str) -> LeafPath:
