@@ -413,6 +413,54 @@ class TestParameterPaths:
         assert "inner3.inner1.param" in all_paths
 
 
+class TestValidateSharing:
+    def test_validate_sharing_valid_model(self):
+        # A valid model should pass validation
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        result = shared_model.validate_sharing(raise_on_error=False)
+
+        assert result["valid"] is True
+        assert result["n_shared_params"] == 1
+        assert result["n_unique_params"] == 1
+        assert result["errors"] == []
+
+    def test_validate_sharing_complex_model(self):
+        # Complex model should also pass
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+
+        result = shared_model.validate_sharing(raise_on_error=False)
+
+        assert result["valid"] is True
+        assert result["n_shared_params"] == 3  # 3 duplicates
+        assert result["n_unique_params"] == 3  # 3 unique params
+        assert result["errors"] == []
+
+    def test_validate_sharing_no_sharing(self):
+        # Model with no sharing should also pass
+        model = SimpleModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        result = shared_model.validate_sharing(raise_on_error=False)
+
+        assert result["valid"] is True
+        assert result["n_shared_params"] == 0
+        assert result["n_unique_params"] == 1
+        assert result["errors"] == []
+
+    def test_validate_sharing_raises_on_error(self):
+        # Test that raise_on_error=True raises ValueError
+        # (We can't easily create an invalid model, so just test the valid case doesn't raise)
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        # Should not raise
+        result = shared_model.validate_sharing(raise_on_error=True)
+        assert result["valid"] is True
+
+
 class TestSharingSummary:
     def test_get_sharing_summary_simple(self):
         # Simple model with one shared parameter

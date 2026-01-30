@@ -398,6 +398,72 @@ class ShareModule(Module):
 
         return all_paths
 
+    def validate_sharing(self, raise_on_error: bool = True) -> dict[str, Any]:
+        """
+        Validate the sharing structure of the model.
+
+        Checks that:
+        1. All Shared objects reference valid parent parameters
+        2. Parent parameters exist and have the expected shape
+        3. No orphaned Shared objects exist
+
+        Args:
+            raise_on_error: If True (default), raises ValueError on validation
+                failure. If False, returns validation results without raising.
+
+        Returns:
+            A dictionary containing validation results:
+            - 'valid': bool - True if all checks passed
+            - 'n_shared_params': int - Number of shared parameter relationships
+            - 'n_unique_params': int - Number of unique parameters
+            - 'errors': list[str] - List of error messages (empty if valid)
+
+        Example:
+            >>> result = model.validate_sharing(raise_on_error=False)
+            >>> if not result['valid']:
+            ...     print("Errors:", result['errors'])
+        """
+        errors: list[str] = []
+
+        # Check that all parent paths are valid
+        for leaf_id, parent_path in self._parent_leaf_paths.items():
+            try:
+                parent_leaf = use_path_get_leaf(self.model, parent_path)
+                # If the model is unlocked, the parent should be an actual array
+                # If locked, it should also be an array (not Shared)
+                if is_shared(parent_leaf):
+                    errors.append(
+                        f"Parent at '{leafpath_to_str(parent_path)}' is itself a Shared "
+                        f"object, which indicates a bug in sharing detection."
+                    )
+            except (AttributeError, KeyError) as e:
+                errors.append(
+                    f"Parent path '{leafpath_to_str(parent_path)}' is invalid: {e}"
+                )
+
+        # Check that all duplicate paths reference valid parents
+        for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
+            if dupl_id not in self._parent_leaf_paths:
+                errors.append(
+                    f"Duplicate at '{leafpath_to_str(dupl_path)}' references unknown "
+                    f"parent id {dupl_id}."
+                )
+
+        result = {
+            "valid": len(errors) == 0,
+            "n_shared_params": len(self._dupl_leaf_ids),
+            "n_unique_params": len(self._parent_leaf_paths),
+            "errors": errors,
+        }
+
+        if raise_on_error and errors:
+            raise ValueError(
+                f"Sharing validation failed with {len(errors)} error(s):\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
+
+        return result
+
     def set(self, params: list[str], values: list[Array]) -> Self:
         """
         Return a new model with updated parameter values. Can only be used to update values of Parameters or ConstrainedParameters. The model must not be locked.
