@@ -50,6 +50,57 @@ def get_duplicated_parameters(
     return get_duplicated_leaves(tree, filter_specs)
 
 
+def _detect_shared_modules(model: Module) -> dict[str, list[str]]:
+    """Detect which Module-level components are shared (same object identity).
+
+    This detects when entire sub-modules are the same Python object, which
+    is different from parameter-level sharing (where different modules may
+    share the same Parameter object).
+
+    Args:
+        model: The model to analyze (BEFORE ShareModule processing).
+
+    Returns:
+        Dictionary mapping parent paths to list of duplicate paths.
+        E.g., {"branch_a": ["branch_b"]} means branch_b is the same object as branch_a.
+    """
+    seen_ids: dict[int, str] = {}
+    shared: dict[str, list[str]] = {}
+
+    def traverse(obj: Any, path: str) -> None:
+        if not isinstance(obj, Module):
+            return
+
+        obj_id = id(obj)
+
+        # If we've seen this object before, it's a shared component
+        if obj_id in seen_ids:
+            parent_path = seen_ids[obj_id]
+            if parent_path not in shared:
+                shared[parent_path] = []
+            shared[parent_path].append(path)
+            return  # Don't traverse children of duplicate modules
+
+        # Record this object
+        seen_ids[obj_id] = path
+
+        # Traverse child modules
+        # Get all public attributes that are Modules
+        for attr_name in vars(obj).keys():
+            if attr_name.startswith("_"):
+                continue
+            try:
+                child = getattr(obj, attr_name)
+                if isinstance(child, Module):
+                    child_path = f"{path}.{attr_name}" if path else attr_name
+                    traverse(child, child_path)
+            except (AttributeError, TypeError):
+                pass
+
+    traverse(model, "")
+    return shared
+
+
 class Shared:
     """A sentinel object used to indicate a parameter is shared.
 
@@ -154,15 +205,20 @@ class ShareModule(Module):
     _dupl_leaf_ids: list[int]
     _dupl_leaf_paths: list[LeafPath]
     _parent_leaf_paths: Dict[int, LeafPath]
+    _shared_components: dict[str, list[str]]
 
     # Is this instance locked?
     _locked: bool = False
 
     # Keep track of attributes to avoid recursion
-    _attr_names = {"model", "_dupl_leaf_ids", "_dupl_leaf_paths", "_parent_leaf_paths", "_locked"}
+    _attr_names = {"model", "_dupl_leaf_ids", "_dupl_leaf_paths", "_parent_leaf_paths", "_shared_components", "_locked"}
 
     def __init__(self, model: Module, locked: bool = False):
-        # Save the sharing info
+        # Detect module-level sharing BEFORE any tree manipulation
+        # (tree_at operations can break object identity)
+        self._shared_components = _detect_shared_modules(model)
+
+        # Save the parameter-level sharing info
         (
             self._dupl_leaf_ids,
             self._dupl_leaf_paths,
@@ -219,6 +275,7 @@ class ShareModule(Module):
             "_dupl_leaf_ids": self._dupl_leaf_ids,
             "_dupl_leaf_paths": self._dupl_leaf_paths,
             "_parent_leaf_paths": self._parent_leaf_paths,
+            "_shared_components": self._shared_components,
             "_locked": self._locked,
         }
 
@@ -328,6 +385,27 @@ class ShareModule(Module):
         # Return a new instance with the deep-copied model
         cls = type(self)
         return cls(copied_model, locked=self._locked)
+
+    def get_shared_components(self) -> dict[str, list[str]]:
+        """
+        Get module-level components that are shared (same object).
+
+        This is useful for visualization - it shows when entire sub-models
+        are the same object, not just their leaf parameters. The internal
+        sharing mechanism still operates at the parameter level.
+
+        Note: Module sharing is detected during ShareModule initialization
+        before any tree manipulation (which can break object identity).
+
+        Returns:
+            Dict mapping parent component paths to list of paths that share
+            the same object. Only components that are actually shared are included.
+
+        Example:
+            >>> model.get_shared_components()
+            {'branch_a': ['branch_b']}  # branch_b IS branch_a (same object)
+        """
+        return self._shared_components
 
     def get_sharing_summary(self) -> dict[str, list[str]]:
         """
@@ -505,8 +583,10 @@ class ShareModule(Module):
         Print the model tree in an easy to parse format.
 
         Args:
-            show_sharing: If True, also print a summary of sharing relationships
-                after the tree. Default is False for backwards compatibility.
+            show_sharing: If True, also print summaries of sharing relationships
+                after the tree. Shows both component-level sharing (entire modules
+                that are the same object) and parameter-level sharing.
+                Default is False for backwards compatibility.
 
         Example with show_sharing=True:
             └── model (LineRatioModel)
@@ -515,21 +595,34 @@ class ShareModule(Module):
                 └── line_2 (LinkedEmissionLine)
                     └── v (GPField)
 
+            Shared components (same object):
+              line_1.v  ←  line_2.v
+
             Shared parameters:
               line_1.v.coefficients  ←  line_2.v.coefficients
         """
         graph, root_id = get_digraph(self)
         print_graph(graph, root_id)
 
-        if show_sharing and self._dupl_leaf_ids:
-            print("\nShared parameters:")
-            summary = self.get_sharing_summary()
-            for parent_path, dupl_paths in summary.items():
-                # Strip .val/.unconstrained_val suffix for cleaner display
-                parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
-                for dupl_path in dupl_paths:
-                    dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
-                    print(f"  {parent_display}  ←  {dupl_display}")
+        if show_sharing:
+            # Show component-level sharing (entire modules that are the same object)
+            shared_components = self.get_shared_components()
+            if shared_components:
+                print("\nShared components (same object):")
+                for parent_path, shared_paths in shared_components.items():
+                    for shared_path in shared_paths:
+                        print(f"  {parent_path}  ←  {shared_path}")
+
+            # Show parameter-level sharing
+            if self._dupl_leaf_ids:
+                print("\nShared parameters:")
+                summary = self.get_sharing_summary()
+                for parent_path, dupl_paths in summary.items():
+                    # Strip .val/.unconstrained_val suffix for cleaner display
+                    parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
+                    for dupl_path in dupl_paths:
+                        dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
+                        print(f"  {parent_display}  ←  {dupl_display}")
 
     def plot_model_graph(
         self,
