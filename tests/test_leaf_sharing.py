@@ -260,6 +260,67 @@ def assert_array_equal_but_different(x, y):
     pass
 
 
+class TestParameterPaths:
+    def test_get_parameter_paths_simple(self):
+        # Simple model with one parameter
+        model = SimpleModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        paths = shared_model.get_parameter_paths()
+
+        assert len(paths) == 1
+        assert "param" in paths
+
+    def test_get_parameter_paths_shared_default(self):
+        # Model with shared parameters - default should only show parent
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        paths = shared_model.get_parameter_paths()
+
+        # Only the parent (a) should be shown, not the shared (b)
+        assert len(paths) == 1
+        assert "a" in paths
+        assert "b" not in paths
+
+    def test_get_parameter_paths_shared_show_all(self):
+        # Model with shared parameters - show_shared=True should show all
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        paths = shared_model.get_parameter_paths(show_shared=True)
+
+        # Both a and b should be shown
+        assert len(paths) == 2
+        assert "a" in paths
+        assert "b" in paths
+
+    def test_get_parameter_paths_complex(self):
+        # Complex model with multiple shared parameters
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+
+        # Default - only unique parameters
+        paths = shared_model.get_parameter_paths()
+
+        # inner1.param is the parent, inner3.inner2.param and inner3.shared are unique
+        assert "inner1.param" in paths
+        assert "inner3.inner2.param" in paths
+        assert "inner3.shared" in paths
+        # These are shared (duplicates of inner1.param)
+        assert "param" not in paths
+        assert "inner2.param" not in paths
+
+        # With show_shared=True
+        all_paths = shared_model.get_parameter_paths(show_shared=True)
+
+        # All should be present
+        assert "inner1.param" in all_paths
+        assert "param" in all_paths
+        assert "inner2.param" in all_paths
+        assert "inner3.inner1.param" in all_paths
+
+
 class TestSharingSummary:
     def test_get_sharing_summary_simple(self):
         # Simple model with one shared parameter

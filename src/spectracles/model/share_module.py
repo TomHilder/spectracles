@@ -279,6 +279,49 @@ class ShareModule(Module):
 
         return dict(summary)
 
+    def get_parameter_paths(self, show_shared: bool = False) -> list[str]:
+        """
+        Get all parameter paths that can be used with the `set()` method.
+
+        Args:
+            show_shared: If False (default), only returns paths to unique/parent
+                parameters. If True, also includes paths to shared (duplicate)
+                parameters.
+
+        Returns:
+            A list of parameter path strings (e.g., ['line.A.coefficients',
+            'line.v.coefficients']).
+
+        Example:
+            >>> model.get_parameter_paths()
+            ['line_1.A.coefficients', 'line_1.v.coefficients', 'line_2.A.coefficients']
+            >>> model.get_parameter_paths(show_shared=True)
+            ['line_1.A.coefficients', 'line_1.v.coefficients', 'line_2.A.coefficients',
+             'line_2.v.coefficients']  # line_2.v is shared with line_1.v
+        """
+        # Get all unique/parent parameter paths (strip the .val/.unconstrained_val suffix)
+        parent_paths: list[str] = []
+        for path in self._parent_leaf_paths.values():
+            # Remove the last component (.val or .unconstrained_val) to get the Parameter path
+            param_path = path[:-1]
+            param_path_str = leafpath_to_str(param_path)
+            if param_path_str not in parent_paths:
+                parent_paths.append(param_path_str)
+
+        if not show_shared:
+            return parent_paths
+
+        # Also include shared/duplicate paths
+        all_paths = parent_paths.copy()
+        for dupl_path in self._dupl_leaf_paths:
+            # Remove the last component (.val or .unconstrained_val) to get the Parameter path
+            param_path = dupl_path[:-1]
+            param_path_str = leafpath_to_str(param_path)
+            if param_path_str not in all_paths:
+                all_paths.append(param_path_str)
+
+        return all_paths
+
     def set(self, params: list[str], values: list[Array]) -> Self:
         """
         Return a new model with updated parameter values. Can only be used to update values of Parameters or ConstrainedParameters. The model must not be locked.

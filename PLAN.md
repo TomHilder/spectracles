@@ -23,6 +23,7 @@ uv run pytest tests/test_leaf_sharing.py -v
 - **GitHub Actions CI**: Set up workflows to run tests on different Python versions/environments.
 - **Static type checking**: Ensure mypy/pyright coverage is comprehensive across the codebase.
 - **Docstrings**: Add docstrings for all user-facing functionality (public methods, classes, modules).
+- **Alternative to `build_model()`**: Consider a class decorator (`@shareable`) or base class (`ShareableModule`) to avoid the need for `build_model(MyModel, ...)`. The decorator approach is cleanest - no inheritance required, opt-in per class. Main challenge is ensuring equinox's PyTree machinery still works.
 
 ## Scope
 
