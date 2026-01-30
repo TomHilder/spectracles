@@ -1,8 +1,8 @@
 # Test Coverage Report
 
 **Date:** January 2026
-**Total Tests:** 218 passing
-**Overall Coverage (excluding lvm_models):** 78%
+**Total Tests:** 285 passing
+**Overall Coverage (excluding lvm_models):** 82%
 
 ## Summary
 
@@ -12,7 +12,7 @@ This report analyzes test coverage for the spectracles library, excluding the `l
 
 | Module | Statements | Missed | Coverage | Status |
 |--------|-----------|--------|----------|--------|
-| `__init__.py` | 14 | 2 | 86% | Good |
+| `__init__.py` | 15 | 2 | 87% | Good |
 | `_version.py` | 13 | 0 | 100% | Complete |
 | `model/data.py` | 17 | 0 | 100% | Complete |
 | `model/formatting.py` | 103 | 0 | 100% | Complete |
@@ -20,11 +20,12 @@ This report analyzes test coverage for the spectracles library, excluding the `l
 | `model/io.py` | 28 | 3 | 89% | Good |
 | `model/kernels.py` | 50 | 1 | 98% | Excellent |
 | `model/parameter.py` | 154 | 6 | 96% | Excellent |
-| `model/share_module.py` | 400 | 103 | 74% | Good |
+| `model/share_module.py` | 400 | 97 | 76% | Good |
 | `model/spatial.py` | 122 | 27 | 78% | Good |
 | `model/spectral.py` | 27 | 1 | 96% | Excellent |
 | `optimise/opt_frame.py` | 113 | 12 | 89% | Good |
-| `optimise/opt_schedule.py` | 161 | 77 | 52% | Moderate |
+| `optimise/opt_schedule.py` | 161 | 5 | 97% | Excellent |
+| `optimise/schedule_builder.py` | 168 | 14 | 92% | Excellent |
 | `tree/path_utils.py` | 37 | 0 | 100% | Complete |
 
 ## Modules with Complete Coverage (100%)
@@ -39,6 +40,22 @@ All formatting utilities for Rich-based pretty printing are covered by smoke tes
 Path utilities for PyTree traversal are thoroughly tested.
 
 ## Modules with Excellent Coverage (>90%)
+
+### `optimise/opt_schedule.py` - 97%
+Both `OptimiserSchedule` and `ManagedOptimiserSchedule` are thoroughly tested including:
+- Phase state management (PENDING, RUNNING, COMPLETED, SKIPPED)
+- Sequential execution with `run_all()`, `run_next_phase()`, `run_phase_by_index()`
+- Skip and reset functionality
+- Status inspection methods
+- Loss history tracking
+
+### `optimise/schedule_builder.py` - 92%
+The parameter-centric schedule builder API is well tested including:
+- Helper functions (`free_in`, `free_after`, `free_until`, `fixed_in`)
+- Initialization helpers (`init_normal`, `init_value`, `init_uniform`)
+- Pattern matching with wildcards (`*`, `**`)
+- Shared parameter validation
+- Full schedule building and execution
 
 ### `model/graph.py` - 99%
 Graph visualization utilities including `print_graph()` and `layered_hierarchy_pos()` are well tested.
@@ -73,27 +90,12 @@ Spatial models including FourierGP, FourierBasis, and PerSpaxel are tested.
 - Some branches in conjugate symmetry handling
 - Edge cases in dimension checks
 
-### `model/share_module.py` - 74%
+### `model/share_module.py` - 76%
 Core ShareModule functionality is tested including parameter sharing, validation, model building, and `fix_all()`/`free_all()` methods.
 
 **Untested areas:**
 - `print_graph()` visualization (lines 809-883)
 - Some branches in sharing detection (lines 291-332)
-
-## Modules Needing Attention (<70%)
-
-### `optimise/opt_schedule.py` - 52%
-The multi-phase optimization scheduler has moderate testing coverage.
-
-**Tested areas:**
-- PhaseConfig initialization and validation
-- Phase creation
-- OptimiserSchedule creation and execution
-- Loss history tracking
-
-**Untested areas:**
-- `OptimiserScheduleUnsafe` class (experimental)
-- Phase reset and skip functionality
 
 ## Test File Mapping
 
@@ -105,9 +107,10 @@ The multi-phase optimization scheduler has moderate testing coverage.
 | `test_io.py` | model/io.py | 8 |
 | `test_kernels.py` | model/kernels.py | 16 |
 | `test_leaf_sharing.py` | model/share_module.py, tree/path_utils.py | 52 |
-| `test_opt_schedule.py` | optimise/opt_schedule.py | 15 |
+| `test_opt_schedule.py` | optimise/opt_schedule.py | 37 |
 | `test_optimise.py` | optimise/opt_frame.py | 13 |
 | `test_parameter.py` | model/parameter.py | 36 |
+| `test_schedule_builder.py` | optimise/schedule_builder.py | 45 |
 | `test_spatial.py` | model/spatial.py | 22 |
 | `test_spectral.py` | model/spectral.py | 8 |
 
@@ -118,31 +121,29 @@ The multi-phase optimization scheduler has moderate testing coverage.
 | Initial | 133 | 48% | Baseline |
 | Update 1 | 183 | 70% | +formatting, +fix_all/free_all, +opt_schedule |
 | Update 2 | 218 | 78% | +graph, +FourierBasis, +parameter repr/log |
+| Update 3 | 285 | 82% | +ManagedOptimiserSchedule (97%), +schedule_builder (92%) |
 
 ## Recent Improvements
 
+### Update 3 (Current)
+1. **`optimise/opt_schedule.py`**: 52% → 97% (+45%)
+   - Renamed OptimiserScheduleUnsafe to ManagedOptimiserSchedule
+   - Added 22 comprehensive tests for state management, skip/reset, status inspection
+   - Added docstrings to all classes
+
+2. **`optimise/schedule_builder.py`**: New module at 92%
+   - Parameter-centric API for building schedules
+   - 45 tests covering helpers, pattern matching, building, and shared validation
+
 ### Update 2
 1. **`model/graph.py`**: 45% → 99% (+54%)
-   - Added 13 tests for print_graph and layered_hierarchy_pos
-
 2. **`model/parameter.py`**: 77% → 96% (+19%)
-   - Added 5 tests for log parameterization
-   - Added 11 tests for repr methods
-
 3. **`model/spatial.py`**: 70% → 78% (+8%)
-   - Added 6 tests for FourierBasis class
 
 ### Update 1
 1. **`model/formatting.py`**: 36% → 100% (+64%)
 2. **`model/share_module.py`**: 64% → 74% (+10%)
 3. **`optimise/opt_schedule.py`**: 36% → 52% (+16%)
-4. **`tree/path_utils.py`**: 97% → 100% (+3%)
-
-## Recommendations
-
-### Low Priority
-1. **`optimise/opt_schedule.py`**: Test experimental `OptimiserScheduleUnsafe` class if it will be used.
-2. **`model/share_module.py`**: Add tests for `print_graph()` visualization method.
 
 ## Excluded from Coverage
 

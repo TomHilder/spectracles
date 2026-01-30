@@ -19,7 +19,7 @@ uv run pytest tests/test_leaf_sharing.py -v
 
 ## Completed Features
 
-All planned UX improvements have been implemented:
+### Phase 1: Core UX Improvements
 
 1. ✅ **Better `Shared` repr with parent path** - Shows `Shared → a.val` instead of memory address
 2. ✅ **`get_sharing_summary()` method** - Returns dict mapping parent paths to shared child paths
@@ -31,15 +31,54 @@ All planned UX improvements have been implemented:
 8. ✅ **`get_shared_components()` method** - Detects module-level (branch) sharing for visualization
 9. ✅ **Python 3.10+ support** - Replaced `type` statement with TypeAlias, lowered networkx to >=3.4
 
+### Phase 2: Schedule Builder API
+
+1. ✅ **Parameter-centric schedule builder** - Declarative API to specify optimization schedules
+   - `build_schedule()` function generates PhaseConfig objects from parameter specs
+   - Helpers: `free_in()`, `free_after()`, `free_until()`, `fixed_in()`
+   - Initialization: `init_normal()`, `init_value()`, `init_uniform()`
+   - Glob-style pattern matching for parameter paths (`*`, `**`)
+   - Validates shared parameter paths
+
+2. ✅ **ManagedOptimiserSchedule** - Renamed from OptimiserScheduleUnsafe, fully tested
+   - State tracking (PENDING, RUNNING, COMPLETED, SKIPPED)
+   - `run_next_phase()`, `skip_phase()`, `reset()`, `reset_from_phase()`
+   - Status inspection: `get_phase_status()`, `is_complete()`, etc.
+
+3. ✅ **`fix_all()` / `free_all()` methods** - Freeze or unfreeze all parameters at once
+
+### Phase 3: Documentation
+
+1. ✅ **MkDocs Material setup** - Dark/light mode toggle, code highlighting
+2. ✅ **mkdocstrings integration** - Auto-generated API docs from docstrings
+3. ✅ **Schedule Builder docs** - Guide, examples, and API reference
+4. ✅ **Optimization API docs** - OptimiserSchedule, ManagedOptimiserSchedule, PhaseConfig
+5. ✅ **GitHub Actions workflow** - Build and deploy docs on release
+
+## Test Coverage
+
+- **Total tests:** 285 passing
+- **Overall coverage:** 82% (excluding lvm_models)
+- Key modules at 90%+: opt_schedule (97%), schedule_builder (92%), formatting (100%), graph (99%)
+
+See `TEST_COVERAGE_REPORT.md` for details.
+
 ## Future Work (Deferred)
 
 - **GitHub Actions CI**: Set up workflows to run tests on different Python versions/environments.
 - **Static type checking**: Ensure mypy/pyright coverage is comprehensive across the codebase.
-- **Docstrings**: Add docstrings for all user-facing functionality (public methods, classes, modules).
-- **Alternative to `build_model()`**: Consider a class decorator (`@shareable`) or base class (`ShareableModule`) to avoid the need for `build_model(MyModel, ...)`. The decorator approach is cleanest - no inheritance required, opt-in per class. Main challenge is ensuring equinox's PyTree machinery still works.
-- **Accept Parameter objects in `set()`**: Stretch goal - allow passing Parameter objects directly instead of just path strings.
+- **More docstrings**: Add docstrings for remaining user-facing functionality.
+- **Alternative to `build_model()`**: Consider a class decorator (`@shareable`) or base class.
+- **Accept Parameter objects in `set()`**: Allow passing Parameter objects directly.
 
 ## Documentation
 
-- Update README.md with relevant usage examples as features are added
-- Keep documentation minimal but useful
+Docs are built with MkDocs Material. To preview locally:
+
+```bash
+pip install mkdocs-material mkdocstrings[python]
+pip install -e .
+mkdocs serve
+```
+
+Docs are auto-deployed to GitHub Pages on release.
