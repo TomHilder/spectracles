@@ -129,8 +129,8 @@ class OptimiserSchedule:
         return jnp.concatenate(self.loss_histories)
 
 
-# TODO: Check the expanded implementation from Claude below that is more general
-# (I think it is mostly fine but we should check all the implemented logic actually works)
+# ManagedOptimiserSchedule below provides more control over phase execution
+# with state tracking, skip/reset functionality, and status inspection.
 
 
 class PhaseState(Enum):
@@ -140,7 +140,7 @@ class PhaseState(Enum):
     SKIPPED = "skipped"
 
 
-class OptimiserScheduleUnsafe:
+class ManagedOptimiserSchedule:
     def __init__(
         self,
         model: ShareModule,

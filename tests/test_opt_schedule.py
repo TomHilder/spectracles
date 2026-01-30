@@ -5,8 +5,8 @@ import optax  # type: ignore[import]
 import pytest
 from spectracles.model.share_module import build_model
 from spectracles.optimise.opt_schedule import (
+    ManagedOptimiserSchedule,
     OptimiserSchedule,
-    OptimiserScheduleUnsafe,
     Phase,
     PhaseConfig,
     PhaseState,
@@ -274,8 +274,8 @@ class TestOptimiserSchedule:
         assert jnp.allclose(locked.a.val, 0.5, rtol=1e-1)
 
 
-class TestOptimiserScheduleUnsafe:
-    """Tests for the OptimiserScheduleUnsafe class with phase state management."""
+class TestManagedOptimiserSchedule:
+    """Tests for the ManagedOptimiserSchedule class with phase state management."""
 
     def setup_method(self):
         """Common setup for tests."""
@@ -295,7 +295,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         assert len(schedule.phases) == 2
         assert len(schedule.model_history) == 1
@@ -308,7 +308,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
         assert len(schedule.model_history) == 3
@@ -321,7 +321,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # Run first phase
         result = schedule.run_next_phase(x=self.x, y=self.y)
@@ -345,7 +345,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # Run phase 0
         schedule.run_phase_by_index(0, x=self.x, y=self.y)
@@ -357,7 +357,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # Try to run phase 1 before phase 0
         with pytest.raises(RuntimeError, match="must complete phases in order"):
@@ -368,7 +368,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.sgd(learning_rate=0.1)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
         # Try to run completed phase again
@@ -380,7 +380,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.sgd(learning_rate=0.1)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         with pytest.raises(ValueError, match="out of range"):
             schedule.run_phase_by_index(5, x=self.x, y=self.y)
@@ -394,7 +394,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # Skip first phase
         schedule.skip_phase(0)
@@ -411,7 +411,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # Try to skip phase 1 before phase 0
         with pytest.raises(RuntimeError, match="must process phases in order"):
@@ -422,7 +422,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.sgd(learning_rate=0.1)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
         with pytest.raises(RuntimeError, match="already been completed"):
@@ -434,7 +434,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
         # Reset
@@ -452,7 +452,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.001)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
         # Reset from phase 1
@@ -470,7 +470,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_next_phase(x=self.x, y=self.y)
 
         status = schedule.get_phase_status()
@@ -486,7 +486,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.sgd(learning_rate=0.1)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         assert not schedule.is_complete()
 
         schedule.run_all(x=self.x, y=self.y)
@@ -498,7 +498,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         assert schedule.get_next_phase_index() == 0
 
         schedule.run_next_phase(x=self.x, y=self.y)
@@ -513,7 +513,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         assert schedule.get_completed_phases() == []
 
         schedule.run_next_phase(x=self.x, y=self.y)
@@ -528,7 +528,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         assert schedule.get_pending_phases() == [0, 1]
 
         schedule.run_next_phase(x=self.x, y=self.y)
@@ -540,7 +540,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=15, optimiser=optax.adam(learning_rate=0.01)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # No completed phases yet
         assert schedule.loss_histories == []
@@ -563,7 +563,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.adam(learning_rate=0.001)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # Run phases 0 and 1
         schedule.run_phases([0, 1], x=self.x, y=self.y)
@@ -577,7 +577,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=10, optimiser=optax.sgd(learning_rate=0.1)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
 
         # Run single phase with int (not list)
         schedule.run_phases(0, x=self.x, y=self.y)
@@ -590,7 +590,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=50, optimiser=optax.adam(learning_rate=0.1)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         initial_loss = self.loss_fn(self.model.get_locked_model(), self.x, self.y)
 
         schedule.run_all(x=self.x, y=self.y)
@@ -611,7 +611,7 @@ class TestOptimiserScheduleUnsafe:
             PhaseConfig(n_steps=20, optimiser=optax.adam(learning_rate=0.1)),
         ]
 
-        schedule = OptimiserScheduleUnsafe(self.model, self.loss_fn, configs)
+        schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
         first_run_final = schedule.model_history[-1]
