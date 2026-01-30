@@ -117,8 +117,11 @@ class Shared:
         self.parent_path = parent_path
 
     def __repr__(self) -> str:
+        from spectracles.model.formatting import shared_repr_parts, render_to_string
+
         if self.parent_path:
-            return f"Shared → {self.parent_path}"
+            text = shared_repr_parts(self.parent_path)
+            return render_to_string(text)
         return f"Shared({self.id})"
 
     def __str__(self) -> str:
@@ -283,6 +286,86 @@ class ShareModule(Module):
         # When dealing with frozen instances, we need to use object.__setattr__
         for key, value in state.items():
             object.__setattr__(self, key, value)
+
+    def __repr__(self) -> str:
+        from spectracles.model.formatting import (
+            create_model_tree,
+            add_tree_node,
+            render_to_string,
+            styled_type,
+            styled_free,
+            styled_fixed,
+        )
+        from rich.text import Text
+
+        # Count parameters
+        n_unique = len(self._parent_leaf_paths)
+        n_shared = len(self._dupl_leaf_ids)
+
+        # Build header
+        header = Text()
+        header.append_text(styled_type("ShareModule"))
+        header.append(" (", style="dim")
+        header.append(f"{n_unique} params", style="value")
+        if n_shared > 0:
+            header.append(", ", style="dim")
+            header.append(f"{n_shared} shared", style="shared")
+        header.append(", ", style="dim")
+        if self._locked:
+            header.append_text(styled_fixed())
+        else:
+            header.append_text(styled_free())
+        header.append(")", style="dim")
+
+        # Create tree
+        tree = create_model_tree("model", type(self.model).__name__)
+
+        # Add model attributes that are parameters or modules
+        self._add_model_attrs_to_tree(tree, self.model, "")
+
+        # Combine header and tree
+        result = Text()
+        result.append_text(header)
+        result.append("\n")
+        result.append(render_to_string(tree))
+
+        return render_to_string(result)
+
+    def _add_model_attrs_to_tree(self, tree, obj, path_prefix: str) -> None:
+        """Recursively add model attributes to the tree."""
+        from spectracles.model.formatting import add_tree_node
+        from rich.text import Text
+
+        for attr_name in vars(obj).keys():
+            if attr_name.startswith("_"):
+                continue
+
+            try:
+                attr = getattr(obj, attr_name)
+            except (AttributeError, TypeError):
+                continue
+
+            full_path = f"{path_prefix}.{attr_name}" if path_prefix else attr_name
+
+            # Check if it's a parameter
+            if is_parameter(attr):
+                # Get the repr of the parameter (already styled)
+                node = tree.add(Text(f"{attr_name}: ", style="value") + Text(repr(attr)))
+            # Check if it's a nested Module (but not a parameter)
+            elif isinstance(attr, Module) and not is_parameter(attr):
+                # Create a subtree for nested modules
+                label = Text()
+                label.append(attr_name, style="value")
+                label.append(" (", style="dim")
+                label.append(type(attr).__name__, style="type")
+                label.append(")", style="dim")
+                subtree = tree.add(label)
+                self._add_model_attrs_to_tree(subtree, attr, full_path)
+
+    def debug_repr(self) -> str:
+        """Return the full equinox-style repr for debugging."""
+        import equinox as eqx
+        return eqx.tree_pformat(self)
 
     def __call__(self, *args, **kwargs) -> Any:
         # Replace nodes specified by `where` with the nodes specified by `get`
@@ -601,6 +684,11 @@ class ShareModule(Module):
             Shared parameters:
               line_1.v.coefficients  ←  line_2.v.coefficients
         """
+        from rich.text import Text
+        from spectracles.model.formatting import get_console
+
+        console = get_console()
+
         graph, root_id = get_digraph(self)
         print_graph(graph, root_id)
 
@@ -608,21 +696,33 @@ class ShareModule(Module):
             # Show component-level sharing (entire modules that are the same object)
             shared_components = self.get_shared_components()
             if shared_components:
-                print("\nShared components (same object):")
+                header = Text("\nShared components ", style="dim")
+                header.append("(same object)", style="dim")
+                header.append(":", style="dim")
+                console.print(header)
                 for parent_path, shared_paths in shared_components.items():
                     for shared_path in shared_paths:
-                        print(f"  {parent_path}  ←  {shared_path}")
+                        line = Text("  ")
+                        line.append(parent_path, style="value")
+                        line.append("  ←  ", style="shared")
+                        line.append(shared_path, style="shared")
+                        console.print(line)
 
             # Show parameter-level sharing
             if self._dupl_leaf_ids:
-                print("\nShared parameters:")
+                header = Text("\nShared parameters:", style="dim")
+                console.print(header)
                 summary = self.get_sharing_summary()
                 for parent_path, dupl_paths in summary.items():
                     # Strip .val/.unconstrained_val suffix for cleaner display
                     parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
                     for dupl_path in dupl_paths:
                         dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
-                        print(f"  {parent_display}  ←  {dupl_display}")
+                        line = Text("  ")
+                        line.append(parent_display, style="value")
+                        line.append("  ←  ", style="shared")
+                        line.append(dupl_display, style="shared")
+                        console.print(line)
 
     def plot_model_graph(
         self,

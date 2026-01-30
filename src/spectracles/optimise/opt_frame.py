@@ -182,6 +182,124 @@ class OptimiserFrame:
             pbar.set_description(f"Optimising (Δloss trend: {trend:.2e})")
         return jnp.abs(trend) < Δloss
 
+    def get_gradient_summary(
+        self, *loss_args, **loss_kwargs
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Compute gradients and return a summary with norms per parameter.
+
+        This is useful for debugging optimization issues like vanishing or
+        exploding gradients.
+
+        Args:
+            *loss_args: Positional arguments to pass to the loss function.
+            **loss_kwargs: Keyword arguments to pass to the loss function.
+
+        Returns:
+            A dictionary mapping parameter paths to gradient info:
+            {
+                'param.path': {
+                    'norm': float,      # L2 norm of gradient
+                    'max': float,       # Max absolute value
+                    'min': float,       # Min absolute value
+                    'has_nan': bool,    # Whether gradient contains NaN
+                    'has_inf': bool,    # Whether gradient contains Inf
+                    'shape': tuple,     # Shape of the gradient array
+                },
+                ...
+            }
+
+        Example:
+            >>> summary = frame.get_gradient_summary(x=x_data, y=y_data)
+            >>> for path, info in summary.items():
+            ...     print(f"{path}: norm={info['norm']:.2e}")
+        """
+        # Compute gradients
+        @filter_value_and_grad
+        def get_loss(vary_model, fixed_model, loss_fn, *inner_args, **inner_kwargs):
+            model = combine(vary_model, fixed_model)
+            return loss_fn(model, *inner_args, **inner_kwargs)
+
+        filter_spec = self.get_filter_spec(self.model)
+        vary_model, fixed_model = partition(self.model, filter_spec)
+
+        _, grad = get_loss(
+            vary_model, fixed_model, self.loss_fn, *loss_args, **loss_kwargs
+        )
+
+        # Extract gradient arrays with their paths
+        grad_leaves = leaves_with_path(grad, is_leaf=is_array)
+
+        summary: dict[str, dict[str, Any]] = {}
+        for path, grad_array in grad_leaves:
+            if grad_array is None:
+                continue
+
+            path_str = leafpath_to_str(path)
+            grad_flat = grad_array.flatten()
+
+            summary[path_str] = {
+                "norm": float(jnp.linalg.norm(grad_flat)),
+                "max": float(jnp.max(jnp.abs(grad_flat))),
+                "min": float(jnp.min(jnp.abs(grad_flat))),
+                "has_nan": bool(jnp.any(jnp.isnan(grad_flat))),
+                "has_inf": bool(jnp.any(jnp.isinf(grad_flat))),
+                "shape": grad_array.shape,
+            }
+
+        return summary
+
+    def print_gradient_summary(self, *loss_args, **loss_kwargs) -> None:
+        """
+        Print a formatted summary of gradient norms per parameter.
+
+        This is a convenience wrapper around get_gradient_summary() that
+        prints the results in a human-readable format with colors.
+
+        Args:
+            *loss_args: Positional arguments to pass to the loss function.
+            **loss_kwargs: Keyword arguments to pass to the loss function.
+        """
+        from rich.table import Table
+        from spectracles.model.formatting import get_console
+
+        console = get_console()
+        summary = self.get_gradient_summary(*loss_args, **loss_kwargs)
+
+        # Create styled table
+        table = Table(
+            title="Gradient Summary",
+            show_header=True,
+            header_style="bold #89b4fa",  # blue
+            border_style="#6c7086",  # dim
+        )
+        table.add_column("Parameter Path", style="#cdd6f4", no_wrap=True)  # value
+        table.add_column("Norm", justify="right", style="#cdd6f4")
+        table.add_column("Max", justify="right", style="#cdd6f4")
+        table.add_column("Issues", justify="center")
+
+        for path, info in sorted(summary.items()):
+            issues = []
+            if info["has_nan"]:
+                issues.append("NaN")
+            if info["has_inf"]:
+                issues.append("Inf")
+
+            # Style issues in red if present
+            if issues:
+                issues_str = f"[#f38ba8]{','.join(issues)}[/]"  # red
+            else:
+                issues_str = ""
+
+            table.add_row(
+                path,
+                f"{info['norm']:.2e}",
+                f"{info['max']:.2e}",
+                issues_str,
+            )
+
+        console.print(table)
+
 
 # class OptimiserFrame:
 #     """Drop-in replacement version with scan acceleration.

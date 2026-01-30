@@ -33,7 +33,7 @@ def print_graph(
     is_last: bool = True,
 ) -> None:
     """
-    Print a graph as an ASCII tree.
+    Print a graph as a styled ASCII tree with Rich colors.
 
     Args:
         graph: The NetworkX DiGraph to print.
@@ -41,21 +41,37 @@ def print_graph(
         indent: Current indentation string (used for recursion).
         is_last: Whether this node is the last child of its parent.
     """
+    from rich.text import Text
+    from spectracles.model.formatting import get_console
+
+    console = get_console()
+
     # Get info for current node
     node_data = graph.nodes[root_id]
     name = node_data["name"]
     node_type = node_data["type"]
+    is_param = node_data.get("is_param", False)
 
-    # Format display text
+    # Build styled display text
+    text = Text()
+    text.append(indent, style="tree")
+    text.append("└── " if is_last else "├── ", style="tree")
+
     if name is None:
         # Root module without parent attribute name
-        display_text = node_type
+        text.append(node_type, style="type")
     else:
         # Regular format: "name (Type)"
-        display_text = f"{name} ({node_type})"
+        text.append(name, style="value")
+        text.append(" (", style="dim")
+        # Parameters get special color
+        if is_param:
+            text.append(node_type, style="free")
+        else:
+            text.append(node_type, style="type")
+        text.append(")", style="dim")
 
-    # Print this node
-    print(f"{indent}{'└── ' if is_last else '├── '}{display_text}")
+    console.print(text)
 
     # Find child nodes (those pointing to this node)
     children = []

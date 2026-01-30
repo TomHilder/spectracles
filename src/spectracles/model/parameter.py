@@ -52,6 +52,29 @@ class Parameter(Module):
         self.fix = fixed
         self.val = _array_from_user(dims, initial)
 
+    def __repr__(self) -> str:
+        from spectracles.model.formatting import (
+            format_array_value,
+            parameter_repr_parts,
+            render_to_string,
+        )
+        from spectracles.model.share_module import Shared
+
+        # Check if val is a Shared sentinel (in unlocked ShareModule context)
+        if isinstance(self.val, Shared):
+            text = parameter_repr_parts(
+                "Parameter", "", self.fix, shared_path=self.val.parent_path
+            )
+        else:
+            value_str = format_array_value(self.val)
+            text = parameter_repr_parts("Parameter", value_str, self.fix)
+        return render_to_string(text)
+
+    def debug_repr(self) -> str:
+        """Return the full equinox-style repr for debugging."""
+        import equinox as eqx
+        return eqx.tree_pformat(self)
+
 
 class ConstrainedParameter(Module):
     """A parameter in a statistical model, which may be fixed or free, with lower and/or upper bounds. Can be an array, but all entries must share the same bounds."""
@@ -60,6 +83,10 @@ class ConstrainedParameter(Module):
     fix: bool
     forward_transform: Callable[[Array], Array]
     backward_transform: Callable[[Array], Array]
+    # Store bounds for display purposes
+    _lower: float | None
+    _upper: float | None
+    _log: bool
 
     def __init__(
         self,
@@ -71,6 +98,10 @@ class ConstrainedParameter(Module):
         log: bool = False,
     ):
         self.fix = fixed
+        # Store bounds for repr
+        self._lower = lower
+        self._upper = upper
+        self._log = log
 
         # If log parameterization is requested
         if log:
@@ -140,6 +171,35 @@ class ConstrainedParameter(Module):
     def val(self) -> Array:
         return self.forward_transform(self.unconstrained_val)
 
+    def __repr__(self) -> str:
+        from spectracles.model.formatting import (
+            format_array_value,
+            format_constraint,
+            parameter_repr_parts,
+            render_to_string,
+        )
+        from spectracles.model.share_module import Shared
+
+        constraint_str = format_constraint(self._lower, self._upper, self._log)
+
+        # Check if unconstrained_val is a Shared sentinel (in unlocked ShareModule context)
+        if isinstance(self.unconstrained_val, Shared):
+            text = parameter_repr_parts(
+                "ConstrainedParameter", "", self.fix, constraint_str,
+                shared_path=self.unconstrained_val.parent_path
+            )
+        else:
+            value_str = format_array_value(self.val)
+            text = parameter_repr_parts(
+                "ConstrainedParameter", value_str, self.fix, constraint_str
+            )
+        return render_to_string(text)
+
+    def debug_repr(self) -> str:
+        """Return the full equinox-style repr for debugging."""
+        import equinox as eqx
+        return eqx.tree_pformat(self)
+
 
 AnyParameter = Parameter | ConstrainedParameter
 
@@ -153,6 +213,17 @@ class Known(Parameter):
         dims: int | tuple | None = None,
     ):
         super().__init__(initial=value, dims=dims, fixed=True)
+
+    def __repr__(self) -> str:
+        from spectracles.model.formatting import (
+            format_array_value,
+            known_repr_parts,
+            render_to_string,
+        )
+
+        value_str = format_array_value(self.val)
+        text = known_repr_parts(value_str)
+        return render_to_string(text)
 
 
 def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:
