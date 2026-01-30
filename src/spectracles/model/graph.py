@@ -26,11 +26,26 @@ def temporarily_disable_tex():
         mpl.rcParams["text.usetex"] = prev_setting
 
 
-def print_graph(graph: DiGraph, root_id: int, indent: str = "", is_last: bool = True) -> None:
+def print_graph(
+    graph: DiGraph,
+    root_id: int,
+    indent: str = "",
+    is_last: bool = True,
+) -> None:
+    """
+    Print a graph as an ASCII tree.
+
+    Args:
+        graph: The NetworkX DiGraph to print.
+        root_id: The ID of the root node.
+        indent: Current indentation string (used for recursion).
+        is_last: Whether this node is the last child of its parent.
+    """
     # Get info for current node
     node_data = graph.nodes[root_id]
     name = node_data["name"]
     node_type = node_data["type"]
+
     # Format display text
     if name is None:
         # Root module without parent attribute name
@@ -38,13 +53,16 @@ def print_graph(graph: DiGraph, root_id: int, indent: str = "", is_last: bool = 
     else:
         # Regular format: "name (Type)"
         display_text = f"{name} ({node_type})"
+
     # Print this node
     print(f"{indent}{'└── ' if is_last else '├── '}{display_text}")
+
     # Find child nodes (those pointing to this node)
     children = []
     for src, dst in graph.edges():
         if src == root_id:
             children.append(dst)
+
     # Recurse for each child
     new_indent = indent + ("    " if is_last else "│   ")
     for i, child_id in enumerate(children):

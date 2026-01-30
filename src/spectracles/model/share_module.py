@@ -500,11 +500,36 @@ class ShareModule(Module):
                 new_fix.append(ff)
         return tree_at(lambda x: use_paths_get_leaves(x, fix_paths), self, new_fix)  # type: ignore[no-any-return]
 
-    def print_model_tree(self) -> None:
+    def print_model_tree(self, show_sharing: bool = False) -> None:
         """
-        Print the model tree in an easy to parse format. This is a simple tree structure that shows the model and its parameters. It does not show the sharing structure.
+        Print the model tree in an easy to parse format.
+
+        Args:
+            show_sharing: If True, also print a summary of sharing relationships
+                after the tree. Default is False for backwards compatibility.
+
+        Example with show_sharing=True:
+            └── model (LineRatioModel)
+                ├── line_1 (EmissionLine)
+                │   └── v (GPField)
+                └── line_2 (LinkedEmissionLine)
+                    └── v (GPField)
+
+            Shared parameters:
+              line_1.v.coefficients  ←  line_2.v.coefficients
         """
-        print_graph(*get_digraph(self))
+        graph, root_id = get_digraph(self)
+        print_graph(graph, root_id)
+
+        if show_sharing and self._dupl_leaf_ids:
+            print("\nShared parameters:")
+            summary = self.get_sharing_summary()
+            for parent_path, dupl_paths in summary.items():
+                # Strip .val/.unconstrained_val suffix for cleaner display
+                parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
+                for dupl_path in dupl_paths:
+                    dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
+                    print(f"  {parent_display}  ←  {dupl_display}")
 
     def plot_model_graph(
         self,

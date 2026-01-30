@@ -504,6 +504,60 @@ class TestSharingSummary:
         assert summary == {}
 
 
+class TestPrintModelTree:
+    def test_print_model_tree_basic(self, capsys):
+        # Test that print_model_tree runs without error
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        shared_model.print_model_tree()
+
+        captured = capsys.readouterr()
+        assert "SharedLeafModel" in captured.out
+        # Note: due to sharing, only one of a/b may appear in the tree
+        # (they're the same object)
+
+    def test_print_model_tree_show_sharing(self, capsys):
+        # Test that show_sharing prints sharing summary
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        shared_model.print_model_tree(show_sharing=True)
+
+        captured = capsys.readouterr()
+        # Should show "Shared parameters:" section
+        assert "Shared parameters:" in captured.out
+        # Should show the sharing relationship with arrow
+        assert "←" in captured.out
+        # Should mention both a and b
+        assert "a" in captured.out
+        assert "b" in captured.out
+
+    def test_print_model_tree_complex_sharing(self, capsys):
+        # Test with complex model
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+
+        shared_model.print_model_tree(show_sharing=True)
+
+        captured = capsys.readouterr()
+        # Should have sharing summary section
+        assert "Shared parameters:" in captured.out
+        # Should have multiple sharing annotations
+        assert captured.out.count("←") >= 1
+
+    def test_print_model_tree_no_sharing(self, capsys):
+        # Test with model that has no sharing
+        model = SimpleModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        shared_model.print_model_tree(show_sharing=True)
+
+        captured = capsys.readouterr()
+        # Should NOT show "Shared parameters:" section since there's no sharing
+        assert "Shared parameters:" not in captured.out
+
+
 class TestBuildAndParentModel:
     def test_build_model(self):
         # Test building a model
