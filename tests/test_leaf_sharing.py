@@ -10,6 +10,7 @@ from spectracles.model.share_module import (
     Shared,
     ShareModule,
     build_model,
+    contains_shared,
     # get_duplicated_leaves, # TODO: this should be tested in test_path_utils.py
     get_duplicated_parameters,
     parent_model,
@@ -258,6 +259,97 @@ def assert_array_equal_but_different(x, y):
     # Since we can't directly modify JAX arrays, this test is disabled
     # and we only check for equality
     pass
+
+
+class TestContainsShared:
+    def test_contains_shared_true(self):
+        # Create a model with shared leaves
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        # The model's b parameter contains a Shared value
+        assert contains_shared(shared_model.b) is True
+        # The whole model contains Shared values
+        assert contains_shared(shared_model.model) is True
+
+    def test_contains_shared_false(self):
+        # Create a model with shared leaves
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        # The model's a parameter does NOT contain Shared (it's the parent)
+        assert contains_shared(shared_model.a) is False
+
+    def test_contains_shared_locked_model(self):
+        # Locked models should not contain Shared values
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+        locked_model = shared_model.get_locked_model()
+
+        assert contains_shared(locked_model.a) is False
+        assert contains_shared(locked_model.b) is False
+        assert contains_shared(locked_model.model) is False
+
+    def test_contains_shared_simple(self):
+        # Simple model with no sharing
+        model = SimpleModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        assert contains_shared(shared_model.param) is False
+        assert contains_shared(shared_model.model) is False
+
+
+class TestSubcomponentAccessError:
+    def test_callable_subcomponent_with_shared_raises_helpful_error(self):
+        # Create a complex model where inner2 contains Shared values
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+
+        # Accessing inner2 should work (returns proxy)
+        inner2 = shared_model.inner2
+
+        # But trying to call it should raise a helpful RuntimeError
+        with pytest.raises(RuntimeError) as exc_info:
+            inner2(jnp.array([1.0]))
+
+        # Check the error message is helpful
+        error_msg = str(exc_info.value)
+        assert "inner2" in error_msg
+        assert "get_locked_model()" in error_msg
+        assert "Shared" in error_msg
+
+    def test_callable_subcomponent_without_shared_works(self):
+        # Simple model has no shared parameters
+        model = SimpleModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        # The model itself should be callable without issues
+        x = jnp.array([1.0, 2.0, 3.0])
+        result = shared_model(x)
+        assert jnp.allclose(result, x)
+
+    def test_subcomponent_attribute_access_still_works(self):
+        # Even for sub-components with Shared values, attribute access should work
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+
+        # We can access attributes of inner2 even though it contains Shared
+        inner2 = shared_model.inner2
+        assert hasattr(inner2, "param")
+        # The param's val should be a Shared object
+        assert isinstance(inner2.param.val, Shared)
+
+    def test_locked_model_subcomponent_is_callable(self):
+        # Locked models should have callable sub-components
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+        locked_model = shared_model.get_locked_model()
+
+        # inner2 should be callable on the locked model
+        x = jnp.array([1.0])
+        result = locked_model.inner2(x)
+        # inner2 is SimpleModel, so it just multiplies by param.val (2.0)
+        assert jnp.allclose(result, 2.0 * x)
 
 
 class TestParameterPaths:

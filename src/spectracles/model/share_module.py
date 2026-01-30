@@ -78,6 +78,75 @@ def is_shared(x: Any) -> bool:
     return isinstance(x, Shared)
 
 
+def contains_shared(obj: Any) -> bool:
+    """
+    Check if an object (e.g., a model sub-component) contains any Shared sentinel values.
+
+    This is useful for checking whether a sub-component of an unlocked ShareModule
+    can be called directly. Sub-components containing Shared values cannot be called
+    because the Shared sentinels are not valid JAX values.
+
+    Args:
+        obj: Any object to check (typically an equinox Module).
+
+    Returns:
+        True if the object contains any Shared values, False otherwise.
+
+    Example:
+        >>> model = build_model(MyModel, ...)
+        >>> if contains_shared(model.line_1):
+        ...     # Use locked model for this sub-component
+        ...     locked = model.get_locked_model()
+        ...     result = locked.line_1(data)
+        ... else:
+        ...     result = model.line_1(data)
+    """
+    found_shared = [False]
+
+    def check_leaf(x):
+        if is_shared(x):
+            found_shared[0] = True
+        return x
+
+    tree_map(check_leaf, obj, is_leaf=is_shared)
+    return found_shared[0]
+
+
+class _SharedSubcomponentProxy:
+    """Proxy for sub-components that contain Shared values.
+
+    Delegates attribute access to the underlying object, but raises a helpful
+    error when the user tries to call the sub-component.
+    """
+
+    def __init__(self, obj: Any, attr_name: str):
+        # Use object.__setattr__ to avoid triggering our __setattr__
+        object.__setattr__(self, "_obj", obj)
+        object.__setattr__(self, "_attr_name", attr_name)
+
+    def __call__(self, *args, **kwargs):
+        raise RuntimeError(
+            f"Cannot call '{self._attr_name}' directly - it contains shared parameters "
+            f"that have been replaced with Shared sentinel objects.\n\n"
+            f"To call sub-components of the model, use get_locked_model() first:\n"
+            f"    locked_model = model.get_locked_model()\n"
+            f"    result = locked_model.{self._attr_name}(...)\n\n"
+            f"Note: Locked models cannot be optimised, so get_locked_model() is "
+            f"intended for inference/prediction only."
+        )
+
+    def __repr__(self):
+        return repr(self._obj)
+
+    def __getattr__(self, name):
+        # Delegate attribute access to the underlying object
+        return getattr(self._obj, name)
+
+    def __setattr__(self, name, value):
+        # Delegate attribute setting to the underlying object
+        setattr(self._obj, name, value)
+
+
 class ShareModule(Module):
     model: Module
 
@@ -130,11 +199,18 @@ class ShareModule(Module):
             raise AttributeError(f"The model attribute is None, cannot access {name}")
 
         try:
-            return getattr(self.model, name)
+            attr = getattr(self.model, name)
         except AttributeError:
             raise AttributeError(
                 f"Neither {type(self).__name__} nor {type(self.model).__name__} has attribute {name}"
             )
+
+        # If the model is not locked and the attribute is callable and contains
+        # Shared values, wrap it in a proxy that gives a helpful error on __call__
+        if not self._locked and callable(attr) and contains_shared(attr):
+            return _SharedSubcomponentProxy(attr, name)
+
+        return attr
 
     def __getstate__(self):
         # Make sure we don't include any computed properties that might cause recursion
