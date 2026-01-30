@@ -15,19 +15,13 @@
 <br />
 <div align="center">
   <a href="https://github.com/TomHilder/spectracles">
-    <img src="https://raw.githubusercontent.com/TomHilder/spectracles/main/logo.png" alt="spectrackles" width="420">
+    <img src="https://raw.githubusercontent.com/TomHilder/spectracles/main/logo.png" alt="spectracles" width="420">
   </a>
 
-<!--  <h3 align="center">Wakeflow</h3> -->
-
   <p align="center">
-    Unified spectrospatial models for integral field spectroscopy in jax
+    Unified spectrospatial models for integral field spectroscopy in JAX
   </p>
 </div>
-
-<!-- <div align="center">
-<img src="https://raw.githubusercontent.com/TomHilder/spectracles/main/logo.png" alt="spectracles" width="420"></img>
-</div> -->
 
 ## Glasses for your spectra
 
@@ -37,19 +31,19 @@ It can also be used as a general-purpose statistical model library that extends 
 
 ## Installation
 
-Easiest is from PyPI either with `pip`
+From PyPI with `pip`:
 
 ```sh
 pip install spectracles
 ```
 
-or `uv` (recommended)
+Or with `uv` (recommended):
 
 ```sh
 uv add spectracles
 ```
 
-Or, you can clone and build from source
+From source:
 
 ```sh
 git clone git@github.com:TomHilder/spectracles.git
@@ -57,28 +51,67 @@ cd spectracles
 pip install -e .
 ```
 
-**Important:** `fftw` must be installed or the required dependency`jax-finufft` will fail to build.
+**Note:** `fftw` must be installed or the dependency `jax-finufft` will fail to build.
 
-## Usage
+## Quick Start
 
-TODO
+```python
+import spectracles as sp
+import jax.numpy as jnp
+
+# Define your model as an equinox Module with Parameters
+class MyModel(eqx.Module):
+    amplitude: sp.Parameter
+    scale: sp.Parameter
+
+    def __init__(self):
+        self.amplitude = sp.Parameter(initial=1.0)
+        self.scale = sp.Parameter(initial=1.0)
+
+    def __call__(self, x):
+        return self.amplitude.val * jnp.sin(self.scale.val * x)
+
+# Build a ShareModule that handles parameter sharing
+model = sp.build_model(MyModel)
+
+# Define a loss function
+def loss_fn(model, x, y):
+    return jnp.mean((model(x) - y) ** 2)
+
+# Create an optimization schedule
+schedule = sp.build_schedule(
+    model, loss_fn,
+    phases=[
+        (100, 0.1),   # 100 steps at lr=0.1
+        (50, 0.01),   # 50 steps at lr=0.01
+    ],
+    params={
+        "amplitude": sp.free_in(0, 1),  # Free in both phases
+        "scale": sp.free_after(1),       # Free only in phase 1
+    },
+)
+
+# Run optimization
+schedule.run_all(x=x_data, y=y_data)
+final_model = schedule.model_history[-1]
+```
+
+## Features
+
+- **Parameter sharing** - Couple parameters across model components
+- **Declarative optimization schedules** - Specify which parameters are free/fixed per phase
+- **Glob patterns** - Use wildcards like `"gp.kernel.*"` to match parameters
+- **JAX integration** - Built on equinox, fully compatible with JAX transformations
+- **Rich output** - Pretty-printed model trees and gradient diagnostics
+
+## Documentation
+
+Full documentation: [tomhilder.github.io/spectracles](https://tomhilder.github.io/spectracles/)
 
 ## Citation
 
-TODO
+Coming soon.
 
-## Help
+## License
 
-TODO
-
-### TODO
-
-- [ ] Relax version requirements from being strictly my environment (which is very up-to-date)
-- [ ] Migrate some stuff from the `model` subpackage to a new subpackage called `spectroscopy` or something, idea to separate generic modelling stuff from applied spectrospatial models stuff
-- [x] Instead of replacing shared leaves with `0`, replace with some class/object instead
-- [ ] Nicer `__repr__` for `ShareModule` that actually says the memory address
-- [ ] Add memory address to the top of `print_model_tree`
-- [ ] Support tuples, lists and dicts of models as attributes of models
-- [ ] Handle non-odd number of modes
-- [ ] Write better tests
-- [ ] Rigorously type check the tests
+MIT
