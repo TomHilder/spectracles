@@ -1,8 +1,8 @@
 # Test Coverage Report
 
 **Date:** January 2026
-**Total Tests:** 183 passing
-**Overall Coverage (excluding lvm_models):** 70%
+**Total Tests:** 218 passing
+**Overall Coverage (excluding lvm_models):** 78%
 
 ## Summary
 
@@ -16,12 +16,12 @@ This report analyzes test coverage for the spectracles library, excluding the `l
 | `_version.py` | 13 | 0 | 100% | Complete |
 | `model/data.py` | 17 | 0 | 100% | Complete |
 | `model/formatting.py` | 103 | 0 | 100% | Complete |
-| `model/graph.py` | 76 | 42 | 45% | Needs Work |
+| `model/graph.py` | 76 | 1 | 99% | Excellent |
 | `model/io.py` | 28 | 3 | 89% | Good |
 | `model/kernels.py` | 50 | 1 | 98% | Excellent |
-| `model/parameter.py` | 154 | 36 | 77% | Good |
+| `model/parameter.py` | 154 | 6 | 96% | Excellent |
 | `model/share_module.py` | 400 | 103 | 74% | Good |
-| `model/spatial.py` | 122 | 36 | 70% | Moderate |
+| `model/spatial.py` | 122 | 27 | 78% | Good |
 | `model/spectral.py` | 27 | 1 | 96% | Excellent |
 | `optimise/opt_frame.py` | 113 | 12 | 89% | Good |
 | `optimise/opt_schedule.py` | 161 | 77 | 52% | Moderate |
@@ -40,8 +40,14 @@ Path utilities for PyTree traversal are thoroughly tested.
 
 ## Modules with Excellent Coverage (>90%)
 
+### `model/graph.py` - 99%
+Graph visualization utilities including `print_graph()` and `layered_hierarchy_pos()` are well tested.
+
 ### `model/kernels.py` - 98%
-Kernel implementations (Matern12, Matern32, Matern52, SquaredExponential) are well tested. Only missing coverage is one branch in the kernel normalization.
+Kernel implementations (Matern12, Matern32, Matern52, SquaredExponential) are well tested.
+
+### `model/parameter.py` - 96%
+Parameter classes including repr methods and log parameterization are thoroughly tested.
 
 ### `model/spectral.py` - 96%
 Spectral models (Constant, Gaussian) are well covered.
@@ -56,21 +62,16 @@ The OptimiserFrame class is well tested including:
 
 **Untested areas:**
 - Early convergence exit path (lines 141-149)
-- Some edge cases in gradient summary
 
 ### `model/io.py` - 89%
 Save/load functionality is well tested.
 
-**Untested areas:**
-- Error handling when file already exists without overwrite flag
-
-### `model/parameter.py` - 77%
-Parameter and ConstrainedParameter classes are tested for core functionality.
+### `model/spatial.py` - 78%
+Spatial models including FourierGP, FourierBasis, and PerSpaxel are tested.
 
 **Untested areas:**
-- `__repr__` methods with Rich formatting (lines 56-71)
-- Log parameterization branches (lines 108-114, 140, 150)
-- Some edge cases in inverse transforms
+- Some branches in conjugate symmetry handling
+- Edge cases in dimension checks
 
 ### `model/share_module.py` - 74%
 Core ShareModule functionality is tested including parameter sharing, validation, model building, and `fix_all()`/`free_all()` methods.
@@ -78,15 +79,6 @@ Core ShareModule functionality is tested including parameter sharing, validation
 **Untested areas:**
 - `print_graph()` visualization (lines 809-883)
 - Some branches in sharing detection (lines 291-332)
-- Error paths in sharing validation
-
-### `model/spatial.py` - 70%
-Spatial models are tested for basic operations.
-
-**Untested areas:**
-- FourierBasis class (lines 88-105)
-- Some branches in conjugate symmetry handling
-- Error handling in dimension checks
 
 ## Modules Needing Attention (<70%)
 
@@ -102,17 +94,6 @@ The multi-phase optimization scheduler has moderate testing coverage.
 **Untested areas:**
 - `OptimiserScheduleUnsafe` class (experimental)
 - Phase reset and skip functionality
-- Edge cases in phase ordering
-
-### `model/graph.py` - 45%
-Graph visualization utilities have limited direct testing.
-
-**Untested areas:**
-- `print_graph()` function
-- `layered_hierarchy_pos()` layout algorithm
-- Matplotlib integration
-
-**Recommendation:** These are visualization utilities. Consider adding smoke tests to ensure they don't crash.
 
 ## Test File Mapping
 
@@ -120,40 +101,48 @@ Graph visualization utilities have limited direct testing.
 |-----------|---------------|-------|
 | `test_data.py` | model/data.py | 8 |
 | `test_formatting.py` | model/formatting.py | 27 |
+| `test_graph.py` | model/graph.py | 13 |
 | `test_io.py` | model/io.py | 8 |
 | `test_kernels.py` | model/kernels.py | 16 |
 | `test_leaf_sharing.py` | model/share_module.py, tree/path_utils.py | 52 |
 | `test_opt_schedule.py` | optimise/opt_schedule.py | 15 |
 | `test_optimise.py` | optimise/opt_frame.py | 13 |
-| `test_parameter.py` | model/parameter.py | 20 |
-| `test_spatial.py` | model/spatial.py | 16 |
+| `test_parameter.py` | model/parameter.py | 36 |
+| `test_spatial.py` | model/spatial.py | 22 |
 | `test_spectral.py` | model/spectral.py | 8 |
+
+## Coverage History
+
+| Date | Tests | Coverage | Key Changes |
+|------|-------|----------|-------------|
+| Initial | 133 | 48% | Baseline |
+| Update 1 | 183 | 70% | +formatting, +fix_all/free_all, +opt_schedule |
+| Update 2 | 218 | 78% | +graph, +FourierBasis, +parameter repr/log |
 
 ## Recent Improvements
 
-The following improvements were made to test coverage:
+### Update 2
+1. **`model/graph.py`**: 45% → 99% (+54%)
+   - Added 13 tests for print_graph and layered_hierarchy_pos
 
+2. **`model/parameter.py`**: 77% → 96% (+19%)
+   - Added 5 tests for log parameterization
+   - Added 11 tests for repr methods
+
+3. **`model/spatial.py`**: 70% → 78% (+8%)
+   - Added 6 tests for FourierBasis class
+
+### Update 1
 1. **`model/formatting.py`**: 36% → 100% (+64%)
-   - Added 27 smoke tests covering all formatting utilities
-
 2. **`model/share_module.py`**: 64% → 74% (+10%)
-   - Added 8 tests for `fix_all()` and `free_all()` methods
-
 3. **`optimise/opt_schedule.py`**: 36% → 52% (+16%)
-   - Added 15 tests for PhaseConfig, Phase, and OptimiserSchedule
-
 4. **`tree/path_utils.py`**: 97% → 100% (+3%)
-   - Full coverage achieved
 
 ## Recommendations
 
-### Medium Priority
-1. **`model/spatial.py`**: Add tests for FourierBasis class and edge cases in dimension handling.
-2. **`model/parameter.py`**: Add tests for log parameterization and edge cases in bounded transforms.
-
 ### Low Priority
-3. **`model/graph.py`**: Consider adding smoke tests for graph visualization.
-4. **`optimise/opt_schedule.py`**: Test experimental `OptimiserScheduleUnsafe` class if it will be used.
+1. **`optimise/opt_schedule.py`**: Test experimental `OptimiserScheduleUnsafe` class if it will be used.
+2. **`model/share_module.py`**: Add tests for `print_graph()` visualization method.
 
 ## Excluded from Coverage
 
