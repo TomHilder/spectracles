@@ -39,6 +39,8 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Schedule Builder: schedule_builder.md
+  - Examples:
+    - examples/schedule_builder.md
   - API Reference:
     - api/schedule_builder.md
 

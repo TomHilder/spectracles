@@ -1,4 +1,34 @@
-"""schedule_builder.py - Parameter-centric API for building optimization schedules with less boilerplate."""
+"""Parameter-centric API for building optimization schedules.
+
+This module provides a declarative way to specify optimization schedules
+by describing each parameter's behavior across phases, rather than
+describing each phase's effect on parameters.
+
+Instead of writing verbose PhaseConfig objects:
+
+    phases = [
+        PhaseConfig(n_steps=100, optimiser=adam(0.1),
+                    fix_status_updates={"a": False, "b": True, "c": True}),
+        PhaseConfig(n_steps=50, optimiser=adam(0.01),
+                    fix_status_updates={"a": False, "b": False, "c": True}),
+    ]
+
+You can write:
+
+    schedule = build_schedule(
+        model, loss_fn,
+        phases=[(100, 0.1), (50, 0.01)],
+        params={
+            "a": free_in(0, 1),
+            "b": free_after(1),
+            "c": fixed_in(0, 1),
+        },
+    )
+
+Supports glob-style pattern matching for parameter paths:
+    - "*" matches any single path component
+    - "**" matches any number of components
+"""
 
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
@@ -23,13 +53,41 @@ from spectracles.optimise.opt_schedule import (
 
 @dataclass
 class ParamSpec:
-    """Specification for a parameter across phases."""
+    """Specification for how a parameter behaves across optimization phases.
+
+    ParamSpecs are typically created using helper functions like `free_in()`,
+    `free_after()`, `init_normal()`, etc., and combined with the `|` operator.
+
+    Attributes:
+        free_phases: Set of phase indices where the parameter is free (optimized).
+            May contain sentinel values for late resolution (e.g., free_after).
+        init_specs: Dictionary mapping phase indices to InitSpec objects that
+            describe how to initialize the parameter at the start of that phase.
+
+    Example:
+        >>> # Parameter free in phases 0 and 1, initialized to normal in phase 0
+        >>> spec = free_in(0, 1) | init_normal(0, std=0.1)
+        >>> spec.free_phases
+        {0, 1}
+        >>> 0 in spec.init_specs
+        True
+    """
 
     free_phases: set[int] = field(default_factory=set)
     init_specs: dict[int, "InitSpec"] = field(default_factory=dict)
 
     def __or__(self, other: "ParamSpec") -> "ParamSpec":
-        """Combine two ParamSpecs using the | operator."""
+        """Combine two ParamSpecs using the | operator.
+
+        Free phases are unioned, and init_specs are merged (later values
+        override earlier ones for the same phase).
+
+        Args:
+            other: Another ParamSpec to combine with.
+
+        Returns:
+            A new ParamSpec with combined free_phases and init_specs.
+        """
         combined_free = self.free_phases | other.free_phases
         combined_init = {**self.init_specs, **other.init_specs}
         return ParamSpec(free_phases=combined_free, init_specs=combined_init)
@@ -37,7 +95,19 @@ class ParamSpec:
 
 @dataclass
 class InitSpec:
-    """Specification for parameter initialization."""
+    """Specification for how to initialize a parameter at the start of a phase.
+
+    Created by helper functions `init_normal()`, `init_value()`, and
+    `init_uniform()`. Not typically instantiated directly.
+
+    Attributes:
+        kind: Type of initialization - "normal", "value", or "uniform".
+        value: For kind="value", the constant to fill the parameter with.
+        mean: For kind="normal", the mean of the distribution.
+        std: For kind="normal", the standard deviation.
+        low: For kind="uniform", the lower bound.
+        high: For kind="uniform", the upper bound.
+    """
 
     kind: Literal["normal", "value", "uniform"]
     value: Optional[float] = None
