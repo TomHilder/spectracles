@@ -1,6 +1,8 @@
 """share_module.py - Models built on equinox and jax that can have parameters that are shared between leaves of the model tree. Module refers to equinox Modules not Python modules."""
 
-from typing import Any, Callable, Dict, Self
+from typing import Any, Callable, Dict
+
+from typing_extensions import Self
 
 import matplotlib.pyplot as plt
 from equinox import Module, filter, is_inexact_array, tree_at
