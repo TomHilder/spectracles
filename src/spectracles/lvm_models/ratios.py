@@ -1,11 +1,11 @@
 """ratios.py - Spectrospatial models joint over multiple emission lines where the spatial fields of the lines are modelled in terms of line ratio field(s)."""
 
+import jax
 from jaxtyping import Array
 
-from spectracles import AnyParameter, PerSpaxel, SpatialDataLVM, SpatialModel
-from spectracles.model.kernels import Kernel
-
+from .. import AnyParameter, Kernel, PerSpaxel, SpatialDataLVM, SpatialModel
 from .fields import FieldFromRatio, GPField, PositiveGPField
+from .likelihood import ln_likelihood
 from .line_single import EmissionLine, LinkedEmissionLine
 
 
@@ -28,7 +28,7 @@ class LineRatioModel(SpatialModel):
         σ_lsf_1: AnyParameter,
         σ_lsf_2: AnyParameter,
         v_bary: AnyParameter,
-        v_syst: AnyParameter,
+        v_syst: AnyParameter,  # TODO, need to account for a shift b/w lines
         A_kernel: Kernel,
         v_kernel: Kernel,
         vσ_kernel: Kernel,
@@ -77,3 +77,17 @@ class LineRatioModel(SpatialModel):
         return (
             self.line_1(λ, spatial_data) + self.line_2(λ, spatial_data) + self.cont(spatial_data)
         )
+
+
+def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
+    vmapped_model = jax.vmap(model, in_axes=(0, None))
+    ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
+    print(ln_like)
+    ln_prior = (
+        model.line_1.A.gp.prior_logpdf()
+        + model.line_1.v.gp.prior_logpdf()
+        + model.line_1.vσ.gp.prior_logpdf()
+        + model.line_2.A.log10_ratio_field.gp.prior_logpdf(),
+    )
+    print(ln_prior)
+    return -1 * (ln_like + ln_prior)
