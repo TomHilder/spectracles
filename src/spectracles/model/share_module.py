@@ -528,7 +528,9 @@ class ShareModule(Module):
         else:
             raise ValueError(f"level must be 'parameter' or 'component', got '{level}'")
 
-    def get_parameter_paths(self, show_shared: bool = False) -> list[str]:
+    def get_parameter_paths(
+        self, show_shared: bool = False, show_knowns: bool = False
+    ) -> list[str]:
         """
         Get all parameter paths that can be used with the `set()` method.
 
@@ -536,6 +538,9 @@ class ShareModule(Module):
             show_shared: If False (default), only returns paths to unique/parent
                 parameters. If True, also includes paths to shared (duplicate)
                 parameters.
+            show_knowns: If False (default), excludes Known parameters from the
+                results. Known parameters are fixed constants that cannot be
+                optimized.
 
         Returns:
             A list of parameter path strings (e.g., ['line.A.coefficients',
@@ -548,11 +553,21 @@ class ShareModule(Module):
             ['line_1.A.coefficients', 'line_1.v.coefficients', 'line_2.A.coefficients',
              'line_2.v.coefficients']  # line_2.v is shared with line_1.v
         """
+        from spectracles.model.parameter import Known
+
+        def is_known_param(param_path: tuple) -> bool:
+            """Check if the parameter at this path is a Known."""
+            param = use_path_get_leaf(self, param_path)
+            return isinstance(param, Known)
+
         # Get all unique/parent parameter paths (strip the .val/.unconstrained_val suffix)
         parent_paths: list[str] = []
         for path in self._parent_leaf_paths.values():
             # Remove the last component (.val or .unconstrained_val) to get the Parameter path
             param_path = path[:-1]
+            # Skip Known parameters if not requested
+            if not show_knowns and is_known_param(param_path):
+                continue
             param_path_str = leafpath_to_str(param_path)
             if param_path_str not in parent_paths:
                 parent_paths.append(param_path_str)
@@ -565,6 +580,9 @@ class ShareModule(Module):
         for dupl_path in self._dupl_leaf_paths:
             # Remove the last component (.val or .unconstrained_val) to get the Parameter path
             param_path = dupl_path[:-1]
+            # Skip Known parameters if not requested
+            if not show_knowns and is_known_param(param_path):
+                continue
             param_path_str = leafpath_to_str(param_path)
             if param_path_str not in all_paths:
                 all_paths.append(param_path_str)
