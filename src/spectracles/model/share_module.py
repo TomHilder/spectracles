@@ -693,7 +693,11 @@ class ShareModule(Module):
     def set_fixed_status(self, params: list[str], fix: list[bool]) -> Self:
         """
         Return a new model with parameters updated to be fixed or not based on provided paths and list of bools. Can only be used to update fixed statuses of Parameters or ConstrainedParameters. The model must not be locked.
+
+        Known parameters cannot be unfixed - they are always fixed by definition.
         """
+        from spectracles.model.parameter import Known
+
         # TODO: Refactor based on reused functionality
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")
@@ -703,6 +707,15 @@ class ShareModule(Module):
         fix_paths = []
         new_fix = []
         for pp, ff in zip(param_paths, fix):
+            # Check if trying to unfix a Known parameter
+            param = use_path_get_leaf(self, pp)
+            if isinstance(param, Known) and not ff:
+                path_str = leafpath_to_str(pp)
+                raise ValueError(
+                    f"Cannot unfix Known parameter '{path_str}'. "
+                    f"Known parameters are always fixed by definition."
+                )
+
             val, val_attr = self._get_val_and_attr(pp)
             if is_shared(val):
                 p_id = val.id
@@ -815,8 +828,8 @@ class ShareModule(Module):
                 shared_to_parent[shared_path] = parent_path
 
         # Get unique paths and shared paths
-        unique_paths = self.get_parameter_paths(show_shared=False)
-        all_paths = self.get_parameter_paths(show_shared=True)
+        unique_paths = self.get_parameter_paths(show_shared=False, show_knowns=show_knowns)
+        all_paths = self.get_parameter_paths(show_shared=True, show_knowns=show_knowns)
         shared_paths_set = set(all_paths) - set(unique_paths)
 
         for path in all_paths:
