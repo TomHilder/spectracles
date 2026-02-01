@@ -1000,12 +1000,22 @@ class ShareModule(Module):
         show: bool = True,
         label_func: Callable[[DiGraph], Dict[int, str]] | None = None,
         nx_draw_kwds: dict = DEFAULT_NX_KWDS,
+        sharing_level: str = "component",
     ) -> None:
         """
-        Plot the model as a graph using networkx and matplotlib. The graph is directed towards parameters and accounts for the sharing structure.
+        Plot the model as a graph using networkx and matplotlib. The graph is
+        directed towards parameters and accounts for the sharing structure.
+
+        Args:
+            ax: Matplotlib axes to plot on. If None, creates a new figure.
+            show: If True, calls plt.show() after plotting.
+            label_func: Custom function to generate node labels.
+            nx_draw_kwds: Keyword arguments for networkx drawing functions.
+            sharing_level: How to display sharing - 'component' (default) shows
+                module-level sharing, 'parameter' shows leaf-level sharing.
         """
         with temporarily_disable_tex():  # TODO: implement this and check it works
-            graph, root_id = get_digraph(self)
+            graph, root_id = get_digraph(self, sharing_level=sharing_level)
             pos = layered_hierarchy_pos(graph, root_id)
             if ax is None:
                 _, ax = plt.subplots(figsize=(10, 10), layout="compressed")
@@ -1092,7 +1102,26 @@ def build_model(cls: Callable[..., Module], *args, **kwargs) -> ShareModule:
     return parent_model(cls(*args, **kwargs))
 
 
-def get_digraph(module: ShareModule) -> tuple[DiGraph, int]:
+def get_digraph(
+    module: ShareModule, sharing_level: str = "component"
+) -> tuple[DiGraph, int]:
+    """
+    Build a directed graph representation of the model structure.
+
+    Args:
+        module: The ShareModule to build a graph for.
+        sharing_level: How to handle sharing - 'component' uses module-level
+            sharing, 'parameter' uses leaf-level sharing.
+
+    Returns:
+        A tuple of (DiGraph, root_node_id).
+    """
+    # Build component-level sharing lookup: child_path -> parent_path
+    component_sharing: dict[str, str] = {}
+    for parent_path, child_paths in module._shared_components.items():
+        for child_path in child_paths:
+            component_sharing[child_path] = parent_path
+
     # Filter tree and extract leaves + paths
     filtered_tree = filter(module, is_parameter)
     leaves = leaves_with_path(filtered_tree.model, is_leaf=is_parameter)
@@ -1116,16 +1145,29 @@ def get_digraph(module: ShareModule) -> tuple[DiGraph, int]:
             leaf = getattr(parent, entry.name)
             # Figure out what leaf we are adding, accounting for sharing
             if is_parameter(leaf):
-                if is_constrained(leaf):
-                    val_attr = "unconstrained_val"
+                if sharing_level == "parameter":
+                    # Parameter-level: check if the leaf's value is a Shared sentinel
+                    if is_constrained(leaf):
+                        val_attr = "unconstrained_val"
+                    else:
+                        val_attr = "val"
+                    val_leaf = getattr(leaf, val_attr)
+                    if is_shared(val_leaf):
+                        parent_path = module._parent_leaf_paths[val_leaf.id][:-1]
+                    else:
+                        parent_path = p
+                    leaf = use_path_get_leaf(module, parent_path)
+                elif sharing_level == "component":
+                    # Component-level: check if this path is in shared components
+                    current_path = leafpath_to_str(p)  # Full path to the parameter
+                    if current_path in component_sharing:
+                        # Redirect to parent component (which is the same parameter)
+                        parent_component_path = component_sharing[current_path]
+                        leaf = use_path_get_leaf(module, str_to_leafpath(parent_component_path))
                 else:
-                    val_attr = "val"
-                val_leaf = getattr(leaf, val_attr)
-                if is_shared(val_leaf):
-                    parent_path = module._parent_leaf_paths[val_leaf.id][:-1]
-                else:
-                    parent_path = p
-                leaf = use_path_get_leaf(module, parent_path)
+                    raise ValueError(
+                        f"sharing_level must be 'component' or 'parameter', got '{sharing_level}'"
+                    )
             # If it was a shared leaf, then the following will actually do nothing, as desired
             graph.add_node(
                 id(leaf),
