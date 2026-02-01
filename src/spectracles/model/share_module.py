@@ -367,7 +367,10 @@ class ShareModule(Module):
     def debug_repr(self) -> str:
         """Return the full equinox-style repr for debugging."""
         import equinox as eqx
-        return eqx.tree_pformat(self)
+
+        # Use locked model to get actual values (not Shared sentinels)
+        # and format just the model, not the ShareModule wrapper metadata
+        return eqx.tree_pformat(self.get_locked_model().model)
 
     def __call__(self, *args, **kwargs) -> Any:
         # Replace nodes specified by `where` with the nodes specified by `get`
