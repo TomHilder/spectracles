@@ -680,12 +680,41 @@ class ShareModule(Module):
 
         return result
 
-    def set(self, params: list[str], values: list[Array]) -> Self:
+    def set(
+        self, params: list[str], values: list[Array], allow_set_knowns: bool = False
+    ) -> Self:
         """
-        Return a new model with updated parameter values. Can only be used to update values of Parameters or ConstrainedParameters. The model must not be locked.
+        Return a new model with updated parameter values. Can only be used to
+        update values of Parameters or ConstrainedParameters. The model must
+        not be locked.
+
+        Args:
+            params: List of parameter paths to update.
+            values: List of new values for each parameter.
+            allow_set_knowns: If False (default), raises an error when trying
+                to set Known parameters. Set to True to allow modifying Known
+                values (use with caution).
+
+        Returns:
+            A new ShareModule with updated parameter values.
         """
+        from spectracles.model.parameter import Known
+
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")
+
+        # Check for Known parameters if not allowed
+        if not allow_set_knowns:
+            for param_str in params:
+                param_path = str_to_leafpath(param_str)
+                param = use_path_get_leaf(self, param_path)
+                if isinstance(param, Known):
+                    raise ValueError(
+                        f"Cannot set Known parameter '{param_str}'. "
+                        f"Known parameters are constants. Use allow_set_knowns=True "
+                        f"to override this check."
+                    )
+
         val_paths = self._get_val_paths(params)
         replace_vals = self._prepare_new_vals(val_paths, values)
         return tree_at(lambda x: use_paths_get_leaves(x, val_paths), self, replace_vals)  # type: ignore[no-any-return]
