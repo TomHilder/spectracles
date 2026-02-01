@@ -735,6 +735,200 @@ class ShareModule(Module):
         # Set all to free
         return self.set_fixed_status(all_paths, [False] * len(all_paths))
 
+    def parameter_summary(
+        self, show_shared: bool = True, show_knowns: bool = False
+    ) -> None:
+        """
+        Print a summary table of all parameters with their status.
+
+        Shows path, shape, bounds, free/fixed status, and sharing info.
+
+        Args:
+            show_shared: If True (default), include parameters that are shared
+                from other parameters. If False, only show unique/parent parameters.
+            show_knowns: If False (default), exclude Known parameters from the
+                summary. If True, include them with status 'known'.
+
+        Example:
+            >>> model.parameter_summary()
+            Parameter Summary
+            ──────────────────────────────────────────────────────────────────
+            Path                      Shape     Bounds       Status  Shared from
+            ──────────────────────────────────────────────────────────────────
+            line_1.A.coefficients     (10,)     (-∞, ∞)      free    -
+            line_1.v.coefficients     (10,)     (-∞, ∞)      fixed   -
+            line_2.v.coefficients     (10,)     (-∞, ∞)      fixed   line_1.v.coefficients
+            ──────────────────────────────────────────────────────────────────
+            3 parameters (2 unique, 1 shared) · 1 free, 2 fixed
+        """
+        from rich.table import Table
+        from rich.text import Text
+
+        from spectracles.model.formatting import get_console
+        from spectracles.model.parameter import (
+            ConstrainedParameter,
+            Known,
+            Parameter,
+        )
+
+        console = get_console()
+
+        # Get the locked model for traversal
+        locked = self.get_locked_model()
+
+        # Build list of parameter info
+        params_info = []
+        sharing_summary = self.get_sharing_summary()
+
+        # Create reverse lookup: shared_path -> parent_path
+        shared_to_parent: Dict[str, str] = {}
+        for parent_path, shared_paths in sharing_summary.items():
+            # Strip .val/.unconstrained_val suffix
+            parent_clean = (
+                parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
+            )
+            for shared_path in shared_paths:
+                shared_clean = (
+                    shared_path.rsplit(".", 1)[0] if "." in shared_path else shared_path
+                )
+                shared_to_parent[shared_clean] = parent_clean
+
+        # Get unique paths and shared paths
+        unique_paths = self.get_parameter_paths(show_shared=False)
+        all_paths = self.get_parameter_paths(show_shared=True)
+        shared_paths_set = set(all_paths) - set(unique_paths)
+
+        for path in all_paths:
+            # Skip shared params if not showing them
+            is_shared = path in shared_paths_set
+            if is_shared and not show_shared:
+                continue
+
+            # Get the parameter object from the locked model (has real values, not Shared)
+            param = use_path_get_leaf(locked.model, str_to_leafpath(path))
+
+            # Check if it's a Known
+            is_known = isinstance(param, Known)
+            if is_known and not show_knowns:
+                continue
+
+            # Get shape
+            if isinstance(param, ConstrainedParameter):
+                shape = param.unconstrained_val.shape
+            else:
+                shape = param.val.shape
+
+            # Get bounds
+            if isinstance(param, ConstrainedParameter):
+                lower = param._lower
+                upper = param._upper
+                is_log = param._log
+                if is_log:
+                    bounds = "(0, ∞) log"
+                elif lower is not None and upper is not None:
+                    bounds = f"({lower}, {upper})"
+                elif lower is not None:
+                    bounds = f"({lower}, ∞)"
+                elif upper is not None:
+                    bounds = f"(-∞, {upper})"
+                else:
+                    bounds = "(-∞, ∞)"
+            else:
+                bounds = "(-∞, ∞)"
+
+            # Get status
+            if is_known:
+                status = "known"
+            elif param.fix:
+                status = "fixed"
+            else:
+                status = "free"
+
+            # Get parent (for shared params)
+            parent = shared_to_parent.get(path, "-")
+
+            params_info.append(
+                {
+                    "path": path,
+                    "shape": str(shape),
+                    "bounds": bounds,
+                    "status": status,
+                    "parent": parent,
+                    "is_shared": is_shared,
+                    "is_known": is_known,
+                }
+            )
+
+        # Build the table
+        table = Table(
+            title="Parameter Summary",
+            show_header=True,
+            header_style="bold",
+            border_style="dim",
+            title_style="bold",
+        )
+
+        table.add_column("Path", style="white")
+        table.add_column("Shape", style="dim")
+        table.add_column("Bounds", style="dim")
+        if show_shared:
+            table.add_column("Status", justify="center")
+            table.add_column("Shared from", style="#cba6f7")  # Mauve/shared color
+        else:
+            table.add_column("Status", justify="center")
+
+        for info in params_info:
+            # Style the status
+            if info["status"] == "free":
+                status_text = Text("free", style="#a6e3a1")  # Green
+            elif info["status"] == "fixed":
+                status_text = Text("fixed", style="#f9e2af")  # Yellow
+            else:  # known
+                status_text = Text("known", style="dim")
+
+            if show_shared:
+                table.add_row(
+                    info["path"],
+                    info["shape"],
+                    info["bounds"],
+                    status_text,
+                    info["parent"],
+                )
+            else:
+                table.add_row(
+                    info["path"],
+                    info["shape"],
+                    info["bounds"],
+                    status_text,
+                )
+
+        console.print(table)
+
+        # Summary line
+        total = len(params_info)
+        n_unique = sum(1 for p in params_info if not p["is_shared"])
+        n_shared = sum(1 for p in params_info if p["is_shared"])
+        n_free = sum(1 for p in params_info if p["status"] == "free")
+        n_fixed = sum(1 for p in params_info if p["status"] == "fixed")
+        n_known = sum(1 for p in params_info if p["status"] == "known")
+
+        summary = Text()
+        if show_shared and n_shared > 0:
+            summary.append(f"{total} parameters ", style="dim")
+            summary.append(f"({n_unique} unique, {n_shared} shared)", style="dim")
+        else:
+            summary.append(f"{n_unique} parameters", style="dim")
+
+        if show_knowns and n_known > 0:
+            summary.append(f" + {n_known} known", style="dim")
+
+        summary.append(" · ", style="dim")
+        summary.append(f"{n_free} free", style="#a6e3a1")
+        summary.append(", ", style="dim")
+        summary.append(f"{n_fixed} fixed", style="#f9e2af")
+
+        console.print(summary)
+
     def print_model_tree(self, show_sharing: bool = False) -> None:
         """
         Print the model tree in an easy to parse format.
