@@ -131,6 +131,71 @@ class TestFourierGP:
         assert out.shape == (n,)
 
 
+class TestFourierBasis:
+    def setup_method(self):
+        from spectracles.model.spatial import FourierBasis
+
+        self.FourierBasis = FourierBasis
+        self.n_modes = (5, 5)
+        self.data = SpatialDataGeneric(
+            x=jnp.array([0.0, 0.1, 0.2, 0.3, 0.4]),
+            y=jnp.array([0.5, 0.6, 0.7, 0.8, 0.9]),
+            idx=jnp.arange(5),
+        )
+
+    def test_initialization(self):
+        # Test basic initialization
+        fb = self.FourierBasis(n_modes=self.n_modes)
+
+        # Check attributes
+        assert fb.n_modes == self.n_modes
+        assert fb.coefficients.val.shape == self.n_modes
+        assert fb._freqs.shape == self.n_modes
+
+    def test_initialization_with_coefficients(self):
+        # Test initialization with provided coefficients
+        coeffs = Parameter(initial=jnp.ones(self.n_modes))
+        fb = self.FourierBasis(n_modes=self.n_modes, coefficients=coeffs)
+
+        assert jnp.allclose(fb.coefficients.val, jnp.ones(self.n_modes))
+
+    def test_call(self):
+        # Test function evaluation
+        fb = self.FourierBasis(n_modes=self.n_modes)
+        out = fb(self.data)
+
+        # Check output shape
+        assert out.shape == (self.data.x.shape[0],)
+
+        # Calling twice should give same result (deterministic)
+        out2 = fb(self.data)
+        assert jnp.allclose(out, out2)
+
+    def test_larger_dataset(self):
+        # Test with larger dataset
+        n = 100
+        data = SpatialDataGeneric(
+            x=jnp.linspace(0, 1, n), y=jnp.linspace(0, 1, n), idx=jnp.arange(n)
+        )
+        fb = self.FourierBasis(n_modes=self.n_modes)
+        out = fb(data)
+        assert out.shape == (n,)
+
+    def test_different_n_modes(self):
+        # Test with different number of modes
+        for n_modes in [(3, 3), (7, 5), (5, 7)]:
+            fb = self.FourierBasis(n_modes=n_modes)
+            assert fb.n_modes == n_modes
+            assert fb.coefficients.val.shape == n_modes
+
+    def test_prior_logpdf_not_implemented(self):
+        # Test that prior_logpdf raises NotImplementedError
+        fb = self.FourierBasis(n_modes=self.n_modes)
+
+        with pytest.raises(NotImplementedError):
+            fb.prior_logpdf()
+
+
 class TestPerSpaxel:
     def setup_method(self):
         # Common setup for PerSpaxel tests

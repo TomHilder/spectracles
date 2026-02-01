@@ -9,11 +9,15 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
+    "dill>=0.3.8",
     "equinox>=0.13.0",
     "jax>=0.5.3",
     "jax-finufft",
+    "jaxtyping>=0.3.0",
     "matplotlib>=3.10.5",
-    "networkx>=3.5",
+    "networkx>=3.4",
+    "optax>=0.2.0",
+    "rich>=13.0",
     "tqdm>=4.67.1",
 ]
 
