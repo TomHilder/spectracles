@@ -26,25 +26,59 @@ def temporarily_disable_tex():
         mpl.rcParams["text.usetex"] = prev_setting
 
 
-def print_graph(graph: DiGraph, root_id: int, indent: str = "", is_last: bool = True) -> None:
+def print_graph(
+    graph: DiGraph,
+    root_id: int,
+    indent: str = "",
+    is_last: bool = True,
+) -> None:
+    """
+    Print a graph as a styled ASCII tree with Rich colors.
+
+    Args:
+        graph: The NetworkX DiGraph to print.
+        root_id: The ID of the root node.
+        indent: Current indentation string (used for recursion).
+        is_last: Whether this node is the last child of its parent.
+    """
+    from rich.text import Text
+    from spectracles.model.formatting import get_console
+
+    console = get_console()
+
     # Get info for current node
     node_data = graph.nodes[root_id]
     name = node_data["name"]
     node_type = node_data["type"]
-    # Format display text
+    is_param = node_data.get("is_param", False)
+
+    # Build styled display text
+    text = Text()
+    text.append(indent, style="tree")
+    text.append("└── " if is_last else "├── ", style="tree")
+
     if name is None:
         # Root module without parent attribute name
-        display_text = node_type
+        text.append(node_type, style="type")
     else:
         # Regular format: "name (Type)"
-        display_text = f"{name} ({node_type})"
-    # Print this node
-    print(f"{indent}{'└── ' if is_last else '├── '}{display_text}")
+        text.append(name, style="value")
+        text.append(" (", style="dim")
+        # Parameters get special color
+        if is_param:
+            text.append(node_type, style="free")
+        else:
+            text.append(node_type, style="type")
+        text.append(")", style="dim")
+
+    console.print(text)
+
     # Find child nodes (those pointing to this node)
     children = []
     for src, dst in graph.edges():
         if src == root_id:
             children.append(dst)
+
     # Recurse for each child
     new_indent = indent + ("    " if is_last else "│   ")
     for i, child_id in enumerate(children):

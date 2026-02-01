@@ -231,6 +231,125 @@ class TestBoundFunctions:
             lu_bounded_inv(jnp.array([5.1]), lower, upper)
 
 
+class TestLogParameterization:
+    def test_log_initialization(self):
+        # Test log parameterization
+        c = ConstrainedParameter(initial=1.0, log=True)
+        assert jnp.allclose(c.val, 1.0)
+        assert c._log is True
+
+    def test_log_ensures_positivity(self):
+        # Test that log parameterization ensures positivity
+        c = ConstrainedParameter(initial=0.1, log=True)
+        assert jnp.all(c.val > 0)
+
+        c = ConstrainedParameter(initial=10.0, log=True)
+        assert jnp.all(c.val > 0)
+
+    def test_log_default_value(self):
+        # Test default value for log parameterization is 1.0
+        c = ConstrainedParameter(log=True)
+        assert jnp.allclose(c.val, 1.0)
+
+    def test_log_cannot_have_bounds(self):
+        # Test that log=True cannot be combined with bounds
+        with pytest.raises(ValueError, match="Cannot specify bounds"):
+            ConstrainedParameter(initial=1.0, log=True, lower=0.0)
+
+        with pytest.raises(ValueError, match="Cannot specify bounds"):
+            ConstrainedParameter(initial=1.0, log=True, upper=10.0)
+
+        with pytest.raises(ValueError, match="Cannot specify bounds"):
+            ConstrainedParameter(initial=1.0, log=True, lower=0.0, upper=10.0)
+
+    def test_log_with_arrays(self):
+        # Test log parameterization with arrays
+        arr = jnp.array([0.5, 1.0, 2.0])
+        c = ConstrainedParameter(initial=arr, log=True)
+        assert jnp.all(c.val > 0)
+        assert jnp.allclose(c.val, arr)
+
+
+class TestParameterRepr:
+    def test_parameter_repr_free(self):
+        p = Parameter(initial=1.5)
+        r = repr(p)
+        assert "Parameter" in r
+        assert "1.5" in r
+        assert "free" in r
+
+    def test_parameter_repr_fixed(self):
+        p = Parameter(initial=2.0, fixed=True)
+        r = repr(p)
+        assert "Parameter" in r
+        assert "2" in r
+        assert "fixed" in r
+
+    def test_parameter_repr_array(self):
+        p = Parameter(initial=jnp.array([1.0, 2.0, 3.0]))
+        r = repr(p)
+        assert "Parameter" in r
+        # Should show array values or dtype/shape
+        assert "1" in r or "float" in r.lower()
+
+    def test_constrained_parameter_repr_lower(self):
+        c = ConstrainedParameter(initial=5.0, lower=0.0)
+        r = repr(c)
+        assert "ConstrainedParameter" in r
+        assert "5" in r
+        assert ">" in r or "0" in r  # Should show constraint
+
+    def test_constrained_parameter_repr_upper(self):
+        c = ConstrainedParameter(initial=5.0, upper=10.0)
+        r = repr(c)
+        assert "ConstrainedParameter" in r
+        assert "<" in r or "10" in r  # Should show constraint
+
+    def test_constrained_parameter_repr_both_bounds(self):
+        c = ConstrainedParameter(initial=0.5, lower=0.0, upper=1.0)
+        r = repr(c)
+        assert "ConstrainedParameter" in r
+        assert "0" in r
+        assert "1" in r
+
+    def test_constrained_parameter_repr_log(self):
+        c = ConstrainedParameter(initial=1.0, log=True)
+        r = repr(c)
+        assert "ConstrainedParameter" in r
+        assert "log" in r
+
+    def test_parameter_debug_repr(self):
+        p = Parameter(initial=1.5)
+        r = p.debug_repr()
+        # Should be equinox-style repr
+        assert "Parameter" in r
+        assert "val" in r
+
+    def test_constrained_parameter_debug_repr(self):
+        c = ConstrainedParameter(initial=0.5, lower=0.0)
+        r = c.debug_repr()
+        # Should be equinox-style repr
+        assert "ConstrainedParameter" in r
+        assert "unconstrained_val" in r
+
+
+class TestKnownRepr:
+    def test_known_repr(self):
+        from spectracles.model.parameter import Known
+
+        k = Known(value=3.14)
+        r = repr(k)
+        assert "Known" in r
+        assert "3.14" in r
+
+    def test_known_debug_repr(self):
+        from spectracles.model.parameter import Known
+
+        k = Known(value=2.0)
+        r = k.debug_repr()
+        assert "Known" in r
+
+
 def test_init_parameter():
     # Test with None
     p = init_parameter(None, initial=1.0)

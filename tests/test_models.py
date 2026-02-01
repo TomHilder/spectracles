@@ -81,6 +81,27 @@ class ComplexSharedModel(Module):
         return self.inner1(x) + self.inner2(x) + self.inner3(x) + self.param.val
 
 
+class SharedBranchModel(Module):
+    """Model with shared module branches (entire sub-modules are the same object).
+
+    This is different from SharedLeafModel which shares Parameters.
+    Here entire SimpleModel objects are shared.
+    """
+
+    branch_a: SimpleModel
+    branch_b: SimpleModel  # Same object as branch_a
+    branch_c: SimpleModel  # Different object
+
+    def __init__(self, value=1.0):
+        shared_branch = SimpleModel(value=value)
+        self.branch_a = shared_branch
+        self.branch_b = shared_branch  # Same object!
+        self.branch_c = SimpleModel(value=value * 2)  # Different object
+
+    def __call__(self, x):
+        return self.branch_a(x) + self.branch_b(x) + self.branch_c(x)
+
+
 class SpatialDummyModel(Module):
     """Dummy spatial model class that works with SpatialData."""
 
