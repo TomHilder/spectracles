@@ -33,57 +33,56 @@ def print_graph(
     is_last: bool = True,
 ) -> None:
     """
-    Print a graph as a styled ASCII tree with Rich colors.
+    Print a graph as a styled tree using Rich's Tree widget.
 
     Args:
         graph: The NetworkX DiGraph to print.
         root_id: The ID of the root node.
-        indent: Current indentation string (used for recursion).
-        is_last: Whether this node is the last child of its parent.
+        indent: Deprecated, kept for backwards compatibility.
+        is_last: Deprecated, kept for backwards compatibility.
     """
     from rich.text import Text
+    from rich.tree import Tree
     from spectracles.model.formatting import get_console
 
     console = get_console()
 
-    # Get info for current node
-    node_data = graph.nodes[root_id]
-    name = node_data["name"]
-    node_type = node_data["type"]
-    is_param = node_data.get("is_param", False)
+    def make_node_label(node_id: int) -> Text:
+        """Create a styled label for a node."""
+        node_data = graph.nodes[node_id]
+        name = node_data["name"]
+        node_type = node_data["type"]
+        is_param = node_data.get("is_param", False)
 
-    # Build styled display text
-    text = Text()
-    text.append(indent, style="tree")
-    text.append("└── " if is_last else "├── ", style="tree")
-
-    if name is None:
-        # Root module without parent attribute name
-        text.append(node_type, style="type")
-    else:
-        # Regular format: "name (Type)"
-        text.append(name, style="value")
-        text.append(" (", style="dim")
-        # Parameters get special color
-        if is_param:
-            text.append(node_type, style="free")
-        else:
+        text = Text()
+        if name is None:
+            # Root module without parent attribute name
             text.append(node_type, style="type")
-        text.append(")", style="dim")
+        else:
+            # Regular format: "name (Type)"
+            text.append(name, style="value")
+            text.append(" (", style="dim")
+            if is_param:
+                text.append(node_type, style="free")
+            else:
+                text.append(node_type, style="type")
+            text.append(")", style="dim")
+        return text
 
-    console.print(text)
+    def build_tree(node_id: int, tree: Tree) -> None:
+        """Recursively build the Rich Tree."""
+        children = [dst for src, dst in graph.edges() if src == node_id]
+        for child_id in children:
+            child_label = make_node_label(child_id)
+            subtree = tree.add(child_label)
+            build_tree(child_id, subtree)
 
-    # Find child nodes (those pointing to this node)
-    children = []
-    for src, dst in graph.edges():
-        if src == root_id:
-            children.append(dst)
+    # Create root tree and build recursively
+    root_label = make_node_label(root_id)
+    tree = Tree(root_label, guide_style="tree")
+    build_tree(root_id, tree)
 
-    # Recurse for each child
-    new_indent = indent + ("    " if is_last else "│   ")
-    for i, child_id in enumerate(children):
-        is_last_child = i == len(children) - 1
-        print_graph(graph, child_id, new_indent, is_last_child)
+    console.print(tree)
 
 
 def layered_hierarchy_pos(G: DiGraph, root, total_width: float = 1.0, vert_gap: float = 0.8):

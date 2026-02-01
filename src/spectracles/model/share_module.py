@@ -961,36 +961,38 @@ class ShareModule(Module):
         print_graph(graph, root_id)
 
         if show_sharing:
+            # Build all sharing info into a single Text object to avoid spacing issues
+            output = Text()
+
             # Show component-level sharing (entire modules that are the same object)
             shared_components = self.get_shared_components()
             if shared_components:
-                header = Text("\nShared components ", style="dim")
-                header.append("(same object)", style="dim")
-                header.append(":", style="dim")
-                console.print(header)
+                output.append("\nShared components ", style="dim")
+                output.append("(same object)", style="dim")
+                output.append(":", style="dim")
                 for parent_path, shared_paths in shared_components.items():
                     for shared_path in shared_paths:
-                        line = Text("  ")
-                        line.append(parent_path, style="value")
-                        line.append("  ←  ", style="shared")
-                        line.append(shared_path, style="shared")
-                        console.print(line)
+                        output.append("\n  ")
+                        output.append(parent_path, style="value")
+                        output.append("  ←  ", style="shared")
+                        output.append(shared_path, style="shared")
 
             # Show parameter-level sharing
             if self._dupl_leaf_ids:
-                header = Text("\nShared parameters:", style="dim")
-                console.print(header)
+                output.append("\n\nShared parameters:", style="dim")
                 summary = self.get_sharing_summary()
                 for parent_path, dupl_paths in summary.items():
                     # Strip .val/.unconstrained_val suffix for cleaner display
                     parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
                     for dupl_path in dupl_paths:
                         dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
-                        line = Text("  ")
-                        line.append(parent_display, style="value")
-                        line.append("  ←  ", style="shared")
-                        line.append(dupl_display, style="shared")
-                        console.print(line)
+                        output.append("\n  ")
+                        output.append(parent_display, style="value")
+                        output.append("  ←  ", style="shared")
+                        output.append(dupl_display, style="shared")
+
+            if output:
+                console.print(output)
 
     def plot_model_graph(
         self,
