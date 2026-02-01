@@ -956,8 +956,8 @@ class ShareModule(Module):
 
         Args:
             show_sharing: If True, also print summaries of sharing relationships
-                after the tree. Shows both component-level sharing (entire modules
-                that are the same object) and parameter-level sharing.
+                after the tree. Shows both shared modules (entire modules that
+                are the same object) and shared parameters.
                 Default is False for backwards compatibility.
 
         Example with show_sharing=True:
@@ -967,11 +967,13 @@ class ShareModule(Module):
                 └── line_2 (LinkedEmissionLine)
                     └── v (GPField)
 
-            Shared components (same object):
-              line_1.v  ←  line_2.v
+            Shared modules (parameters within are also shared):
+              line_1.v:
+                ← line_2.v
 
             Shared parameters:
-              line_1.v.coefficients  ←  line_2.v.coefficients
+              line_1.v.coefficients:
+                ← line_2.v.coefficients
         """
         from rich.text import Text
         from spectracles.model.formatting import get_console
@@ -982,35 +984,44 @@ class ShareModule(Module):
         print_graph(graph, root_id)
 
         if show_sharing:
-            # Build all sharing info into a single Text object to avoid spacing issues
-            output = Text()
-
             # Show component-level sharing (entire modules that are the same object)
             shared_components = self.get_sharing_summary(level="component")
             if shared_components:
-                output.append("\nShared components ", style="dim")
-                output.append("(same object)", style="dim")
-                output.append(":", style="dim")
+                header = Text("\nShared modules ", style="dim")
+                header.append("(parameters within are also shared)", style="dim italic")
+                header.append(":", style="dim")
+                console.print(header)
                 for parent_path, shared_paths in shared_components.items():
+                    # Parent on its own line
+                    parent_line = Text("  ")
+                    parent_line.append(parent_path, style="value")
+                    parent_line.append(":", style="dim")
+                    console.print(parent_line)
+                    # Shared paths indented below
                     for shared_path in shared_paths:
-                        output.append("\n  ")
-                        output.append(parent_path, style="value")
-                        output.append("  ←  ", style="shared")
-                        output.append(shared_path, style="shared")
+                        shared_line = Text("    ← ")
+                        shared_line.append(shared_path, style="shared")
+                        console.print(shared_line)
 
             # Show parameter-level sharing
             if self._dupl_leaf_ids:
-                output.append("\n\nShared parameters:", style="dim")
+                header = Text("\nShared parameters:", style="dim")
+                console.print(header)
                 summary = self.get_sharing_summary(level="parameter")
                 for parent_path, dupl_paths in summary.items():
+                    # Strip .val/.unconstrained_val suffix for cleaner display
+                    parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
+                    # Parent on its own line
+                    parent_line = Text("  ")
+                    parent_line.append(parent_display, style="value")
+                    parent_line.append(":", style="dim")
+                    console.print(parent_line)
+                    # Shared paths indented below
                     for dupl_path in dupl_paths:
-                        output.append("\n  ")
-                        output.append(parent_path, style="value")
-                        output.append("  ←  ", style="shared")
-                        output.append(dupl_path, style="shared")
-
-            if output:
-                console.print(output)
+                        dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
+                        shared_line = Text("    ← ")
+                        shared_line.append(dupl_display, style="shared")
+                        console.print(shared_line)
 
     def plot_model_graph(
         self,
