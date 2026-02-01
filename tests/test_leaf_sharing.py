@@ -792,3 +792,130 @@ class TestFixAllFreeAll:
         # All should be free
         assert not locked_freed.param.fix
         assert not locked_freed.inner1.param.fix
+
+
+class TestKnownParameterHandling:
+    """Tests for Known parameter handling in ShareModule."""
+
+    def test_set_known_raises_by_default(self):
+        """set() should raise when trying to modify Known parameters by default."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        with pytest.raises(ValueError, match="Cannot set Known parameter"):
+            model.set(["known"], [jnp.array([999.0])])
+
+    def test_set_known_with_allow_flag(self):
+        """set() should allow modifying Known when allow_set_knowns=True."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown(known_value=1.0))
+
+        # Should work with flag
+        updated = model.set(["known"], [jnp.array([999.0])], allow_set_knowns=True)
+        locked = updated.get_locked_model()
+        assert jnp.allclose(locked.model.known.val, 999.0)
+
+    def test_set_regular_param_still_works(self):
+        """set() should still work for regular Parameters."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown(param_value=1.0))
+
+        updated = model.set(["param"], [jnp.array([42.0])])
+        locked = updated.get_locked_model()
+        assert jnp.allclose(locked.model.param.val, 42.0)
+
+    def test_set_fixed_status_known_unfix_raises(self):
+        """set_fixed_status() should raise when trying to unfix a Known."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        with pytest.raises(ValueError, match="Cannot unfix Known parameter"):
+            model.set_fixed_status(["known"], [False])
+
+    def test_set_fixed_status_known_fix_allowed(self):
+        """set_fixed_status() should allow keeping Known fixed (no-op)."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        # This should work (Known is already fixed)
+        updated = model.set_fixed_status(["known"], [True])
+        assert updated.model.known.fix
+
+    def test_set_fixed_status_regular_param_still_works(self):
+        """set_fixed_status() should still work for regular Parameters."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        # Fix the parameter
+        fixed = model.set_fixed_status(["param"], [True])
+        assert fixed.model.param.fix
+
+        # Unfix the parameter
+        unfixed = fixed.set_fixed_status(["param"], [False])
+        assert not unfixed.model.param.fix
+
+    def test_get_parameter_paths_excludes_known_by_default(self):
+        """get_parameter_paths() should exclude Known parameters by default."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        paths = model.get_parameter_paths()
+
+        assert "param" in paths
+        assert "known" not in paths
+
+    def test_get_parameter_paths_includes_known_with_flag(self):
+        """get_parameter_paths() should include Known with show_knowns=True."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        paths = model.get_parameter_paths(show_knowns=True)
+
+        assert "param" in paths
+        assert "known" in paths
+
+    def test_parameter_summary_excludes_known_by_default(self, capsys):
+        """parameter_summary() should exclude Known parameters by default."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        model.parameter_summary()
+
+        captured = capsys.readouterr()
+        assert "param" in captured.out
+        assert "known" not in captured.out
+
+    def test_parameter_summary_includes_known_with_flag(self, capsys):
+        """parameter_summary() should include Known with show_knowns=True."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        model.parameter_summary(show_knowns=True)
+
+        captured = capsys.readouterr()
+        assert "param" in captured.out
+        assert "known" in captured.out
+
+    def test_free_all_does_not_unfix_known(self):
+        """free_all() should not unfix Known parameters."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        # Fix everything first
+        fixed = model.fix_all()
+        assert fixed.model.param.fix
+        assert fixed.model.known.fix
+
+        # Free all
+        freed = fixed.free_all()
+
+        # Regular param should be free, Known should stay fixed
+        assert not freed.model.param.fix
+        assert freed.model.known.fix

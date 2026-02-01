@@ -1051,18 +1051,15 @@ class ShareModule(Module):
                 console.print(header)
                 summary = self.get_sharing_summary(level="parameter")
                 for parent_path, dupl_paths in summary.items():
-                    # Strip .val/.unconstrained_val suffix for cleaner display
-                    parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
                     # Parent on its own line
                     parent_line = Text("  ")
-                    parent_line.append(parent_display, style="value")
+                    parent_line.append(parent_path, style="value")
                     parent_line.append(":", style="dim")
                     console.print(parent_line)
                     # Shared paths indented below
                     for dupl_path in dupl_paths:
-                        dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
                         shared_line = Text("    ← ")
-                        shared_line.append(dupl_display, style="shared")
+                        shared_line.append(dupl_path, style="shared")
                         console.print(shared_line)
 
     def plot_model_graph(
@@ -1229,12 +1226,22 @@ def get_digraph(
                         parent_path = p
                     leaf = use_path_get_leaf(module, parent_path)
                 elif sharing_level == "component":
-                    # Component-level: check if this path is in shared components
+                    # Component-level: check if any prefix of this path is a shared component
                     current_path = leafpath_to_str(p)  # Full path to the parameter
-                    if current_path in component_sharing:
-                        # Redirect to parent component (which is the same parameter)
-                        parent_component_path = component_sharing[current_path]
-                        leaf = use_path_get_leaf(module, str_to_leafpath(parent_component_path))
+                    path_parts = current_path.split(".")
+                    # Check progressively longer prefixes
+                    for i in range(len(path_parts)):
+                        prefix = ".".join(path_parts[: i + 1])
+                        if prefix in component_sharing:
+                            # Found a shared component - redirect to parent
+                            parent_component = component_sharing[prefix]
+                            suffix = ".".join(path_parts[i + 1 :])
+                            if suffix:
+                                redirect_path = f"{parent_component}.{suffix}"
+                            else:
+                                redirect_path = parent_component
+                            leaf = use_path_get_leaf(module, str_to_leafpath(redirect_path))
+                            break
                 else:
                     raise ValueError(
                         f"sharing_level must be 'component' or 'parameter', got '{sharing_level}'"
