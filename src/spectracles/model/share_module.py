@@ -473,50 +473,57 @@ class ShareModule(Module):
 
     def get_shared_components(self) -> dict[str, list[str]]:
         """
-        Get module-level components that are shared (same object).
+        Deprecated: Use get_sharing_summary(level='component') instead.
+        """
+        import warnings
 
-        This is useful for visualization - it shows when entire sub-models
-        are the same object, not just their leaf parameters. The internal
-        sharing mechanism still operates at the parameter level.
+        warnings.warn(
+            "get_shared_components() is deprecated, use get_sharing_summary(level='component') instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.get_sharing_summary(level="component")
 
-        Note: Module sharing is detected during ShareModule initialization
-        before any tree manipulation (which can break object identity).
+    def get_sharing_summary(
+        self, level: str = "component"
+    ) -> dict[str, list[str]]:
+        """
+        Get a summary of what is shared in the model.
+
+        Args:
+            level: What level of sharing to report:
+                - 'component': Shows which modules are the same object.
+                  (e.g., 'line_1.v' -> ['line_2.v'])
+                - 'parameter': Shows which leaf parameter arrays are shared.
+                  More comprehensive, catches sharing done via tree_at.
+                  (e.g., 'line_1.v' -> ['line_2.v'])
 
         Returns:
-            Dict mapping parent component paths to list of paths that share
-            the same object. Only components that are actually shared are included.
-
-        Example:
-            >>> model.get_shared_components()
-            {'branch_a': ['branch_b']}  # branch_b IS branch_a (same object)
-        """
-        return self._shared_components
-
-    def get_sharing_summary(self) -> dict[str, list[str]]:
-        """
-        Get a summary of which parameters are shared with which.
-
-        Returns:
-            A dictionary mapping parent parameter paths (strings) to lists of
-            child parameter paths that share the same value. Only parameters
-            that are actually shared (have duplicates) are included.
+            A dictionary mapping parent paths to lists of paths that share
+            with them. Only items that are actually shared are included.
 
         Example:
             >>> model.get_sharing_summary()
-            {'line_1.v.coefficients.val': ['line_2.v.coefficients.val']}
+            {'line_1.v': ['line_2.v']}
         """
-        from collections import defaultdict
+        if level == "component":
+            return self._shared_components
+        elif level == "parameter":
+            from collections import defaultdict
 
-        # Build a mapping from parent path to list of duplicate paths
-        summary: dict[str, list[str]] = defaultdict(list)
+            # Build a mapping from parent path to list of duplicate paths
+            summary: dict[str, list[str]] = defaultdict(list)
 
-        for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
-            parent_path = self._parent_leaf_paths[dupl_id]
-            parent_path_str = leafpath_to_str(parent_path)
-            dupl_path_str = leafpath_to_str(dupl_path)
-            summary[parent_path_str].append(dupl_path_str)
+            for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
+                parent_path = self._parent_leaf_paths[dupl_id]
+                # Strip .val/.unconstrained_val suffix for cleaner paths
+                parent_path_str = leafpath_to_str(parent_path[:-1])
+                dupl_path_str = leafpath_to_str(dupl_path[:-1])
+                summary[parent_path_str].append(dupl_path_str)
 
-        return dict(summary)
+            return dict(summary)
+        else:
+            raise ValueError(f"level must be 'parameter' or 'component', got '{level}'")
 
     def get_parameter_paths(self, show_shared: bool = False) -> list[str]:
         """
@@ -778,20 +785,13 @@ class ShareModule(Module):
 
         # Build list of parameter info
         params_info = []
-        sharing_summary = self.get_sharing_summary()
+        sharing_summary = self.get_sharing_summary(level="parameter")
 
         # Create reverse lookup: shared_path -> parent_path
         shared_to_parent: Dict[str, str] = {}
         for parent_path, shared_paths in sharing_summary.items():
-            # Strip .val/.unconstrained_val suffix
-            parent_clean = (
-                parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
-            )
             for shared_path in shared_paths:
-                shared_clean = (
-                    shared_path.rsplit(".", 1)[0] if "." in shared_path else shared_path
-                )
-                shared_to_parent[shared_clean] = parent_clean
+                shared_to_parent[shared_path] = parent_path
 
         # Get unique paths and shared paths
         unique_paths = self.get_parameter_paths(show_shared=False)
@@ -965,7 +965,7 @@ class ShareModule(Module):
             output = Text()
 
             # Show component-level sharing (entire modules that are the same object)
-            shared_components = self.get_shared_components()
+            shared_components = self.get_sharing_summary(level="component")
             if shared_components:
                 output.append("\nShared components ", style="dim")
                 output.append("(same object)", style="dim")
@@ -980,16 +980,13 @@ class ShareModule(Module):
             # Show parameter-level sharing
             if self._dupl_leaf_ids:
                 output.append("\n\nShared parameters:", style="dim")
-                summary = self.get_sharing_summary()
+                summary = self.get_sharing_summary(level="parameter")
                 for parent_path, dupl_paths in summary.items():
-                    # Strip .val/.unconstrained_val suffix for cleaner display
-                    parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
                     for dupl_path in dupl_paths:
-                        dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
                         output.append("\n  ")
-                        output.append(parent_display, style="value")
+                        output.append(parent_path, style="value")
                         output.append("  ←  ", style="shared")
-                        output.append(dupl_display, style="shared")
+                        output.append(dupl_path, style="shared")
 
             if output:
                 console.print(output)
