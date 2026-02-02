@@ -130,8 +130,11 @@ Core ShareModule functionality is tested including parameter sharing, validation
 
 ### Update 5 (Current)
 1. **`model/share_module.py`**: Bug fix for `plot_model_graph(sharing_level="component")`
-   - Fixed `get_digraph()` to skip paths through shared components early
-   - Component-level now correctly shows collapsed graph without duplicate nodes
+   - Fixed `get_digraph()` to correctly handle shared components:
+     - Adds edges from parent to shared component (e.g., `line_2 -> v`)
+     - Resolves shared component to parent's node (same graph node ID)
+     - Stops traversing into children (parent's path handles those)
+   - Component-level now correctly shows shared edges without duplicate subtrees
    - Fixed `print_model_tree` spacing regression (single Text object output)
 
 ### Update 4

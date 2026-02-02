@@ -1200,25 +1200,36 @@ def get_digraph(
     )
     # Select one path to a leaf
     for p in paths:
-        current_path_str = leafpath_to_str(p)
-
-        # For component-level sharing, skip paths that go through shared components
-        # (the parent component's path will add all needed nodes)
-        if sharing_level == "component":
-            path_parts = current_path_str.split(".")
-            skip_path = False
-            for i in range(len(path_parts) - 1):  # Don't check the leaf itself
-                prefix = ".".join(path_parts[: i + 1])
-                if prefix in component_sharing:
-                    skip_path = True
-                    break
-            if skip_path:
-                continue
-
         # Iterate from model down to leaf
         parent = module.model
+        current_path_parts: list[str] = []
         for entry in p:
+            current_path_parts.append(entry.name)
+            current_prefix = ".".join(current_path_parts)
+
             leaf = getattr(parent, entry.name)
+
+            # For component-level sharing, check if this component is shared
+            if sharing_level == "component" and current_prefix in component_sharing:
+                # This component is shared - resolve to the parent component
+                parent_path_str = component_sharing[current_prefix]
+                # Get the actual parent component object using the shared path utilities
+                parent_component = use_path_get_leaf(
+                    module, str_to_leafpath(parent_path_str)
+                )
+                # Add node for the parent component (using its id so edges merge)
+                graph.add_node(
+                    id(parent_component),
+                    name=entry.name,
+                    type=parent_component.__class__.__name__,
+                    is_param=is_parameter(parent_component),
+                    is_root=False,
+                )
+                # Connect from current parent to the shared component
+                graph.add_edge(id(parent), id(parent_component))
+                # Stop traversing this path - the parent's path handles children
+                break
+
             # Figure out what leaf we are adding, accounting for sharing
             if is_parameter(leaf):
                 if sharing_level == "parameter":
