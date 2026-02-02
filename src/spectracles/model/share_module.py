@@ -1022,45 +1022,38 @@ class ShareModule(Module):
 
         console = get_console()
 
-        graph, root_id = get_digraph(self)
+        # Always show full tree structure (parameter-level shows all branches)
+        graph, root_id = get_digraph(self, sharing_level="parameter")
         print_graph(graph, root_id)
 
         if show_sharing:
+            # Build all sharing info into a single Text object to avoid spacing issues
+            output = Text()
+
             # Show component-level sharing (entire modules that are the same object)
             shared_components = self.get_sharing_summary(level="component")
             if shared_components:
-                header = Text("\nShared modules ", style="dim")
-                header.append("(parameters within are also shared)", style="dim italic")
-                header.append(":", style="dim")
-                console.print(header)
+                output.append("\nShared modules ", style="dim")
+                output.append("(parameters within are also shared)", style="dim italic")
+                output.append(":", style="dim")
                 for parent_path, shared_paths in shared_components.items():
-                    # Parent on its own line
-                    parent_line = Text("  ")
-                    parent_line.append(parent_path, style="value")
-                    parent_line.append(":", style="dim")
-                    console.print(parent_line)
-                    # Shared paths indented below
+                    output.append(f"\n  {parent_path}:", style="value")
                     for shared_path in shared_paths:
-                        shared_line = Text("    ← ")
-                        shared_line.append(shared_path, style="shared")
-                        console.print(shared_line)
+                        output.append("\n    ← ", style="dim")
+                        output.append(shared_path, style="shared")
 
             # Show parameter-level sharing
             if self._dupl_leaf_ids:
-                header = Text("\nShared parameters:", style="dim")
-                console.print(header)
+                output.append("\n\nShared parameters:", style="dim")
                 summary = self.get_sharing_summary(level="parameter")
                 for parent_path, dupl_paths in summary.items():
-                    # Parent on its own line
-                    parent_line = Text("  ")
-                    parent_line.append(parent_path, style="value")
-                    parent_line.append(":", style="dim")
-                    console.print(parent_line)
-                    # Shared paths indented below
+                    output.append(f"\n  {parent_path}:", style="value")
                     for dupl_path in dupl_paths:
-                        shared_line = Text("    ← ")
-                        shared_line.append(dupl_path, style="shared")
-                        console.print(shared_line)
+                        output.append("\n    ← ", style="dim")
+                        output.append(dupl_path, style="shared")
+
+            if output:
+                console.print(output)
 
     def plot_model_graph(
         self,
@@ -1207,6 +1200,21 @@ def get_digraph(
     )
     # Select one path to a leaf
     for p in paths:
+        current_path_str = leafpath_to_str(p)
+
+        # For component-level sharing, skip paths that go through shared components
+        # (the parent component's path will add all needed nodes)
+        if sharing_level == "component":
+            path_parts = current_path_str.split(".")
+            skip_path = False
+            for i in range(len(path_parts) - 1):  # Don't check the leaf itself
+                prefix = ".".join(path_parts[: i + 1])
+                if prefix in component_sharing:
+                    skip_path = True
+                    break
+            if skip_path:
+                continue
+
         # Iterate from model down to leaf
         parent = module.model
         for entry in p:
@@ -1225,24 +1233,7 @@ def get_digraph(
                     else:
                         parent_path = p
                     leaf = use_path_get_leaf(module, parent_path)
-                elif sharing_level == "component":
-                    # Component-level: check if any prefix of this path is a shared component
-                    current_path = leafpath_to_str(p)  # Full path to the parameter
-                    path_parts = current_path.split(".")
-                    # Check progressively longer prefixes
-                    for i in range(len(path_parts)):
-                        prefix = ".".join(path_parts[: i + 1])
-                        if prefix in component_sharing:
-                            # Found a shared component - redirect to parent
-                            parent_component = component_sharing[prefix]
-                            suffix = ".".join(path_parts[i + 1 :])
-                            if suffix:
-                                redirect_path = f"{parent_component}.{suffix}"
-                            else:
-                                redirect_path = parent_component
-                            leaf = use_path_get_leaf(module, str_to_leafpath(redirect_path))
-                            break
-                else:
+                elif sharing_level != "component":
                     raise ValueError(
                         f"sharing_level must be 'component' or 'parameter', got '{sharing_level}'"
                     )

@@ -124,10 +124,17 @@ Core ShareModule functionality is tested including parameter sharing, validation
 | Update 2 | 218 | 78% | +graph, +FourierBasis, +parameter repr/log |
 | Update 3 | 285 | 82% | +ManagedOptimiserSchedule (97%), +schedule_builder (92%) |
 | Update 4 | 298 | 82% | +Known parameter handling, +sharing levels, +parameter_summary |
+| Update 5 | 298 | 82% | Bug fix: component-level sharing in plot_model_graph |
 
 ## Recent Improvements
 
-### Update 4 (Current)
+### Update 5 (Current)
+1. **`model/share_module.py`**: Bug fix for `plot_model_graph(sharing_level="component")`
+   - Fixed `get_digraph()` to skip paths through shared components early
+   - Component-level now correctly shows collapsed graph without duplicate nodes
+   - Fixed `print_model_tree` spacing regression (single Text object output)
+
+### Update 4
 1. **`model/share_module.py`**: Added 132 statements for new features
    - `parameter_summary()` method with Rich table output
    - `get_sharing_summary(level='component'|'parameter')` consolidated API
