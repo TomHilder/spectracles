@@ -1213,10 +1213,10 @@ def get_digraph(
             if sharing_level == "component" and current_prefix in component_sharing:
                 # This component is shared - resolve to the parent component
                 parent_path_str = component_sharing[current_prefix]
-                # Get the actual parent component object by traversing the path
-                parent_component = module.model
-                for part in parent_path_str.split("."):
-                    parent_component = getattr(parent_component, part)
+                # Get the actual parent component object using the shared path utilities
+                parent_component = use_path_get_leaf(
+                    module, str_to_leafpath(parent_path_str)
+                )
                 # Add node for the parent component (using its id so edges merge)
                 graph.add_node(
                     id(parent_component),
