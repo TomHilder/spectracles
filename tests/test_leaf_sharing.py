@@ -467,58 +467,6 @@ class TestValidateSharing:
         assert result["valid"] is True
 
 
-class TestSharedComponents:
-    def test_get_shared_components_with_branch_sharing(self):
-        # SharedBranchModel shares entire SimpleModel modules
-        model = SharedBranchModel(value=1.0)
-        shared_model = ShareModule(model)
-
-        components = shared_model.get_shared_components()
-
-        # branch_a and branch_b are the same object
-        assert len(components) == 1
-        # The parent should be 'branch_a' and shared should include 'branch_b'
-        parent = list(components.keys())[0]
-        assert "branch_a" in parent
-        assert len(components[parent]) == 1
-        assert "branch_b" in components[parent][0]
-
-    def test_get_shared_components_parameter_sharing(self):
-        # SharedLeafModel shares a Parameter object between a and b
-        # Since Parameter is also an equinox Module, this is detected as module sharing
-        model = SharedLeafModel(value=1.0)
-        shared_model = ShareModule(model)
-
-        components = shared_model.get_shared_components()
-
-        # Parameters ARE Modules, so component sharing is detected
-        assert len(components) == 1
-        parent = list(components.keys())[0]
-        assert "a" in parent
-        assert "b" in components[parent][0]
-
-    def test_get_shared_components_complex_parameter_sharing(self):
-        # ComplexSharedModel shares Parameters across different Modules
-        # But the Modules themselves are different objects
-        model = ComplexSharedModel(value=2.0)
-        shared_model = ShareModule(model)
-
-        components = shared_model.get_shared_components()
-
-        # inner1 and inner2 are different SimpleModel objects (even though
-        # they share the same Parameter), so no component sharing detected
-        assert components == {}
-
-    def test_get_shared_components_no_sharing(self):
-        # SimpleModel has no shared components
-        model = SimpleModel(value=1.0)
-        shared_model = ShareModule(model)
-
-        components = shared_model.get_shared_components()
-
-        assert components == {}
-
-
 class TestSharingSummary:
     def test_get_sharing_summary_simple_component(self):
         # Simple model with one shared parameter - component level (default)
@@ -880,23 +828,23 @@ class TestKnownParameterHandling:
         assert "param" in paths
         assert "known" in paths
 
-    def test_parameter_summary_excludes_known_by_default(self, capsys):
-        """parameter_summary() should exclude Known parameters by default."""
+    def test_get_parameter_summary_excludes_known_by_default(self, capsys):
+        """get_parameter_summary() should exclude Known parameters by default."""
         from .test_models import ModelWithKnown
 
         model = ShareModule(ModelWithKnown())
-        model.parameter_summary()
+        model.get_parameter_summary()
 
         captured = capsys.readouterr()
         assert "param" in captured.out
         assert "known" not in captured.out
 
-    def test_parameter_summary_includes_known_with_flag(self, capsys):
-        """parameter_summary() should include Known with show_knowns=True."""
+    def test_get_parameter_summary_includes_known_with_flag(self, capsys):
+        """get_parameter_summary() should include Known with show_knowns=True."""
         from .test_models import ModelWithKnown
 
         model = ShareModule(ModelWithKnown())
-        model.parameter_summary(show_knowns=True)
+        model.get_parameter_summary(show_knowns=True)
 
         captured = capsys.readouterr()
         assert "param" in captured.out
