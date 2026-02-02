@@ -53,6 +53,6 @@ dev = [
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.8",
-    "types-networkx>=3.4.2",
+    "types-networkx>=3.4.0.20240928",
     "types-tqdm>=4.67.0.20250809",
 ]
