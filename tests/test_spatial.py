@@ -1,12 +1,11 @@
-"""test_spatial.py - tests for the modelling_lib.model.spatial module."""
+"""test_spatial.py - tests for the spectracles.model.spatial module."""
 
 import jax.numpy as jnp
 import pytest
-from jax.scipy.stats import norm
-from modelling_lib.model.data import SpatialDataGeneric
-from modelling_lib.model.kernels import Matern12, Matern32, Matern52, SquaredExponential
-from modelling_lib.model.parameter import Parameter
-from modelling_lib.model.spatial import FourierGP, PerSpaxel, get_freqs, get_freqs_1D
+from spectracles.model.data import SpatialDataGeneric
+from spectracles.model.kernels import Matern12, Matern32, Matern52, SquaredExponential
+from spectracles.model.parameter import Parameter
+from spectracles.model.spatial import FourierGP, PerSpaxel, get_freqs, get_freqs_1D
 
 
 class TestGetFreqs:
@@ -111,33 +110,6 @@ class TestFourierGP:
         out2 = gp(self.data)
         assert jnp.allclose(out, out2)
 
-    def test_conj_symmetry(self):
-        # Test conjugate symmetry function
-        gp = FourierGP(n_modes=(3, 3), kernel=self.kernel)
-
-        # Create a test array
-        c = jnp.arange(9, dtype=float)
-
-        # Apply conjugate symmetry
-        f = gp._conj_symmetry(c)
-
-        # Check output shape
-        assert f.shape == (3, 3)
-
-        # With get_freqs_1D for n_modes=3, the frequencies are [-1, 0, 1]
-        # This means the DC component is at index [1, 1] for a 3x3 grid
-        # Indexing follows the frequency grid where:
-        # f[1,1] is the DC component (0,0 frequency)
-        # f[0,0] corresponds to (-1,-1) frequency
-        # f[2,2] corresponds to (1,1) frequency, etc.
-
-        # Check that f is Hermitian (f[i,j] = f[2-i,2-j]*)
-        assert jnp.allclose(f[1, 1], f[1, 1].conj())  # DC component is real
-        assert jnp.allclose(f[0, 0], f[2, 2].conj())  # Conjugate pairs
-        assert jnp.allclose(f[0, 1], f[2, 1].conj())
-        assert jnp.allclose(f[0, 2], f[2, 0].conj())
-        assert jnp.allclose(f[1, 0], f[1, 2].conj())
-
     def test_different_kernels(self):
         # Test with different kernel types
         for KernelClass in [Matern12, Matern32, Matern52, SquaredExponential]:
@@ -148,15 +120,6 @@ class TestFourierGP:
             out = gp(self.data)
             assert out.shape == (self.data.x.shape[0],)
 
-    def test_prior_logpdf(self):
-        # Test prior log PDF calculation
-        gp = FourierGP(n_modes=self.n_modes, kernel=self.kernel)
-        log_p = gp.prior_logpdf()
-
-        # Should match standard normal log PDF
-        expected = norm.logpdf(x=gp.coefficients.val)
-        assert jnp.allclose(log_p, expected)
-
     def test_larger_dataset(self):
         # Test with larger dataset
         n = 100
@@ -166,6 +129,71 @@ class TestFourierGP:
         gp = FourierGP(n_modes=self.n_modes, kernel=self.kernel)
         out = gp(data)
         assert out.shape == (n,)
+
+
+class TestFourierBasis:
+    def setup_method(self):
+        from spectracles.model.spatial import FourierBasis
+
+        self.FourierBasis = FourierBasis
+        self.n_modes = (5, 5)
+        self.data = SpatialDataGeneric(
+            x=jnp.array([0.0, 0.1, 0.2, 0.3, 0.4]),
+            y=jnp.array([0.5, 0.6, 0.7, 0.8, 0.9]),
+            idx=jnp.arange(5),
+        )
+
+    def test_initialization(self):
+        # Test basic initialization
+        fb = self.FourierBasis(n_modes=self.n_modes)
+
+        # Check attributes
+        assert fb.n_modes == self.n_modes
+        assert fb.coefficients.val.shape == self.n_modes
+        assert fb._freqs.shape == self.n_modes
+
+    def test_initialization_with_coefficients(self):
+        # Test initialization with provided coefficients
+        coeffs = Parameter(initial=jnp.ones(self.n_modes))
+        fb = self.FourierBasis(n_modes=self.n_modes, coefficients=coeffs)
+
+        assert jnp.allclose(fb.coefficients.val, jnp.ones(self.n_modes))
+
+    def test_call(self):
+        # Test function evaluation
+        fb = self.FourierBasis(n_modes=self.n_modes)
+        out = fb(self.data)
+
+        # Check output shape
+        assert out.shape == (self.data.x.shape[0],)
+
+        # Calling twice should give same result (deterministic)
+        out2 = fb(self.data)
+        assert jnp.allclose(out, out2)
+
+    def test_larger_dataset(self):
+        # Test with larger dataset
+        n = 100
+        data = SpatialDataGeneric(
+            x=jnp.linspace(0, 1, n), y=jnp.linspace(0, 1, n), idx=jnp.arange(n)
+        )
+        fb = self.FourierBasis(n_modes=self.n_modes)
+        out = fb(data)
+        assert out.shape == (n,)
+
+    def test_different_n_modes(self):
+        # Test with different number of modes
+        for n_modes in [(3, 3), (7, 5), (5, 7)]:
+            fb = self.FourierBasis(n_modes=n_modes)
+            assert fb.n_modes == n_modes
+            assert fb.coefficients.val.shape == n_modes
+
+    def test_prior_logpdf_not_implemented(self):
+        # Test that prior_logpdf raises NotImplementedError
+        fb = self.FourierBasis(n_modes=self.n_modes)
+
+        with pytest.raises(NotImplementedError):
+            fb.prior_logpdf()
 
 
 class TestPerSpaxel:

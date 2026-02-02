@@ -1,13 +1,13 @@
-"""test_optimise.py tests for the modelling_lib.optimise.optimiser_frame module."""
+"""test_optimise.py tests for the spectracles.optimise.optimiser_frame module."""
 
 import equinox as eqx
 import jax.numpy as jnp
 import optax  # type: ignore[import]
 import pytest
 from jax.tree_util import tree_map
-from modelling_lib.model.parameter import AnyParameter, Parameter
-from modelling_lib.model.share_module import ShareModule, build_model
-from modelling_lib.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
+from spectracles.model.parameter import AnyParameter, Parameter
+from spectracles.model.share_module import ShareModule, build_model
+from spectracles.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
 
 from .test_models import SharedLeafModel, SimpleModel
 
@@ -80,9 +80,14 @@ class TestOptimiserFrame:
 
         optimiser = optax.sgd(learning_rate=0.1)
 
-        # Should raise an error
-        with pytest.raises(ValueError):
+        # Should raise a TypeError with helpful message
+        with pytest.raises(TypeError) as exc_info:
             OptimiserFrame(model, loss_fn, optimiser)
+
+        error_msg = str(exc_info.value)
+        assert "ShareModule" in error_msg
+        assert "build_model" in error_msg
+        assert "SimpleModel" in error_msg
 
     def test_initialization_with_locked_model(self):
         # Create a locked model
@@ -262,3 +267,80 @@ class TestOptimiserFrame:
 
         # Check that param2 hasn't changed at all
         assert optimized_model.param2.val[0] == 0.1
+
+
+class TestGradientDiagnostics:
+    def test_get_gradient_summary(self):
+        # Create a model and loss function
+        model = build_model(SimpleModel, value=1.0)
+
+        def loss_fn(model, x, y):
+            pred = model(x)
+            return jnp.mean((pred - y) ** 2)
+
+        # Create data
+        x = jnp.array([1.0, 2.0, 3.0])
+        y = 2.0 * x
+
+        # Create optimiser and frame
+        optimiser = optax.sgd(learning_rate=0.1)
+        frame = OptimiserFrame(model, loss_fn, optimiser)
+
+        # Get gradient summary
+        summary = frame.get_gradient_summary(x=x, y=y)
+
+        # Should have at least one parameter
+        assert len(summary) >= 1
+
+        # Check structure of summary entries
+        for path, info in summary.items():
+            assert "norm" in info
+            assert "max" in info
+            assert "min" in info
+            assert "has_nan" in info
+            assert "has_inf" in info
+            assert "shape" in info
+
+            # Values should be reasonable (no NaN/Inf in this simple case)
+            assert not info["has_nan"]
+            assert not info["has_inf"]
+            assert info["norm"] >= 0
+
+    def test_get_gradient_summary_shared_params(self):
+        # Test with shared parameters
+        model = build_model(SharedLeafModel, value=1.0)
+
+        def loss_fn(model, x, y):
+            pred = model(x)
+            return jnp.mean((pred - y) ** 2)
+
+        x = jnp.array([1.0, 2.0, 3.0])
+        y = x
+
+        optimiser = optax.adam(learning_rate=0.1)
+        frame = OptimiserFrame(model, loss_fn, optimiser)
+
+        # Should not raise
+        summary = frame.get_gradient_summary(x=x, y=y)
+        assert len(summary) >= 1
+
+    def test_print_gradient_summary(self, capsys):
+        # Test that print_gradient_summary runs without error
+        model = build_model(SimpleModel, value=1.0)
+
+        def loss_fn(model, x, y):
+            pred = model(x)
+            return jnp.mean((pred - y) ** 2)
+
+        x = jnp.array([1.0, 2.0, 3.0])
+        y = 2.0 * x
+
+        optimiser = optax.sgd(learning_rate=0.1)
+        frame = OptimiserFrame(model, loss_fn, optimiser)
+
+        # Should not raise and should print something
+        frame.print_gradient_summary(x=x, y=y)
+
+        captured = capsys.readouterr()
+        assert "Gradient Summary" in captured.out
+        assert "Norm" in captured.out

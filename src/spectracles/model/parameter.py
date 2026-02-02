@@ -45,12 +45,35 @@ class Parameter(Module):
 
     def __init__(
         self,
-        dims: int | tuple | None = None,
         initial: Array | None = None,
+        dims: int | tuple | None = None,
         fixed: bool = False,
     ):
         self.fix = fixed
         self.val = _array_from_user(dims, initial)
+
+    def __repr__(self) -> str:
+        from spectracles.model.formatting import (
+            format_array_value,
+            parameter_repr_parts,
+            render_to_string,
+        )
+        from spectracles.model.share_module import Shared
+
+        # Check if val is a Shared sentinel (in unlocked ShareModule context)
+        if isinstance(self.val, Shared):
+            text = parameter_repr_parts(
+                "Parameter", "", self.fix, shared_path=self.val.parent_path
+            )
+        else:
+            value_str = format_array_value(self.val)
+            text = parameter_repr_parts("Parameter", value_str, self.fix)
+        return render_to_string(text)
+
+    def debug_repr(self) -> str:
+        """Return the full equinox-style repr for debugging."""
+        import equinox as eqx
+        return eqx.tree_pformat(self)
 
 
 class ConstrainedParameter(Module):
@@ -60,17 +83,25 @@ class ConstrainedParameter(Module):
     fix: bool
     forward_transform: Callable[[Array], Array]
     backward_transform: Callable[[Array], Array]
+    # Store bounds for display purposes
+    _lower: float | None
+    _upper: float | None
+    _log: bool
 
     def __init__(
         self,
-        dims: int | tuple | None = None,
         initial: Array | None = None,
+        dims: int | tuple | None = None,
         fixed: bool = False,
         lower: float | None = None,
         upper: float | None = None,
         log: bool = False,
     ):
         self.fix = fixed
+        # Store bounds for repr
+        self._lower = lower
+        self._upper = upper
+        self._log = log
 
         # If log parameterization is requested
         if log:
@@ -124,18 +155,75 @@ class ConstrainedParameter(Module):
                     raise BoundsError(
                         "Attempted to auto-initialise ConstrainedParameter with zeros by default, "
                         "but this lies outside provided bounds. Please provide a manual "
-                        "intialisation inside the bounds instead."
+                        "initialisation inside the bounds instead."
                     )
             # Or because the user asked for an initial value outside the bounds
             else:
                 raise e
 
+        # Final check that we haven't become a nan somehow
+        if jnp.any(jnp.isnan(self.unconstrained_val)):
+            raise ValueError(
+                "Parameter initialisation resulted in NaN values. Check bounds and initial value. Otherwise, please report this as a bug."
+            )
+
     @property
     def val(self) -> Array:
         return self.forward_transform(self.unconstrained_val)
 
+    def __repr__(self) -> str:
+        from spectracles.model.formatting import (
+            format_array_value,
+            format_constraint,
+            parameter_repr_parts,
+            render_to_string,
+        )
+        from spectracles.model.share_module import Shared
+
+        constraint_str = format_constraint(self._lower, self._upper, self._log)
+
+        # Check if unconstrained_val is a Shared sentinel (in unlocked ShareModule context)
+        if isinstance(self.unconstrained_val, Shared):
+            text = parameter_repr_parts(
+                "ConstrainedParameter", "", self.fix, constraint_str,
+                shared_path=self.unconstrained_val.parent_path
+            )
+        else:
+            value_str = format_array_value(self.val)
+            text = parameter_repr_parts(
+                "ConstrainedParameter", value_str, self.fix, constraint_str
+            )
+        return render_to_string(text)
+
+    def debug_repr(self) -> str:
+        """Return the full equinox-style repr for debugging."""
+        import equinox as eqx
+        return eqx.tree_pformat(self)
+
 
 AnyParameter = Parameter | ConstrainedParameter
+
+
+class Known(Parameter):
+    """A known value that will never be optimised."""
+
+    def __init__(
+        self,
+        value: float | Array | None = None,
+        dims: int | tuple | None = None,
+    ):
+        super().__init__(initial=value, dims=dims, fixed=True)
+
+    def __repr__(self) -> str:
+        from spectracles.model.formatting import (
+            format_array_value,
+            known_repr_parts,
+            render_to_string,
+        )
+
+        value_str = format_array_value(self.val)
+        text = known_repr_parts(value_str)
+        return render_to_string(text)
 
 
 def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:
@@ -183,8 +271,8 @@ def l_bounded(x: Array, lower: float) -> Array:
 
 
 def l_bounded_inv(f: Array, lower: float) -> Array:
-    if jnp.any(f < lower):
-        raise BoundsError("Initial value lies below lower bound.")
+    if jnp.any(f <= lower):
+        raise BoundsError("Initial value lies below or on lower bound.")
     return softplus_inv(f - lower)
 
 
@@ -193,8 +281,8 @@ def u_bounded(x: Array, upper: float) -> Array:
 
 
 def u_bounded_inv(f: Array, upper: float) -> Array:
-    if jnp.any(f > upper):
-        raise BoundsError("Initial value lies above upper bound.")
+    if jnp.any(f >= upper):
+        raise BoundsError("Initial value lies above or on upper bound.")
     return -softplus_inv(upper - f)
 
 
@@ -204,10 +292,10 @@ def lu_bounded(x: Array, lower: float, upper: float) -> Array:
 
 
 def lu_bounded_inv(f: Array, lower: float, upper: float) -> Array:
-    if jnp.any(f < lower):
-        raise BoundsError("Initial value lies below lower bound.")
-    elif jnp.any(f > upper):
-        raise BoundsError("Initial value lies above upper bound.")
+    if jnp.any(f <= lower):
+        raise BoundsError("Initial value lies below or on lower bound.")
+    elif jnp.any(f >= upper):
+        raise BoundsError("Initial value lies above or on upper bound.")
     return softplus_frac_inv((f - lower) / (upper - lower))
 
 

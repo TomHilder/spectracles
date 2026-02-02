@@ -1,10 +1,10 @@
-"""test_spectral.py - tests for the modelling_lib.model.spectral module."""
+"""test_spectral.py - tests for the spectracles.model.spectral module."""
 
 import jax.numpy as jnp
 from jax import vmap
-from modelling_lib.model.data import SpatialDataGeneric
-from modelling_lib.model.spatial import SpatialModel
-from modelling_lib.model.spectral import Constant, Gaussian
+from spectracles.model.data import SpatialDataGeneric
+from spectracles.model.spatial import SpatialModel
+from spectracles.model.spectral import Constant, Gaussian
 
 
 class DummySpatialModel(SpatialModel):

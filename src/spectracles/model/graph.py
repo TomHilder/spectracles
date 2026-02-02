@@ -26,30 +26,63 @@ def temporarily_disable_tex():
         mpl.rcParams["text.usetex"] = prev_setting
 
 
-def print_graph(graph: DiGraph, root_id: int, indent: str = "", is_last: bool = True) -> None:
-    # Get info for current node
-    node_data = graph.nodes[root_id]
-    name = node_data["name"]
-    node_type = node_data["type"]
-    # Format display text
-    if name is None:
-        # Root module without parent attribute name
-        display_text = node_type
-    else:
-        # Regular format: "name (Type)"
-        display_text = f"{name} ({node_type})"
-    # Print this node
-    print(f"{indent}{'└── ' if is_last else '├── '}{display_text}")
-    # Find child nodes (those pointing to this node)
-    children = []
-    for src, dst in graph.edges():
-        if src == root_id:
-            children.append(dst)
-    # Recurse for each child
-    new_indent = indent + ("    " if is_last else "│   ")
-    for i, child_id in enumerate(children):
-        is_last_child = i == len(children) - 1
-        print_graph(graph, child_id, new_indent, is_last_child)
+def print_graph(
+    graph: DiGraph,
+    root_id: int,
+    indent: str = "",
+    is_last: bool = True,
+) -> None:
+    """
+    Print a graph as a styled tree using Rich's Tree widget.
+
+    Args:
+        graph: The NetworkX DiGraph to print.
+        root_id: The ID of the root node.
+        indent: Deprecated, kept for backwards compatibility.
+        is_last: Deprecated, kept for backwards compatibility.
+    """
+    from rich.text import Text
+    from rich.tree import Tree
+    from spectracles.model.formatting import get_console
+
+    console = get_console()
+
+    def make_node_label(node_id: int) -> Text:
+        """Create a styled label for a node."""
+        node_data = graph.nodes[node_id]
+        name = node_data["name"]
+        node_type = node_data["type"]
+        is_param = node_data.get("is_param", False)
+
+        text = Text()
+        if name is None:
+            # Root module without parent attribute name
+            text.append(node_type, style="type")
+        else:
+            # Regular format: "name (Type)"
+            text.append(name, style="value")
+            text.append(" (", style="dim")
+            if is_param:
+                text.append(node_type, style="free")
+            else:
+                text.append(node_type, style="type")
+            text.append(")", style="dim")
+        return text
+
+    def build_tree(node_id: int, tree: Tree) -> None:
+        """Recursively build the Rich Tree."""
+        children = [dst for src, dst in graph.edges() if src == node_id]
+        for child_id in children:
+            child_label = make_node_label(child_id)
+            subtree = tree.add(child_label)
+            build_tree(child_id, subtree)
+
+    # Create root tree and build recursively
+    root_label = make_node_label(root_id)
+    tree = Tree(root_label, guide_style="tree")
+    build_tree(root_id, tree)
+
+    console.print(tree)
 
 
 def layered_hierarchy_pos(G: DiGraph, root, total_width: float = 1.0, vert_gap: float = 0.8):

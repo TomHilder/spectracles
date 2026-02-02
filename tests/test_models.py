@@ -5,8 +5,8 @@ These need to be in a separate file from the tests beacuse the serialisation we 
 import equinox as eqx
 import jax.numpy as jnp
 from equinox import Module
-from modelling_lib.model.data import SpatialData
-from modelling_lib.model.parameter import Parameter
+from spectracles.model.data import SpatialData
+from spectracles.model.parameter import Known, Parameter
 
 
 class SimpleModel(Module):
@@ -79,6 +79,41 @@ class ComplexSharedModel(Module):
 
     def __call__(self, x):
         return self.inner1(x) + self.inner2(x) + self.inner3(x) + self.param.val
+
+
+class SharedBranchModel(Module):
+    """Model with shared module branches (entire sub-modules are the same object).
+
+    This is different from SharedLeafModel which shares Parameters.
+    Here entire SimpleModel objects are shared.
+    """
+
+    branch_a: SimpleModel
+    branch_b: SimpleModel  # Same object as branch_a
+    branch_c: SimpleModel  # Different object
+
+    def __init__(self, value=1.0):
+        shared_branch = SimpleModel(value=value)
+        self.branch_a = shared_branch
+        self.branch_b = shared_branch  # Same object!
+        self.branch_c = SimpleModel(value=value * 2)  # Different object
+
+    def __call__(self, x):
+        return self.branch_a(x) + self.branch_b(x) + self.branch_c(x)
+
+
+class ModelWithKnown(Module):
+    """Model with both Parameter and Known parameters."""
+
+    param: Parameter
+    known: Known
+
+    def __init__(self, param_value=1.0, known_value=2.0):
+        self.param = Parameter(initial=param_value)
+        self.known = Known(value=known_value)
+
+    def __call__(self, x):
+        return self.param.val * x + self.known.val
 
 
 class SpatialDummyModel(Module):
