@@ -22,14 +22,22 @@ uv run pytest tests/test_leaf_sharing.py -v
 ### Phase 1: Core UX Improvements
 
 1. ✅ **Better `Shared` repr with parent path** - Shows `Shared → a.val` instead of memory address
-2. ✅ **`get_sharing_summary()` method** - Returns dict mapping parent paths to shared child paths
-3. ✅ **`get_parameter_paths(show_shared=False)` method** - Lists parameter paths for use with `set()`
+2. ✅ **`get_sharing_summary(level=...)` method** - Returns dict mapping parent paths to shared child paths
+   - `level='component'`: Module-level sharing (default)
+   - `level='parameter'`: Leaf-level parameter sharing
+   - Deprecated `get_shared_components()` in favor of `get_sharing_summary(level='component')`
+3. ✅ **`get_parameter_paths(show_shared, show_knowns)` method** - Lists parameter paths for use with `set()`
+   - `show_shared=False`: Excludes shared/duplicate paths (default)
+   - `show_knowns=False`: Excludes Known parameters (default)
 4. ✅ **Clearer sub-component access error** - Helpful error message when calling sub-components with Shared values
 5. ✅ **`validate_sharing()` method** - Validates sharing structure, returns diagnostic info
-6. ✅ **`print_model_tree(show_sharing=True)` option** - Shows sharing relationships after tree
+6. ✅ **`print_model_tree(show_sharing=True)` option** - Shows sharing relationships after tree with improved formatting
 7. ✅ **Gradient diagnostics in OptimiserFrame** - `get_gradient_summary()` and `print_gradient_summary()`
-8. ✅ **`get_shared_components()` method** - Detects module-level (branch) sharing for visualization
-9. ✅ **Python 3.10+ support** - Replaced `type` statement with TypeAlias, lowered networkx to >=3.4
+8. ✅ **Python 3.10+ support** - Replaced `type` statement with TypeAlias, lowered networkx to >=3.4
+9. ✅ **`parameter_summary()` method** - Rich table showing path, shape, bounds, status, sharing info
+10. ✅ **Known parameter protections** - `set()` and `set_fixed_status()` block modifications by default
+11. ✅ **`plot_model_graph(sharing_level=...)` option** - Visualize at component or parameter level
+12. ✅ **`debug_repr()` fix** - Clean output without extra whitespace
 
 ### Phase 2: Schedule Builder API
 
@@ -58,7 +66,7 @@ uv run pytest tests/test_leaf_sharing.py -v
 
 ## Test Coverage
 
-- **Total tests:** 285 passing
+- **Total tests:** 298 passing
 - **Overall coverage:** 82% (excluding lvm_models)
 - Key modules at 90%+: opt_schedule (97%), schedule_builder (92%), formatting (100%), graph (99%)
 
@@ -70,6 +78,7 @@ See `TEST_COVERAGE_REPORT.md` for details.
 - **More docstrings**: Add docstrings for remaining user-facing functionality.
 - **Alternative to `build_model()`**: Consider a class decorator (`@shareable`) or base class.
 - **Accept Parameter objects in `set()`**: Allow passing Parameter objects directly.
+- **Support lists/tuples/dicts of Parameters**: Currently ShareModule only supports attribute-based paths. See GitHub issue for details.
 
 ## Documentation
 
