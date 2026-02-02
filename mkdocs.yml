@@ -42,6 +42,7 @@ nav:
   - Examples:
     - examples/schedule_builder.md
   - API Reference:
+    - api/share_module.md
     - api/opt_schedule.md
     - api/schedule_builder.md
 

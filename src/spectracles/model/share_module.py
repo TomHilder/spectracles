@@ -474,19 +474,6 @@ class ShareModule(Module):
         cls = type(self)
         return cls(copied_model, locked=self._locked)
 
-    def get_shared_components(self) -> dict[str, list[str]]:
-        """
-        Deprecated: Use get_sharing_summary(level='component') instead.
-        """
-        import warnings
-
-        warnings.warn(
-            "get_shared_components() is deprecated, use get_sharing_summary(level='component') instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.get_sharing_summary(level="component")
-
     def get_sharing_summary(
         self, level: str = "component"
     ) -> dict[str, list[str]]:
@@ -805,7 +792,7 @@ class ShareModule(Module):
         # Set all to free
         return self.set_fixed_status(all_paths, [False] * len(all_paths))
 
-    def parameter_summary(
+    def get_parameter_summary(
         self, show_shared: bool = True, show_knowns: bool = False
     ) -> None:
         """
@@ -820,7 +807,7 @@ class ShareModule(Module):
                 summary. If True, include them with status 'known'.
 
         Example:
-            >>> model.parameter_summary()
+            >>> model.get_parameter_summary()
             Parameter Summary
             ──────────────────────────────────────────────────────────────────
             Path                      Shape     Bounds       Status  Shared from

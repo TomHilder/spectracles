@@ -1,7 +1,7 @@
 # Test Coverage Report
 
 **Date:** February 2026
-**Total Tests:** 298 passing
+**Total Tests:** 294 passing
 **Overall Coverage (excluding lvm_models):** 82%
 
 ## Summary
@@ -123,12 +123,19 @@ Core ShareModule functionality is tested including parameter sharing, validation
 | Update 1 | 183 | 70% | +formatting, +fix_all/free_all, +opt_schedule |
 | Update 2 | 218 | 78% | +graph, +FourierBasis, +parameter repr/log |
 | Update 3 | 285 | 82% | +ManagedOptimiserSchedule (97%), +schedule_builder (92%) |
-| Update 4 | 298 | 82% | +Known parameter handling, +sharing levels, +parameter_summary |
+| Update 4 | 298 | 82% | +Known parameter handling, +sharing levels, +get_parameter_summary |
 | Update 5 | 298 | 82% | Bug fix: component-level sharing in plot_model_graph |
+| Update 6 | 294 | 82% | API cleanup: removed get_shared_components, renamed parameter_summary |
 
 ## Recent Improvements
 
-### Update 5 (Current)
+### Update 6 (Current)
+1. **API cleanup for ShareModule method naming consistency**
+   - Removed deprecated `get_shared_components()` (use `get_sharing_summary(level='component')`)
+   - Renamed `parameter_summary()` → `get_parameter_summary()` for consistency with other getters
+   - Removed 4 redundant tests for `get_shared_components`
+
+### Update 5
 1. **`model/share_module.py`**: Bug fix for `plot_model_graph(sharing_level="component")`
    - Fixed `get_digraph()` to correctly handle shared components:
      - Adds edges from parent to shared component (e.g., `line_2 -> v`)
@@ -139,7 +146,7 @@ Core ShareModule functionality is tested including parameter sharing, validation
 
 ### Update 4
 1. **`model/share_module.py`**: Added 132 statements for new features
-   - `parameter_summary()` method with Rich table output
+   - `get_parameter_summary()` method with Rich table output
    - `get_sharing_summary(level='component'|'parameter')` consolidated API
    - `get_parameter_paths(show_knowns=False)` excludes Known by default
    - `set(allow_set_knowns=False)` protects Known parameters
