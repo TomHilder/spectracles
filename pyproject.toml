@@ -15,7 +15,7 @@ dependencies = [
     "jax-finufft",
     "jaxtyping>=0.3.0",
     "matplotlib>=3.10.5",
-    "networkx>=3.4.2",
+    "networkx>=3.4",
     "optax>=0.2.0",
     "rich>=13.0",
     "tqdm>=4.67.1",
