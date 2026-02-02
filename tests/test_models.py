@@ -6,7 +6,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from equinox import Module
 from spectracles.model.data import SpatialData
-from spectracles.model.parameter import Parameter
+from spectracles.model.parameter import Known, Parameter
 
 
 class SimpleModel(Module):
@@ -100,6 +100,20 @@ class SharedBranchModel(Module):
 
     def __call__(self, x):
         return self.branch_a(x) + self.branch_b(x) + self.branch_c(x)
+
+
+class ModelWithKnown(Module):
+    """Model with both Parameter and Known parameters."""
+
+    param: Parameter
+    known: Known
+
+    def __init__(self, param_value=1.0, known_value=2.0):
+        self.param = Parameter(initial=param_value)
+        self.known = Known(value=known_value)
+
+    def __call__(self, x):
+        return self.param.val * x + self.known.val
 
 
 class SpatialDummyModel(Module):

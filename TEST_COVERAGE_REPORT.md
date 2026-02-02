@@ -1,7 +1,7 @@
 # Test Coverage Report
 
-**Date:** January 2026
-**Total Tests:** 285 passing
+**Date:** February 2026
+**Total Tests:** 298 passing
 **Overall Coverage (excluding lvm_models):** 82%
 
 ## Summary
@@ -16,11 +16,11 @@ This report analyzes test coverage for the spectracles library, excluding the `l
 | `_version.py` | 13 | 0 | 100% | Complete |
 | `model/data.py` | 17 | 0 | 100% | Complete |
 | `model/formatting.py` | 103 | 0 | 100% | Complete |
-| `model/graph.py` | 76 | 1 | 99% | Excellent |
+| `model/graph.py` | 78 | 1 | 99% | Excellent |
 | `model/io.py` | 28 | 3 | 89% | Good |
 | `model/kernels.py` | 50 | 1 | 98% | Excellent |
 | `model/parameter.py` | 154 | 6 | 96% | Excellent |
-| `model/share_module.py` | 400 | 97 | 76% | Good |
+| `model/share_module.py` | 532 | 131 | 75% | Good |
 | `model/spatial.py` | 122 | 27 | 78% | Good |
 | `model/spectral.py` | 27 | 1 | 96% | Excellent |
 | `optimise/opt_frame.py` | 113 | 12 | 89% | Good |
@@ -90,12 +90,13 @@ Spatial models including FourierGP, FourierBasis, and PerSpaxel are tested.
 - Some branches in conjugate symmetry handling
 - Edge cases in dimension checks
 
-### `model/share_module.py` - 76%
-Core ShareModule functionality is tested including parameter sharing, validation, model building, and `fix_all()`/`free_all()` methods.
+### `model/share_module.py` - 75%
+Core ShareModule functionality is tested including parameter sharing, validation, model building, `fix_all()`/`free_all()` methods, and Known parameter handling.
 
 **Untested areas:**
-- `print_graph()` visualization (lines 809-883)
-- Some branches in sharing detection (lines 291-332)
+- `plot_model_graph()` visualization
+- Some branches in `get_digraph()` graph building
+- `debug_repr()` formatting
 
 ## Test File Mapping
 
@@ -106,7 +107,7 @@ Core ShareModule functionality is tested including parameter sharing, validation
 | `test_graph.py` | model/graph.py | 13 |
 | `test_io.py` | model/io.py | 8 |
 | `test_kernels.py` | model/kernels.py | 16 |
-| `test_leaf_sharing.py` | model/share_module.py, tree/path_utils.py | 52 |
+| `test_leaf_sharing.py` | model/share_module.py, tree/path_utils.py | 63 |
 | `test_opt_schedule.py` | optimise/opt_schedule.py | 37 |
 | `test_optimise.py` | optimise/opt_frame.py | 13 |
 | `test_parameter.py` | model/parameter.py | 36 |
@@ -122,10 +123,26 @@ Core ShareModule functionality is tested including parameter sharing, validation
 | Update 1 | 183 | 70% | +formatting, +fix_all/free_all, +opt_schedule |
 | Update 2 | 218 | 78% | +graph, +FourierBasis, +parameter repr/log |
 | Update 3 | 285 | 82% | +ManagedOptimiserSchedule (97%), +schedule_builder (92%) |
+| Update 4 | 298 | 82% | +Known parameter handling, +sharing levels, +parameter_summary |
 
 ## Recent Improvements
 
-### Update 3 (Current)
+### Update 4 (Current)
+1. **`model/share_module.py`**: Added 132 statements for new features
+   - `parameter_summary()` method with Rich table output
+   - `get_sharing_summary(level='component'|'parameter')` consolidated API
+   - `get_parameter_paths(show_knowns=False)` excludes Known by default
+   - `set(allow_set_knowns=False)` protects Known parameters
+   - `set_fixed_status()` blocks unfixing Known parameters
+   - `plot_model_graph(sharing_level=...)` option
+   - Improved `print_model_tree` sharing display format
+   - `debug_repr()` fix for cleaner output
+
+2. **`test_leaf_sharing.py`**: 52 → 63 tests (+11)
+   - Added `TestKnownParameterHandling` test class with 11 tests
+   - Covers `allow_set_knowns`, `show_knowns`, Known unfixing protection
+
+### Update 3
 1. **`optimise/opt_schedule.py`**: 52% → 97% (+45%)
    - Renamed OptimiserScheduleUnsafe to ManagedOptimiserSchedule
    - Added 22 comprehensive tests for state management, skip/reset, status inspection

@@ -520,8 +520,8 @@ class TestSharedComponents:
 
 
 class TestSharingSummary:
-    def test_get_sharing_summary_simple(self):
-        # Simple model with one shared parameter
+    def test_get_sharing_summary_simple_component(self):
+        # Simple model with one shared parameter - component level (default)
         model = SharedLeafModel(value=1.0)
         shared_model = ShareModule(model)
 
@@ -529,27 +529,49 @@ class TestSharingSummary:
 
         # Should have one parent with one duplicate
         assert len(summary) == 1
-        assert "a.val" in summary
-        assert summary["a.val"] == ["b.val"]
+        assert "a" in summary
+        assert summary["a"] == ["b"]
 
-    def test_get_sharing_summary_complex(self):
-        # Complex model with multiple shared parameters
+    def test_get_sharing_summary_simple_parameter(self):
+        # Simple model with one shared parameter - parameter level
+        model = SharedLeafModel(value=1.0)
+        shared_model = ShareModule(model)
+
+        summary = shared_model.get_sharing_summary(level="parameter")
+
+        # Should have one parent with one duplicate
+        assert len(summary) == 1
+        assert "a" in summary
+        assert summary["a"] == ["b"]
+
+    def test_get_sharing_summary_complex_parameter(self):
+        # Complex model - parameter level catches tree_at sharing
         model = ComplexSharedModel(value=2.0)
         shared_model = ShareModule(model)
 
-        summary = shared_model.get_sharing_summary()
+        summary = shared_model.get_sharing_summary(level="parameter")
 
-        # Should have one parent (inner1.param.val) with multiple duplicates
+        # Should have one parent (inner1.param) with multiple duplicates
         assert len(summary) == 1
         parent_path = list(summary.keys())[0]
-        assert "inner1.param.val" == parent_path
+        assert "inner1.param" == parent_path
 
-        # Should have 3 duplicates: param.val, inner2.param.val, inner3.inner1.param.val
+        # Should have 3 duplicates: param, inner2.param, inner3.inner1.param
         duplicates = summary[parent_path]
         assert len(duplicates) == 3
-        assert "param.val" in duplicates
-        assert "inner2.param.val" in duplicates
-        assert "inner3.inner1.param.val" in duplicates
+        assert "param" in duplicates
+        assert "inner2.param" in duplicates
+        assert "inner3.inner1.param" in duplicates
+
+    def test_get_sharing_summary_complex_component(self):
+        # Complex model - component level doesn't catch tree_at sharing
+        model = ComplexSharedModel(value=2.0)
+        shared_model = ShareModule(model)
+
+        summary = shared_model.get_sharing_summary(level="component")
+
+        # tree_at sharing breaks object identity, so component level is empty
+        assert len(summary) == 0
 
     def test_get_sharing_summary_no_sharing(self):
         # Model with no shared parameters
@@ -770,3 +792,130 @@ class TestFixAllFreeAll:
         # All should be free
         assert not locked_freed.param.fix
         assert not locked_freed.inner1.param.fix
+
+
+class TestKnownParameterHandling:
+    """Tests for Known parameter handling in ShareModule."""
+
+    def test_set_known_raises_by_default(self):
+        """set() should raise when trying to modify Known parameters by default."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        with pytest.raises(ValueError, match="Cannot set Known parameter"):
+            model.set(["known"], [jnp.array([999.0])])
+
+    def test_set_known_with_allow_flag(self):
+        """set() should allow modifying Known when allow_set_knowns=True."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown(known_value=1.0))
+
+        # Should work with flag
+        updated = model.set(["known"], [jnp.array([999.0])], allow_set_knowns=True)
+        locked = updated.get_locked_model()
+        assert jnp.allclose(locked.model.known.val, 999.0)
+
+    def test_set_regular_param_still_works(self):
+        """set() should still work for regular Parameters."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown(param_value=1.0))
+
+        updated = model.set(["param"], [jnp.array([42.0])])
+        locked = updated.get_locked_model()
+        assert jnp.allclose(locked.model.param.val, 42.0)
+
+    def test_set_fixed_status_known_unfix_raises(self):
+        """set_fixed_status() should raise when trying to unfix a Known."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        with pytest.raises(ValueError, match="Cannot unfix Known parameter"):
+            model.set_fixed_status(["known"], [False])
+
+    def test_set_fixed_status_known_fix_allowed(self):
+        """set_fixed_status() should allow keeping Known fixed (no-op)."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        # This should work (Known is already fixed)
+        updated = model.set_fixed_status(["known"], [True])
+        assert updated.model.known.fix
+
+    def test_set_fixed_status_regular_param_still_works(self):
+        """set_fixed_status() should still work for regular Parameters."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        # Fix the parameter
+        fixed = model.set_fixed_status(["param"], [True])
+        assert fixed.model.param.fix
+
+        # Unfix the parameter
+        unfixed = fixed.set_fixed_status(["param"], [False])
+        assert not unfixed.model.param.fix
+
+    def test_get_parameter_paths_excludes_known_by_default(self):
+        """get_parameter_paths() should exclude Known parameters by default."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        paths = model.get_parameter_paths()
+
+        assert "param" in paths
+        assert "known" not in paths
+
+    def test_get_parameter_paths_includes_known_with_flag(self):
+        """get_parameter_paths() should include Known with show_knowns=True."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        paths = model.get_parameter_paths(show_knowns=True)
+
+        assert "param" in paths
+        assert "known" in paths
+
+    def test_parameter_summary_excludes_known_by_default(self, capsys):
+        """parameter_summary() should exclude Known parameters by default."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        model.parameter_summary()
+
+        captured = capsys.readouterr()
+        assert "param" in captured.out
+        assert "known" not in captured.out
+
+    def test_parameter_summary_includes_known_with_flag(self, capsys):
+        """parameter_summary() should include Known with show_knowns=True."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+        model.parameter_summary(show_knowns=True)
+
+        captured = capsys.readouterr()
+        assert "param" in captured.out
+        assert "known" in captured.out
+
+    def test_free_all_does_not_unfix_known(self):
+        """free_all() should not unfix Known parameters."""
+        from .test_models import ModelWithKnown
+
+        model = ShareModule(ModelWithKnown())
+
+        # Fix everything first
+        fixed = model.fix_all()
+        assert fixed.model.param.fix
+        assert fixed.model.known.fix
+
+        # Free all
+        freed = fixed.free_all()
+
+        # Regular param should be free, Known should stay fixed
+        assert not freed.model.param.fix
+        assert freed.model.known.fix

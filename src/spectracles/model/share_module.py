@@ -367,7 +367,10 @@ class ShareModule(Module):
     def debug_repr(self) -> str:
         """Return the full equinox-style repr for debugging."""
         import equinox as eqx
-        return eqx.tree_pformat(self)
+
+        # Use locked model to get actual values (not Shared sentinels)
+        # and format just the model, not the ShareModule wrapper metadata
+        return eqx.tree_pformat(self.get_locked_model().model)
 
     def __call__(self, *args, **kwargs) -> Any:
         # Replace nodes specified by `where` with the nodes specified by `get`
@@ -473,52 +476,61 @@ class ShareModule(Module):
 
     def get_shared_components(self) -> dict[str, list[str]]:
         """
-        Get module-level components that are shared (same object).
+        Deprecated: Use get_sharing_summary(level='component') instead.
+        """
+        import warnings
 
-        This is useful for visualization - it shows when entire sub-models
-        are the same object, not just their leaf parameters. The internal
-        sharing mechanism still operates at the parameter level.
+        warnings.warn(
+            "get_shared_components() is deprecated, use get_sharing_summary(level='component') instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.get_sharing_summary(level="component")
 
-        Note: Module sharing is detected during ShareModule initialization
-        before any tree manipulation (which can break object identity).
+    def get_sharing_summary(
+        self, level: str = "component"
+    ) -> dict[str, list[str]]:
+        """
+        Get a summary of what is shared in the model.
+
+        Args:
+            level: What level of sharing to report:
+                - 'component': Shows which modules are the same object.
+                  (e.g., 'line_1.v' -> ['line_2.v'])
+                - 'parameter': Shows which leaf parameter arrays are shared.
+                  More comprehensive, catches sharing done via tree_at.
+                  (e.g., 'line_1.v' -> ['line_2.v'])
 
         Returns:
-            Dict mapping parent component paths to list of paths that share
-            the same object. Only components that are actually shared are included.
-
-        Example:
-            >>> model.get_shared_components()
-            {'branch_a': ['branch_b']}  # branch_b IS branch_a (same object)
-        """
-        return self._shared_components
-
-    def get_sharing_summary(self) -> dict[str, list[str]]:
-        """
-        Get a summary of which parameters are shared with which.
-
-        Returns:
-            A dictionary mapping parent parameter paths (strings) to lists of
-            child parameter paths that share the same value. Only parameters
-            that are actually shared (have duplicates) are included.
+            A dictionary mapping parent paths to lists of paths that share
+            with them. Only items that are actually shared are included.
 
         Example:
             >>> model.get_sharing_summary()
-            {'line_1.v.coefficients.val': ['line_2.v.coefficients.val']}
+            {'line_1.v': ['line_2.v']}
         """
-        from collections import defaultdict
+        if level == "component":
+            return self._shared_components
+        elif level == "parameter":
+            from collections import defaultdict
 
-        # Build a mapping from parent path to list of duplicate paths
-        summary: dict[str, list[str]] = defaultdict(list)
+            # Build a mapping from parent path to list of duplicate paths
+            summary: dict[str, list[str]] = defaultdict(list)
 
-        for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
-            parent_path = self._parent_leaf_paths[dupl_id]
-            parent_path_str = leafpath_to_str(parent_path)
-            dupl_path_str = leafpath_to_str(dupl_path)
-            summary[parent_path_str].append(dupl_path_str)
+            for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
+                parent_path = self._parent_leaf_paths[dupl_id]
+                # Strip .val/.unconstrained_val suffix for cleaner paths
+                parent_path_str = leafpath_to_str(parent_path[:-1])
+                dupl_path_str = leafpath_to_str(dupl_path[:-1])
+                summary[parent_path_str].append(dupl_path_str)
 
-        return dict(summary)
+            return dict(summary)
+        else:
+            raise ValueError(f"level must be 'parameter' or 'component', got '{level}'")
 
-    def get_parameter_paths(self, show_shared: bool = False) -> list[str]:
+    def get_parameter_paths(
+        self, show_shared: bool = False, show_knowns: bool = False
+    ) -> list[str]:
         """
         Get all parameter paths that can be used with the `set()` method.
 
@@ -526,6 +538,9 @@ class ShareModule(Module):
             show_shared: If False (default), only returns paths to unique/parent
                 parameters. If True, also includes paths to shared (duplicate)
                 parameters.
+            show_knowns: If False (default), excludes Known parameters from the
+                results. Known parameters are fixed constants that cannot be
+                optimized.
 
         Returns:
             A list of parameter path strings (e.g., ['line.A.coefficients',
@@ -538,11 +553,21 @@ class ShareModule(Module):
             ['line_1.A.coefficients', 'line_1.v.coefficients', 'line_2.A.coefficients',
              'line_2.v.coefficients']  # line_2.v is shared with line_1.v
         """
+        from spectracles.model.parameter import Known
+
+        def is_known_param(param_path: tuple) -> bool:
+            """Check if the parameter at this path is a Known."""
+            param = use_path_get_leaf(self, param_path)
+            return isinstance(param, Known)
+
         # Get all unique/parent parameter paths (strip the .val/.unconstrained_val suffix)
         parent_paths: list[str] = []
         for path in self._parent_leaf_paths.values():
             # Remove the last component (.val or .unconstrained_val) to get the Parameter path
             param_path = path[:-1]
+            # Skip Known parameters if not requested
+            if not show_knowns and is_known_param(param_path):
+                continue
             param_path_str = leafpath_to_str(param_path)
             if param_path_str not in parent_paths:
                 parent_paths.append(param_path_str)
@@ -555,6 +580,9 @@ class ShareModule(Module):
         for dupl_path in self._dupl_leaf_paths:
             # Remove the last component (.val or .unconstrained_val) to get the Parameter path
             param_path = dupl_path[:-1]
+            # Skip Known parameters if not requested
+            if not show_knowns and is_known_param(param_path):
+                continue
             param_path_str = leafpath_to_str(param_path)
             if param_path_str not in all_paths:
                 all_paths.append(param_path_str)
@@ -652,12 +680,41 @@ class ShareModule(Module):
 
         return result
 
-    def set(self, params: list[str], values: list[Array]) -> Self:
+    def set(
+        self, params: list[str], values: list[Array], allow_set_knowns: bool = False
+    ) -> Self:
         """
-        Return a new model with updated parameter values. Can only be used to update values of Parameters or ConstrainedParameters. The model must not be locked.
+        Return a new model with updated parameter values. Can only be used to
+        update values of Parameters or ConstrainedParameters. The model must
+        not be locked.
+
+        Args:
+            params: List of parameter paths to update.
+            values: List of new values for each parameter.
+            allow_set_knowns: If False (default), raises an error when trying
+                to set Known parameters. Set to True to allow modifying Known
+                values (use with caution).
+
+        Returns:
+            A new ShareModule with updated parameter values.
         """
+        from spectracles.model.parameter import Known
+
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")
+
+        # Check for Known parameters if not allowed
+        if not allow_set_knowns:
+            for param_str in params:
+                param_path = str_to_leafpath(param_str)
+                param = use_path_get_leaf(self, param_path)
+                if isinstance(param, Known):
+                    raise ValueError(
+                        f"Cannot set Known parameter '{param_str}'. "
+                        f"Known parameters are constants. Use allow_set_knowns=True "
+                        f"to override this check."
+                    )
+
         val_paths = self._get_val_paths(params)
         replace_vals = self._prepare_new_vals(val_paths, values)
         return tree_at(lambda x: use_paths_get_leaves(x, val_paths), self, replace_vals)  # type: ignore[no-any-return]
@@ -665,7 +722,11 @@ class ShareModule(Module):
     def set_fixed_status(self, params: list[str], fix: list[bool]) -> Self:
         """
         Return a new model with parameters updated to be fixed or not based on provided paths and list of bools. Can only be used to update fixed statuses of Parameters or ConstrainedParameters. The model must not be locked.
+
+        Known parameters cannot be unfixed - they are always fixed by definition.
         """
+        from spectracles.model.parameter import Known
+
         # TODO: Refactor based on reused functionality
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")
@@ -675,6 +736,15 @@ class ShareModule(Module):
         fix_paths = []
         new_fix = []
         for pp, ff in zip(param_paths, fix):
+            # Check if trying to unfix a Known parameter
+            param = use_path_get_leaf(self, pp)
+            if isinstance(param, Known) and not ff:
+                path_str = leafpath_to_str(pp)
+                raise ValueError(
+                    f"Cannot unfix Known parameter '{path_str}'. "
+                    f"Known parameters are always fixed by definition."
+                )
+
             val, val_attr = self._get_val_and_attr(pp)
             if is_shared(val):
                 p_id = val.id
@@ -778,24 +848,17 @@ class ShareModule(Module):
 
         # Build list of parameter info
         params_info = []
-        sharing_summary = self.get_sharing_summary()
+        sharing_summary = self.get_sharing_summary(level="parameter")
 
         # Create reverse lookup: shared_path -> parent_path
         shared_to_parent: Dict[str, str] = {}
         for parent_path, shared_paths in sharing_summary.items():
-            # Strip .val/.unconstrained_val suffix
-            parent_clean = (
-                parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
-            )
             for shared_path in shared_paths:
-                shared_clean = (
-                    shared_path.rsplit(".", 1)[0] if "." in shared_path else shared_path
-                )
-                shared_to_parent[shared_clean] = parent_clean
+                shared_to_parent[shared_path] = parent_path
 
         # Get unique paths and shared paths
-        unique_paths = self.get_parameter_paths(show_shared=False)
-        all_paths = self.get_parameter_paths(show_shared=True)
+        unique_paths = self.get_parameter_paths(show_shared=False, show_knowns=show_knowns)
+        all_paths = self.get_parameter_paths(show_shared=True, show_knowns=show_knowns)
         shared_paths_set = set(all_paths) - set(unique_paths)
 
         for path in all_paths:
@@ -935,8 +998,8 @@ class ShareModule(Module):
 
         Args:
             show_sharing: If True, also print summaries of sharing relationships
-                after the tree. Shows both component-level sharing (entire modules
-                that are the same object) and parameter-level sharing.
+                after the tree. Shows both shared modules (entire modules that
+                are the same object) and shared parameters.
                 Default is False for backwards compatibility.
 
         Example with show_sharing=True:
@@ -946,11 +1009,13 @@ class ShareModule(Module):
                 └── line_2 (LinkedEmissionLine)
                     └── v (GPField)
 
-            Shared components (same object):
-              line_1.v  ←  line_2.v
+            Shared modules (parameters within are also shared):
+              line_1.v:
+                ← line_2.v
 
             Shared parameters:
-              line_1.v.coefficients  ←  line_2.v.coefficients
+              line_1.v.coefficients:
+                ← line_2.v.coefficients
         """
         from rich.text import Text
         from spectracles.model.formatting import get_console
@@ -961,38 +1026,41 @@ class ShareModule(Module):
         print_graph(graph, root_id)
 
         if show_sharing:
-            # Build all sharing info into a single Text object to avoid spacing issues
-            output = Text()
-
             # Show component-level sharing (entire modules that are the same object)
-            shared_components = self.get_shared_components()
+            shared_components = self.get_sharing_summary(level="component")
             if shared_components:
-                output.append("\nShared components ", style="dim")
-                output.append("(same object)", style="dim")
-                output.append(":", style="dim")
+                header = Text("\nShared modules ", style="dim")
+                header.append("(parameters within are also shared)", style="dim italic")
+                header.append(":", style="dim")
+                console.print(header)
                 for parent_path, shared_paths in shared_components.items():
+                    # Parent on its own line
+                    parent_line = Text("  ")
+                    parent_line.append(parent_path, style="value")
+                    parent_line.append(":", style="dim")
+                    console.print(parent_line)
+                    # Shared paths indented below
                     for shared_path in shared_paths:
-                        output.append("\n  ")
-                        output.append(parent_path, style="value")
-                        output.append("  ←  ", style="shared")
-                        output.append(shared_path, style="shared")
+                        shared_line = Text("    ← ")
+                        shared_line.append(shared_path, style="shared")
+                        console.print(shared_line)
 
             # Show parameter-level sharing
             if self._dupl_leaf_ids:
-                output.append("\n\nShared parameters:", style="dim")
-                summary = self.get_sharing_summary()
+                header = Text("\nShared parameters:", style="dim")
+                console.print(header)
+                summary = self.get_sharing_summary(level="parameter")
                 for parent_path, dupl_paths in summary.items():
-                    # Strip .val/.unconstrained_val suffix for cleaner display
-                    parent_display = parent_path.rsplit(".", 1)[0] if "." in parent_path else parent_path
+                    # Parent on its own line
+                    parent_line = Text("  ")
+                    parent_line.append(parent_path, style="value")
+                    parent_line.append(":", style="dim")
+                    console.print(parent_line)
+                    # Shared paths indented below
                     for dupl_path in dupl_paths:
-                        dupl_display = dupl_path.rsplit(".", 1)[0] if "." in dupl_path else dupl_path
-                        output.append("\n  ")
-                        output.append(parent_display, style="value")
-                        output.append("  ←  ", style="shared")
-                        output.append(dupl_display, style="shared")
-
-            if output:
-                console.print(output)
+                        shared_line = Text("    ← ")
+                        shared_line.append(dupl_path, style="shared")
+                        console.print(shared_line)
 
     def plot_model_graph(
         self,
@@ -1000,12 +1068,22 @@ class ShareModule(Module):
         show: bool = True,
         label_func: Callable[[DiGraph], Dict[int, str]] | None = None,
         nx_draw_kwds: dict = DEFAULT_NX_KWDS,
+        sharing_level: str = "component",
     ) -> None:
         """
-        Plot the model as a graph using networkx and matplotlib. The graph is directed towards parameters and accounts for the sharing structure.
+        Plot the model as a graph using networkx and matplotlib. The graph is
+        directed towards parameters and accounts for the sharing structure.
+
+        Args:
+            ax: Matplotlib axes to plot on. If None, creates a new figure.
+            show: If True, calls plt.show() after plotting.
+            label_func: Custom function to generate node labels.
+            nx_draw_kwds: Keyword arguments for networkx drawing functions.
+            sharing_level: How to display sharing - 'component' (default) shows
+                module-level sharing, 'parameter' shows leaf-level sharing.
         """
         with temporarily_disable_tex():  # TODO: implement this and check it works
-            graph, root_id = get_digraph(self)
+            graph, root_id = get_digraph(self, sharing_level=sharing_level)
             pos = layered_hierarchy_pos(graph, root_id)
             if ax is None:
                 _, ax = plt.subplots(figsize=(10, 10), layout="compressed")
@@ -1092,7 +1170,26 @@ def build_model(cls: Callable[..., Module], *args, **kwargs) -> ShareModule:
     return parent_model(cls(*args, **kwargs))
 
 
-def get_digraph(module: ShareModule) -> tuple[DiGraph, int]:
+def get_digraph(
+    module: ShareModule, sharing_level: str = "component"
+) -> tuple[DiGraph, int]:
+    """
+    Build a directed graph representation of the model structure.
+
+    Args:
+        module: The ShareModule to build a graph for.
+        sharing_level: How to handle sharing - 'component' uses module-level
+            sharing, 'parameter' uses leaf-level sharing.
+
+    Returns:
+        A tuple of (DiGraph, root_node_id).
+    """
+    # Build component-level sharing lookup: child_path -> parent_path
+    component_sharing: dict[str, str] = {}
+    for parent_path, child_paths in module._shared_components.items():
+        for child_path in child_paths:
+            component_sharing[child_path] = parent_path
+
     # Filter tree and extract leaves + paths
     filtered_tree = filter(module, is_parameter)
     leaves = leaves_with_path(filtered_tree.model, is_leaf=is_parameter)
@@ -1116,16 +1213,39 @@ def get_digraph(module: ShareModule) -> tuple[DiGraph, int]:
             leaf = getattr(parent, entry.name)
             # Figure out what leaf we are adding, accounting for sharing
             if is_parameter(leaf):
-                if is_constrained(leaf):
-                    val_attr = "unconstrained_val"
+                if sharing_level == "parameter":
+                    # Parameter-level: check if the leaf's value is a Shared sentinel
+                    if is_constrained(leaf):
+                        val_attr = "unconstrained_val"
+                    else:
+                        val_attr = "val"
+                    val_leaf = getattr(leaf, val_attr)
+                    if is_shared(val_leaf):
+                        parent_path = module._parent_leaf_paths[val_leaf.id][:-1]
+                    else:
+                        parent_path = p
+                    leaf = use_path_get_leaf(module, parent_path)
+                elif sharing_level == "component":
+                    # Component-level: check if any prefix of this path is a shared component
+                    current_path = leafpath_to_str(p)  # Full path to the parameter
+                    path_parts = current_path.split(".")
+                    # Check progressively longer prefixes
+                    for i in range(len(path_parts)):
+                        prefix = ".".join(path_parts[: i + 1])
+                        if prefix in component_sharing:
+                            # Found a shared component - redirect to parent
+                            parent_component = component_sharing[prefix]
+                            suffix = ".".join(path_parts[i + 1 :])
+                            if suffix:
+                                redirect_path = f"{parent_component}.{suffix}"
+                            else:
+                                redirect_path = parent_component
+                            leaf = use_path_get_leaf(module, str_to_leafpath(redirect_path))
+                            break
                 else:
-                    val_attr = "val"
-                val_leaf = getattr(leaf, val_attr)
-                if is_shared(val_leaf):
-                    parent_path = module._parent_leaf_paths[val_leaf.id][:-1]
-                else:
-                    parent_path = p
-                leaf = use_path_get_leaf(module, parent_path)
+                    raise ValueError(
+                        f"sharing_level must be 'component' or 'parameter', got '{sharing_level}'"
+                    )
             # If it was a shared leaf, then the following will actually do nothing, as desired
             graph.add_node(
                 id(leaf),
