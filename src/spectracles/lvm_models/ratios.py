@@ -82,12 +82,10 @@ class LineRatioModel(SpatialModel):
 def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
     vmapped_model = jax.vmap(model, in_axes=(0, None))
     ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
-    print(ln_like)
     ln_prior = (
         model.line_1.A.gp.prior_logpdf()
         + model.line_1.v.gp.prior_logpdf()
         + model.line_1.vσ.gp.prior_logpdf()
         + model.line_2.A.log10_ratio_field.gp.prior_logpdf(),
     )
-    print(ln_prior)
     return -1 * (ln_like + ln_prior)

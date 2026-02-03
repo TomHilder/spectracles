@@ -25,7 +25,8 @@ THEME = Theme({
 })
 
 # Console with theme, but force_terminal=False to allow graceful fallback
-_console = Console(theme=THEME, force_terminal=False)
+# force_jupyter=False prevents Rich from using IPython's display() in interactive environments
+_console = Console(theme=THEME, force_terminal=False, force_jupyter=False)
 
 
 def get_console() -> Console:
