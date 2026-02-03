@@ -219,10 +219,20 @@ class Known(Parameter):
             format_array_value,
             known_repr_parts,
             render_to_string,
+            styled_type,
+            styled_shared,
         )
+        from spectracles.model.share_module import Shared
 
-        value_str = format_array_value(self.val)
-        text = known_repr_parts(value_str)
+        # Check if val is a Shared sentinel (in unlocked ShareModule context)
+        if isinstance(self.val, Shared):
+            text = styled_type("Known")
+            text.append("(", style="dim")
+            text.append_text(styled_shared(self.val.parent_path))
+            text.append(")", style="dim")
+        else:
+            value_str = format_array_value(self.val)
+            text = known_repr_parts(value_str)
         return render_to_string(text)
 
 

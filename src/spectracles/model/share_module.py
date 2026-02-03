@@ -292,12 +292,10 @@ class ShareModule(Module):
     def __repr__(self) -> str:
         from spectracles.model.formatting import (
             create_model_tree,
-            add_tree_node,
             render_to_string,
             styled_type,
-            styled_free,
-            styled_fixed,
         )
+        from spectracles.model.parameter import Known
         from rich.text import Text
 
         # Count parameters
@@ -312,11 +310,29 @@ class ShareModule(Module):
         if n_shared > 0:
             header.append(", ", style="dim")
             header.append(f"{n_shared} shared", style="shared")
-        header.append(", ", style="dim")
+
         if self._locked:
-            header.append_text(styled_fixed())
+            # Locked models can't be optimized, so just show "locked"
+            header.append(" · ", style="dim")
+            header.append("locked", style="dim")
         else:
-            header.append_text(styled_free())
+            # Count free vs fixed parameters (unique only, excluding Known)
+            locked = self.get_locked_model()
+            unique_paths = self.get_parameter_paths(show_shared=False, show_knowns=False)
+            n_free = 0
+            n_fixed = 0
+            for path in unique_paths:
+                param = use_path_get_leaf(locked.model, str_to_leafpath(path))
+                if not isinstance(param, Known) and hasattr(param, "fix"):
+                    if param.fix:
+                        n_fixed += 1
+                    else:
+                        n_free += 1
+            header.append(" · ", style="dim")
+            header.append(f"{n_free} free", style="free")
+            header.append(", ", style="dim")
+            header.append(f"{n_fixed} fixed", style="fixed")
+
         header.append(")", style="dim")
 
         # Create tree
@@ -335,7 +351,6 @@ class ShareModule(Module):
 
     def _add_model_attrs_to_tree(self, tree, obj, path_prefix: str) -> None:
         """Recursively add model attributes to the tree."""
-        from spectracles.model.formatting import add_tree_node
         from rich.text import Text
 
         for attr_name in vars(obj).keys():
