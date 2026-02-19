@@ -37,7 +37,7 @@ from typing import Callable, Literal, Optional, Union
 import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, PRNGKeyArray
-from optax import GradientTransformation, sgd, adam  # type: ignore[import]
+from optax import GradientTransformation, adam, sgd  # type: ignore[import]
 
 from spectracles.model.share_module import ShareModule
 from spectracles.optimise.opt_frame import get_opt_filter_spec
@@ -46,7 +46,6 @@ from spectracles.optimise.opt_schedule import (
     OptimiserSchedule,
     PhaseConfig,
 )
-
 
 # --- Parameter Spec Types ---
 
@@ -272,7 +271,10 @@ def _match_pattern(pattern: str, path: str) -> bool:
             suffix = suffix.lstrip(".")
 
             # Check prefix
-            if prefix and not (path.startswith(prefix) or fnmatch(path.split(".")[0], prefix.split(".")[0] if prefix else "*")):
+            if prefix and not (
+                path.startswith(prefix)
+                or fnmatch(path.split(".")[0], prefix.split(".")[0] if prefix else "*")
+            ):
                 if prefix:
                     prefix_parts = prefix.split(".")
                     path_parts = path.split(".")
@@ -298,10 +300,10 @@ def _match_pattern(pattern: str, path: str) -> bool:
                 return True  # "**" alone matches everything
             if not prefix:
                 # Just suffix - check if path ends with suffix pattern
-                return _simple_match(suffix, ".".join(path.split(".")[-len(suffix.split(".")):]))
+                return _simple_match(suffix, ".".join(path.split(".")[-len(suffix.split(".")) :]))
             if not suffix:
                 # Just prefix - check if path starts with prefix pattern
-                return _simple_match(prefix, ".".join(path.split(".")[:len(prefix.split("."))]))
+                return _simple_match(prefix, ".".join(path.split(".")[: len(prefix.split("."))]))
             return True
 
     # Use simple matching for non-recursive patterns
@@ -433,6 +435,7 @@ def build_schedule(
     default_optimizer: Literal["sgd", "adam"] = "adam",
     managed: bool = False,
     get_filter_spec_fn: Callable[[ShareModule], Callable] = get_opt_filter_spec,
+    Δloss_criterion: Optional[float] = None,
     key: Optional[PRNGKeyArray] = None,
 ) -> Union[OptimiserSchedule, ManagedOptimiserSchedule]:
     """Build an optimization schedule using a parameter-centric specification.
@@ -531,8 +534,8 @@ def build_schedule(
                             "Pass key=jr.key(seed) to build_schedule."
                         )
                     current_key, subkey = jr.split(current_key)
-                    val_updates[path] = (
-                        init_spec.mean + init_spec.std * jr.normal(subkey, param_shape)
+                    val_updates[path] = init_spec.mean + init_spec.std * jr.normal(
+                        subkey, param_shape
                     )
                 elif init_spec.kind == "uniform":
                     if current_key is None:
@@ -549,6 +552,7 @@ def build_schedule(
             PhaseConfig(
                 n_steps=n_steps,
                 optimiser=opt,
+                Δloss_criterion=Δloss_criterion,
                 fix_status_updates=fix_updates,
                 param_val_updates=val_updates,
             )
@@ -556,9 +560,7 @@ def build_schedule(
 
     # Create the schedule
     if managed:
-        return ManagedOptimiserSchedule(
-            model, loss_fn, phase_configs, get_filter_spec_fn
-        )
+        return ManagedOptimiserSchedule(model, loss_fn, phase_configs, get_filter_spec_fn)
     else:
         return OptimiserSchedule(model, loss_fn, phase_configs, get_filter_spec_fn)
 
