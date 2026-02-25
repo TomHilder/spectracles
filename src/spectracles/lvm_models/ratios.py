@@ -3,21 +3,29 @@
 import jax
 from jaxtyping import Array
 
-from .. import AnyParameter, Kernel, PerSpaxel, SpatialDataLVM, SpatialModel
+from .. import (
+    AnyParameter,
+    Kernel,
+    PerSpaxel,
+    SpatialDataLVM,
+    SpectralSpatialModel,
+    WindowConstant,
+)
 from .fields import FieldFromRatio, GPField, PositiveGPField
 from .likelihood import ln_likelihood
 from .line_single import EmissionLine, LinkedEmissionLine
 
 
-class LineRatioModel(SpatialModel):
+class LineRatioModel(SpectralSpatialModel):
     """Model of two linked emission lines where the flux spatial field of the weak line is represented via a line ratio field multiplied by the flux spatial field of the strong line. line_1 is the strong line (denominator), line_2 is the weak line (numerator)."""
 
     # Emission lines
     line_1: EmissionLine
     line_2: LinkedEmissionLine
 
-    # Continuum level (same all wavelengths TODO make local to each line?)
-    cont: PerSpaxel
+    # Continuum level
+    cont_1: WindowConstant
+    cont_2: WindowConstant
 
     def __init__(
         self,
@@ -34,6 +42,8 @@ class LineRatioModel(SpatialModel):
         vσ_kernel: Kernel,
         r_kernel: Kernel,
         r_mean_log10: AnyParameter,
+        line_1_λ_window: tuple[float, float],
+        line_2_λ_window: tuple[float, float],
     ):
         # Barycentric correction and LSF as per-spaxel sub-models
         # Very likely these will be fixed (σ_lsf_1, σ_lsf_2v_bary as Known)
@@ -66,7 +76,16 @@ class LineRatioModel(SpatialModel):
             v_syst=v_syst,
         )
         # Local continuum to each line
-        self.cont = PerSpaxel(n_spaxels=n_spaxels)
+        self.cont_1 = WindowConstant(
+            const=PerSpaxel(n_spaxels=n_spaxels),
+            λ_min=line_1_λ_window[0],
+            λ_max=line_1_λ_window[1],
+        )
+        self.cont_2 = WindowConstant(
+            const=PerSpaxel(n_spaxels=n_spaxels),
+            λ_min=line_2_λ_window[0],
+            λ_max=line_2_λ_window[1],
+        )
 
     # Convenience function
     def log10_ratio(self, spatial_data: SpatialDataLVM):
@@ -74,9 +93,9 @@ class LineRatioModel(SpatialModel):
 
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> tuple[Array, Array]:
         """Return the model flux for both lines at the given wavelengths and spatial data."""
-        return (
-            self.line_1(λ, spatial_data) + self.line_2(λ, spatial_data) + self.cont(spatial_data)
-        )
+        comp_1 = self.line_1(λ, spatial_data) + self.cont_1(λ, spatial_data)
+        comp_2 = self.line_2(λ, spatial_data) + self.cont_2(λ, spatial_data)
+        return comp_1 + comp_2
 
 
 def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
@@ -86,6 +105,6 @@ def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
         model.line_1.A.gp.prior_logpdf()
         + model.line_1.v.gp.prior_logpdf()
         + model.line_1.vσ.gp.prior_logpdf()
-        + model.line_2.A.log10_ratio_field.gp.prior_logpdf(),
+        + model.line_2.A.log10_ratio_field.gp.prior_logpdf()
     )
     return -1 * (ln_like + ln_prior)
