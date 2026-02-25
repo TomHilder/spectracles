@@ -45,7 +45,8 @@ class LineRatioModel(SpectralSpatialModel):
         r_mean_log10: AnyParameter,
         line_1_λ_window: tuple[float, float],
         line_2_λ_window: tuple[float, float],
-        C_v_cal: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
+        C_v_cal_1: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
+        C_v_cal_2: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
     ):
         # Barycentric correction and LSF as per-spaxel sub-models
         # Very likely these will be fixed (σ_lsf_1, σ_lsf_2v_bary as Known)
@@ -55,8 +56,8 @@ class LineRatioModel(SpectralSpatialModel):
         σ_lsf_2_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_2)
 
         # Systematics / calibration corrections
-        v_cal_1 = WaveCalVelocity(C_v_cal=C_v_cal, μ=μ_1)
-        v_cal_2 = WaveCalVelocity(C_v_cal=C_v_cal, μ=μ_2)
+        v_cal_1 = WaveCalVelocity(C_v_cal=C_v_cal_1, μ=μ_1)
+        v_cal_2 = WaveCalVelocity(C_v_cal=C_v_cal_2, μ=μ_2)
 
         # Emission lines
         self.line_1 = EmissionLineVCal(
@@ -97,7 +98,7 @@ class LineRatioModel(SpectralSpatialModel):
 
     # Convenience function
     def log10_ratio(self, spatial_data: SpatialDataLVM):
-        return self.line_2.A.log10_ratio_field(spatial_data)
+        return self.line_2.A.log10_ratio(spatial_data)
 
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> tuple[Array, Array]:
         """Return the model flux for both lines at the given wavelengths and spatial data."""
