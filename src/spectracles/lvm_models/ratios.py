@@ -36,7 +36,8 @@ class LineRatioModel(SpectralSpatialModel):
         σ_lsf_1: AnyParameter,
         σ_lsf_2: AnyParameter,
         v_bary: AnyParameter,
-        v_syst: AnyParameter,  # TODO, need to account for a shift b/w lines
+        v_syst_1: AnyParameter,
+        v_syst_2: AnyParameter,
         A_kernel: Kernel,
         v_kernel: Kernel,
         vσ_kernel: Kernel,
@@ -60,7 +61,7 @@ class LineRatioModel(SpectralSpatialModel):
             vσ=PositiveGPField(kernel=vσ_kernel, n_modes=n_modes),
             σ_lsf=σ_lsf_1_,
             v_bary=v_bary_,
-            v_syst=v_syst,
+            v_syst=v_syst_1,
         )
         self.line_2 = EmissionLine(
             μ=μ_2,
@@ -73,7 +74,7 @@ class LineRatioModel(SpectralSpatialModel):
             vσ=self.line_1.vσ,
             σ_lsf=σ_lsf_2_,
             v_bary=v_bary_,
-            v_syst=v_syst,
+            v_syst=v_syst_2,
         )
         # Local continuum to each line
         self.cont_1 = WindowConstant(
