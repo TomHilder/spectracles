@@ -13,15 +13,15 @@ from .. import (
 )
 from .fields import FieldFromRatio, GPField, PositiveGPField
 from .likelihood import ln_likelihood
-from .line_single import EmissionLine, LinkedEmissionLine
+from .line_single import EmissionLineVCal, WaveCalVelocity
 
 
 class LineRatioModel(SpectralSpatialModel):
     """Model of two linked emission lines where the flux spatial field of the weak line is represented via a line ratio field multiplied by the flux spatial field of the strong line. line_1 is the strong line (denominator), line_2 is the weak line (numerator)."""
 
     # Emission lines
-    line_1: EmissionLine
-    line_2: LinkedEmissionLine
+    line_1: EmissionLineVCal
+    line_2: EmissionLineVCal
 
     # Continuum level
     cont_1: WindowConstant
@@ -45,6 +45,7 @@ class LineRatioModel(SpectralSpatialModel):
         r_mean_log10: AnyParameter,
         line_1_λ_window: tuple[float, float],
         line_2_λ_window: tuple[float, float],
+        C_v_cal: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
     ):
         # Barycentric correction and LSF as per-spaxel sub-models
         # Very likely these will be fixed (σ_lsf_1, σ_lsf_2v_bary as Known)
@@ -53,8 +54,12 @@ class LineRatioModel(SpectralSpatialModel):
         σ_lsf_1_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_1)
         σ_lsf_2_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_2)
 
+        # Systematics / calibration corrections
+        v_cal_1 = WaveCalVelocity(C_v_cal=C_v_cal, μ=μ_1)
+        v_cal_2 = WaveCalVelocity(C_v_cal=C_v_cal, μ=μ_2)
+
         # Emission lines
-        self.line_1 = EmissionLine(
+        self.line_1 = EmissionLineVCal(
             μ=μ_1,
             A=PositiveGPField(kernel=A_kernel, n_modes=n_modes),
             v=GPField(kernel=v_kernel, n_modes=n_modes),
@@ -62,8 +67,9 @@ class LineRatioModel(SpectralSpatialModel):
             σ_lsf=σ_lsf_1_,
             v_bary=v_bary_,
             v_syst=v_syst_1,
+            v_cal=v_cal_1,
         )
-        self.line_2 = EmissionLine(
+        self.line_2 = EmissionLineVCal(
             μ=μ_2,
             A=FieldFromRatio(
                 base_field=self.line_1.A,
@@ -75,6 +81,7 @@ class LineRatioModel(SpectralSpatialModel):
             σ_lsf=σ_lsf_2_,
             v_bary=v_bary_,
             v_syst=v_syst_2,
+            v_cal=v_cal_2,
         )
         # Local continuum to each line
         self.cont_1 = WindowConstant(

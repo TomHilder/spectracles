@@ -74,6 +74,43 @@ class EmissionLine(SpectralSpatialModel):
         return (self.vσ(s) * self.μ_obs(s) / C_KMS) ** 2 + self.σ_lsf(s) ** 2
 
 
+class EmissionLineVCal(SpectralSpatialModel):
+    """Emission line model with wavelength calibration correction."""
+
+    # Line centre in Angstroms
+    μ: AnyParameter
+
+    # Model components
+    A: SpatialModel  # Line flux
+    v: SpatialModel  # Radial velocity in rest frame in km/s
+    vσ: SpatialModel  # Broadening velocity in km/s
+
+    # Measured line quantities
+    σ_lsf: SpatialModel  # LSF width (std dev) in Angstroms
+    v_bary: SpatialModel  # Barycentric velocity correction in km/s
+
+    # Global parameters
+    v_syst: AnyParameter  # Systematic velocity offset in km/s
+
+    # Systematics
+    v_cal: WaveCalVelocity  # Per-IFU Velocity calibration offset in km/s
+
+    def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> Array:
+        μ_obs = self.μ_obs(spatial_data)
+        σ2_obs = self.σ2_obs(spatial_data)
+        peak = self.A(spatial_data) / jnp.sqrt(2 * jnp.pi * σ2_obs)
+        return peak * jnp.exp(-0.5 * (λ - μ_obs) ** 2 / σ2_obs)
+
+    def v_obs(self, s) -> Array:
+        return self.v(s) + self.v_syst.val + self.v_cal(s) - self.v_bary(s)
+
+    def μ_obs(self, s) -> Array:
+        return self.μ.val * (1 + self.v_obs(s) / C_KMS)
+
+    def σ2_obs(self, s) -> Array:
+        return (self.vσ(s) * self.μ_obs(s) / C_KMS) ** 2 + self.σ_lsf(s) ** 2
+
+
 class LinkedEmissionLine(SpectralSpatialModel):
     """Emission line where the velocity and broadening are linked to another line."""
 
