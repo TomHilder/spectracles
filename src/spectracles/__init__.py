@@ -4,7 +4,7 @@ from spectracles.model.kernels import Kernel, Matern12, Matern32, Matern52, Squa
 from spectracles.model.parameter import AnyParameter, ConstrainedParameter, Known, Parameter, l_bounded
 from spectracles.model.share_module import ShareModule, build_model, contains_shared
 from spectracles.model.spatial import FourierGP, PerSpaxel, SpatialModel
-from spectracles.model.spectral import Constant, Gaussian, SpectralSpatialModel
+from spectracles.model.spectral import Constant, Gaussian, SpectralSpatialModel, WindowConstant
 from spectracles.optimise.opt_frame import OptimiserFrame
 from spectracles.optimise.opt_schedule import ManagedOptimiserSchedule, OptimiserSchedule, PhaseConfig
 from spectracles.optimise.schedule_builder import (
@@ -41,6 +41,7 @@ __all__ = [
     "ConstrainedParameter",
     "AnyParameter",
     "l_bounded",
+    "WindowConstant",
     "OptimiserFrame",
     "save_model",
     "load_model",

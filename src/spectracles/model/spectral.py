@@ -27,6 +27,23 @@ class Constant(SpectralSpatialModel):
         return self.const(spatial_data) * jnp.ones_like(λ)
 
 
+class WindowConstant(SpectralSpatialModel):
+    # Model parameters
+    const: SpatialModel
+    λ_min: float
+    λ_max: float
+
+    def __init__(self, const: SpatialModel, λ_min: float, λ_max: float):
+        self.const = const
+        self.λ_min = λ_min
+        self.λ_max = λ_max
+
+    def __call__(self, λ: Array, spatial_data: SpatialData):
+        window_cond = jnp.logical_and(λ >= self.λ_min, λ <= self.λ_max)
+        window = jnp.where(window_cond, 1.0, 0.0)
+        return self.const(spatial_data) * window
+
+
 class Gaussian(SpectralSpatialModel):
     # Model parameters
     A: SpatialModel
