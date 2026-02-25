@@ -83,6 +83,9 @@ class FieldFromRatio(SpatialModel):
     def ratio(self, data: SpatialData) -> Array:
         return 10 ** (self.log10_ratio_field(data) + self.log10_ratio_mean.val)
 
+    def log10_ratio(self, data: SpatialData) -> Array:
+        return self.log10_ratio_field(data) + self.log10_ratio_mean.val
+
     def __call__(self, data: SpatialData) -> Array:
         return self.base_field(data) * self.ratio(data)
 
