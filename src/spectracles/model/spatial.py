@@ -148,8 +148,8 @@ class FourierGP(SpatialModel):
 
     def prior_logpdf(self) -> Array:
         fw = self.kernel.feature_weights(self._freqs)
-        jacobian = -0.5 * jnp.log(fw).sum()
-        return norm.logpdf(x=self.coefficients.val).sum() + jacobian
+        log_normalisation = -jnp.log(fw).sum()
+        return norm.logpdf(x=self.coefficients.val).sum() + log_normalisation
 
 
 class MultiFourierGP(SpatialModel):
