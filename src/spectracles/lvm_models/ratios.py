@@ -1,19 +1,39 @@
 """ratios.py - Spectrospatial models joint over multiple emission lines where the spatial fields of the lines are modelled in terms of line ratio field(s)."""
 
 import jax
+import jax.numpy as jnp
 from jaxtyping import Array
 
 from .. import (
     AnyParameter,
     Kernel,
+    Parameter,
     PerSpaxel,
+    SpatialData,
     SpatialDataLVM,
     SpectralSpatialModel,
     WindowConstant,
+    l_bounded,
 )
+from ..model.spatial import PerIFU, PerTilePinned, SpatialModel
 from .fields import FieldFromRatio, GPField, PositiveGPField
 from .likelihood import ln_likelihood
 from .line_single import EmissionLineVCal, WaveCalVelocity
+
+
+class FluxCalFactor(SpatialModel):
+    # Hierarchical flux calibration factor per tile, with per-IFU variations
+    f_cal_raw: PerTilePinned  # Unconstrained flux calibration factor per tile # N_TILES values
+    delta_f_cal: PerIFU  # Additive per-IFU variation in flux calibration factor # 3 values
+
+    def __init__(self, n_tiles, tile_values, ifu_values):
+        self.f_cal_raw = PerTilePinned(n_tiles=n_tiles, tile_values=tile_values)
+        self.delta_f_cal = PerIFU(n_ifus=3, ifu_values=ifu_values)
+
+    def __call__(self, s: SpatialData) -> Array:
+        return l_bounded(self.f_cal_raw(s) + self.delta_f_cal(s), lower=0.0) / l_bounded(
+            0, lower=0.0
+        )
 
 
 class LineRatioModel(SpectralSpatialModel):
@@ -27,8 +47,13 @@ class LineRatioModel(SpectralSpatialModel):
     cont_1: WindowConstant
     cont_2: WindowConstant
 
+    # Calibration/Nuisances
+    flux_cal_1: FluxCalFactor
+    flux_cal_2: FluxCalFactor
+
     def __init__(
         self,
+        n_tiles: int,
         n_spaxels: int,
         n_modes: tuple[int, int],
         μ_1: AnyParameter,
@@ -95,6 +120,16 @@ class LineRatioModel(SpectralSpatialModel):
             λ_min=line_2_λ_window[0],
             λ_max=line_2_λ_window[1],
         )
+        self.flux_cal_1 = FluxCalFactor(
+            n_tiles=n_tiles,
+            tile_values=Parameter(jnp.zeros((n_tiles - 1,))),
+            ifu_values=Parameter(jnp.zeros((3,)), fixed=True),
+        )
+        self.flux_cal_2 = FluxCalFactor(
+            n_tiles=n_tiles,
+            tile_values=Parameter(jnp.zeros((n_tiles - 1,))),
+            ifu_values=Parameter(jnp.zeros((3,)), fixed=True),
+        )
 
     # Convenience function
     def log10_ratio(self, spatial_data: SpatialDataLVM):
@@ -104,16 +139,19 @@ class LineRatioModel(SpectralSpatialModel):
         """Return the model flux for both lines at the given wavelengths and spatial data."""
         comp_1 = self.line_1(λ, spatial_data) + self.cont_1(λ, spatial_data)
         comp_2 = self.line_2(λ, spatial_data) + self.cont_2(λ, spatial_data)
-        return comp_1 + comp_2
+        fcal_1 = self.flux_cal_1(spatial_data)
+        fcal_2 = self.flux_cal_2(spatial_data)
+        return fcal_1 * comp_1 + fcal_2 * comp_2
 
 
 def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
     vmapped_model = jax.vmap(model, in_axes=(0, None))
     ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
+    locked_model = model.get_locked_model()
     ln_prior = (
-        model.line_1.A.gp.prior_logpdf()
-        + model.line_1.v.gp.prior_logpdf()
-        + model.line_1.vσ.gp.prior_logpdf()
-        + model.line_2.A.log10_ratio_field.gp.prior_logpdf()
+        locked_model.line_1.A.gp.prior_logpdf()
+        + locked_model.line_1.v.gp.prior_logpdf()
+        + locked_model.line_1.vσ.gp.prior_logpdf()
+        + locked_model.line_2.A.log10_ratio_field.gp.prior_logpdf()
     )
     return -1 * (ln_like + ln_prior)
