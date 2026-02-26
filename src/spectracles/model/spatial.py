@@ -10,7 +10,7 @@ from jaxtyping import Array
 
 from spectracles.model.data import SpatialData
 from spectracles.model.kernels import Kernel
-from spectracles.model.parameter import Parameter, init_parameter
+from spectracles.model.parameter import AnyParameter, Parameter, init_parameter
 
 # NOTE: List of current obvious foot guns:
 # - n_modes must always be two odd integers, but this is not enforced
@@ -263,3 +263,24 @@ class PerTile(SpatialModel):
 
     def __call__(self, data: SpatialData) -> Array:
         return self.tile_values.val[data.tile_idx]
+
+
+class PerTilePinned(SpatialModel):
+    # Model parameters (n_tiles - 1 since one is pinned)
+    tile_values: AnyParameter
+    pinned_val: float
+
+    def __init__(
+        self,
+        n_tiles: int,
+        tile_values: Parameter | None = None,
+        pinned_val: float = 0.0,
+    ):
+        if n_tiles < 2:
+            raise ValueError("n_tiles must be at least 2 for PerTilePinned")
+        self.tile_values = init_parameter(tile_values, dims=n_tiles - 1)
+        self.pinned_val = pinned_val
+
+    def __call__(self, data: SpatialData) -> Array:
+        tile_values_full = jnp.insert(self.tile_values.val, 0, self.pinned_val)
+        return tile_values_full[data.tile_idx]
