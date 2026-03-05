@@ -76,6 +76,7 @@ class LineRatioModel(SpectralSpatialModel):
         C_v_cal_2: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
         share_f_cal: bool = False,
         share_v_cal: bool = False,
+        share_kinematics: bool = True,
     ):
         # Barycentric correction and LSF as per-spaxel sub-models
         # Very likely these will be fixed (σ_lsf_1, σ_lsf_2v_bary as Known)
@@ -83,14 +84,12 @@ class LineRatioModel(SpectralSpatialModel):
         v_bary_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=v_bary)
         σ_lsf_1_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_1)
         σ_lsf_2_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_2)
-
         # Systematics / calibration corrections
         v_cal_1 = WaveCalVelocity(C_v_cal=C_v_cal_1, μ=μ_1)
         if share_v_cal:
             v_cal_2 = v_cal_1
         else:
             v_cal_2 = WaveCalVelocity(C_v_cal=C_v_cal_2, μ=μ_2)
-
         # Emission lines
         self.line_1 = EmissionLineVCal(
             μ=μ_1,
@@ -102,6 +101,14 @@ class LineRatioModel(SpectralSpatialModel):
             v_syst=v_syst_1,
             v_cal=v_cal_1,
         )
+        # Are the kinematics coupled, or independent?
+        if share_kinematics:
+            l2_v = self.line_1.v
+            l2_vσ = self.line_1.vσ
+        else:
+            l2_v = GPField(kernel=v_kernel, n_modes=n_modes)
+            l2_vσ = PositiveGPField(kernel=vσ_kernel, n_modes=n_modes)
+        # Line 2 setup with intensity given by a ratio to line 1
         self.line_2 = EmissionLineVCal(
             μ=μ_2,
             A=FieldFromRatio(
@@ -109,8 +116,8 @@ class LineRatioModel(SpectralSpatialModel):
                 log10_ratio_field=GPField(kernel=r_kernel, n_modes=n_modes),
                 log10_ratio_mean=r_mean_log10,
             ),
-            v=self.line_1.v,
-            vσ=self.line_1.vσ,
+            v=l2_v,
+            vσ=l2_vσ,
             σ_lsf=σ_lsf_2_,
             v_bary=v_bary_,
             v_syst=v_syst_2,
@@ -164,16 +171,36 @@ class LineRatioModel(SpectralSpatialModel):
         return fcal_1 * comp_1 + fcal_2 * comp_2
 
 
-def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
+def neg_ln_posterior(model, λ, xy_data, data, u_data, mask, shared_kinematics=True):
     vmapped_model = jax.vmap(model, in_axes=(0, None))
     ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
     locked_model = model.get_locked_model()
+    # === Get the prior
+    ln_prior = 0
+    # Line 1 contributions
+    ln_prior = ln_prior + locked_model.line_1.A.gp.prior_logpdf()
+    ln_prior = ln_prior + locked_model.line_1.v.gp.prior_logpdf()
+    ln_prior = ln_prior + locked_model.line_1.vσ.gp.prior_logpdf()
+    # Line 2 contributions
+    ln_prior = ln_prior + locked_model.line_2.A.log10_ratio_field.gp.prior_logpdf()
+    if not shared_kinematics:
+        ln_prior = ln_prior + locked_model.line_2.v.gp.prior_logpdf()
+        ln_prior = ln_prior + locked_model.line_2.vσ.gp.prior_logpdf()
+    # Other priors
     ln_prior = (
-        locked_model.line_1.A.gp.prior_logpdf()
-        + locked_model.line_1.v.gp.prior_logpdf()
-        + locked_model.line_1.vσ.gp.prior_logpdf()
-        + locked_model.line_2.A.log10_ratio_field.gp.prior_logpdf()
+        ln_prior
         + norm.logpdf(x=locked_model.flux_cal_1.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
+    )
+    ln_prior = (
+        ln_prior
         + norm.logpdf(x=locked_model.flux_cal_2.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
     )
+    # ln_prior = (
+    #     locked_model.line_1.A.gp.prior_logpdf()
+    #     + locked_model.line_1.v.gp.prior_logpdf()
+    #     + locked_model.line_1.vσ.gp.prior_logpdf()
+    #     + locked_model.line_2.A.log10_ratio_field.gp.prior_logpdf()
+    #     + norm.logpdf(x=locked_model.flux_cal_1.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
+    #     + norm.logpdf(x=locked_model.flux_cal_2.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
+    # )
     return -1 * (ln_like + ln_prior)
