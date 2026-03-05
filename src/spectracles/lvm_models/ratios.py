@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+from jax.scipy.stats import norm
 from jaxtyping import Array
 
 from .. import (
@@ -15,7 +16,7 @@ from .. import (
     WindowConstant,
     l_bounded,
 )
-from ..model.spatial import PerIFU, PerTilePinned, SpatialModel
+from ..model.spatial import PerIFU, PerTile, PerTilePinned, SpatialModel
 from .fields import FieldFromRatio, GPField, PositiveGPField
 from .likelihood import ln_likelihood
 from .line_single import EmissionLineVCal, WaveCalVelocity
@@ -27,7 +28,8 @@ class FluxCalFactor(SpatialModel):
     delta_f_cal: PerIFU  # Additive per-IFU variation in flux calibration factor # 3 values
 
     def __init__(self, n_tiles, tile_values, ifu_values):
-        self.f_cal_raw = PerTilePinned(n_tiles=n_tiles, tile_values=tile_values)
+        # self.f_cal_raw = PerTilePinned(n_tiles=n_tiles, tile_values=tile_values)
+        self.f_cal_raw = PerTile(n_tiles=n_tiles, tile_values=tile_values)
         self.delta_f_cal = PerIFU(n_ifus=3, ifu_values=ifu_values)
 
     def __call__(self, s: SpatialData) -> Array:
@@ -72,6 +74,8 @@ class LineRatioModel(SpectralSpatialModel):
         line_2_λ_window: tuple[float, float],
         C_v_cal_1: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
         C_v_cal_2: AnyParameter,  # MUST be 2 values i.e. shape is (2,)
+        share_f_cal: bool = False,
+        share_v_cal: bool = False,
     ):
         # Barycentric correction and LSF as per-spaxel sub-models
         # Very likely these will be fixed (σ_lsf_1, σ_lsf_2v_bary as Known)
@@ -82,7 +86,10 @@ class LineRatioModel(SpectralSpatialModel):
 
         # Systematics / calibration corrections
         v_cal_1 = WaveCalVelocity(C_v_cal=C_v_cal_1, μ=μ_1)
-        v_cal_2 = WaveCalVelocity(C_v_cal=C_v_cal_2, μ=μ_2)
+        if share_v_cal:
+            v_cal_2 = v_cal_1
+        else:
+            v_cal_2 = WaveCalVelocity(C_v_cal=C_v_cal_2, μ=μ_2)
 
         # Emission lines
         self.line_1 = EmissionLineVCal(
@@ -122,14 +129,19 @@ class LineRatioModel(SpectralSpatialModel):
         )
         self.flux_cal_1 = FluxCalFactor(
             n_tiles=n_tiles,
-            tile_values=Parameter(jnp.zeros((n_tiles - 1,))),
+            # tile_values=Parameter(jnp.zeros((n_tiles - 1,)), fixed=True),
+            tile_values=Parameter(jnp.zeros((n_tiles,)), fixed=True),
             ifu_values=Parameter(jnp.zeros((3,)), fixed=True),
         )
-        self.flux_cal_2 = FluxCalFactor(
-            n_tiles=n_tiles,
-            tile_values=Parameter(jnp.zeros((n_tiles - 1,))),
-            ifu_values=Parameter(jnp.zeros((3,)), fixed=True),
-        )
+        if share_f_cal:
+            self.flux_cal_2 = self.flux_cal_1
+        else:
+            self.flux_cal_2 = FluxCalFactor(
+                n_tiles=n_tiles,
+                # tile_values=Parameter(jnp.zeros((n_tiles - 1,)), fixed=True),
+                tile_values=Parameter(jnp.zeros((n_tiles,)), fixed=True),
+                ifu_values=Parameter(jnp.zeros((3,)), fixed=True),
+            )
 
     # Convenience function
     def log10_ratio(self, spatial_data: SpatialDataLVM):
@@ -137,8 +149,16 @@ class LineRatioModel(SpectralSpatialModel):
 
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> tuple[Array, Array]:
         """Return the model flux for both lines at the given wavelengths and spatial data."""
+        # return (
+        #     self.flux_cal_1(spatial_data) * self.line_1(λ, spatial_data)
+        #     + self.cont_1(λ, spatial_data)
+        #     + self.flux_cal_2(spatial_data) * self.line_2(λ, spatial_data)
+        #     + self.cont_2(λ, spatial_data)
+        # )
         comp_1 = self.line_1(λ, spatial_data) + self.cont_1(λ, spatial_data)
         comp_2 = self.line_2(λ, spatial_data) + self.cont_2(λ, spatial_data)
+        # fcal = self.flux_cal(spatial_data)
+        # return fcal * (comp_1 + comp_2)
         fcal_1 = self.flux_cal_1(spatial_data)
         fcal_2 = self.flux_cal_2(spatial_data)
         return fcal_1 * comp_1 + fcal_2 * comp_2
@@ -153,5 +173,7 @@ def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
         + locked_model.line_1.v.gp.prior_logpdf()
         + locked_model.line_1.vσ.gp.prior_logpdf()
         + locked_model.line_2.A.log10_ratio_field.gp.prior_logpdf()
+        + norm.logpdf(x=locked_model.flux_cal_1.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
+        + norm.logpdf(x=locked_model.flux_cal_2.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
     )
     return -1 * (ln_like + ln_prior)
