@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+from jax.scipy.stats import norm
 from jaxtyping import Array
 
 from spectracles import (
@@ -186,7 +187,7 @@ class EmissionLineProduction(SpectralSpatialModel):
         return l_bounded(self.f_cal_raw(s), lower=0.0) / l_bounded(0, lower=0.0)
 
 
-class LVMModelSingle(SpectralSpatialModel):
+class LVMModelSingleLegacy(SpectralSpatialModel):
     # Model components
     line: EmissionLineProduction  # Emission line model
     offs: PerSpaxel  # Nuisance offsets per spaxel
@@ -224,7 +225,7 @@ class LVMModelSingle(SpectralSpatialModel):
         return self.offs(λ, spatial_data) + self.line(λ, spatial_data)
 
 
-def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
+def neg_ln_posterior_legacy(model, λ, xy_data, data, u_data, mask):
     vmapped_model = jax.vmap(model, in_axes=(0, None))
     ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
     print(ln_like)
@@ -234,4 +235,79 @@ def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
         + model.line.vσ_raw.prior_logpdf()
     )
     print(ln_prior)
+    return -1 * (ln_like + ln_prior)
+
+
+# ======================================================================
+# New-style model using Field wrappers
+# ======================================================================
+
+
+class FluxCalSingle(SpatialModel):
+    """Per-tile flux calibration factor (positive, centred on 1)."""
+
+    f_cal_raw: PerTile
+
+    def __init__(self, n_tiles: int, tile_values: AnyParameter):
+        self.f_cal_raw = PerTile(n_tiles=n_tiles, tile_values=tile_values)
+
+    def __call__(self, s: SpatialData) -> Array:
+        return l_bounded(self.f_cal_raw(s), lower=0.0) / l_bounded(0, lower=0.0)
+
+
+class LVMModelSingle(SpectralSpatialModel):
+    """Single emission line model using GPField / PositiveGPField wrappers."""
+
+    line: EmissionLineVCal
+    cont: Constant
+    flux_cal: FluxCalSingle
+
+    def __init__(
+        self,
+        n_tiles: int,
+        n_spaxels: int,
+        n_modes: tuple[int, int],
+        μ: AnyParameter,
+        A_kernel: Kernel,
+        v_kernel: Kernel,
+        vσ_kernel: Kernel,
+        σ_lsf: AnyParameter,
+        v_bary: AnyParameter,
+        v_syst: AnyParameter,
+        C_v_cal: AnyParameter,
+        λ_window: tuple[float, float] | None = None,
+    ):
+        from spectracles.lvm_models.fields import GPField, PositiveGPField
+
+        self.line = EmissionLineVCal(
+            μ=μ,
+            A=PositiveGPField(kernel=A_kernel, n_modes=n_modes),
+            v=GPField(kernel=v_kernel, n_modes=n_modes),
+            vσ=PositiveGPField(kernel=vσ_kernel, n_modes=n_modes),
+            σ_lsf=PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf),
+            v_bary=PerSpaxel(n_spaxels=n_spaxels, spaxel_values=v_bary),
+            v_syst=v_syst,
+            v_cal=WaveCalVelocity(C_v_cal=C_v_cal, μ=μ),
+        )
+        self.cont = Constant(const=PerSpaxel(n_spaxels=n_spaxels))
+        self.flux_cal = FluxCalSingle(
+            n_tiles=n_tiles,
+            tile_values=Parameter(jnp.zeros((n_tiles,)), fixed=True),
+        )
+
+    def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> Array:
+        emission = self.line(λ, spatial_data) + self.cont(λ, spatial_data)
+        return self.flux_cal(spatial_data) * emission
+
+
+def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
+    vmapped_model = jax.vmap(model, in_axes=(0, None))
+    ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
+    locked = model.get_locked_model()
+    ln_prior = (
+        locked.line.A.gp.prior_logpdf()
+        + locked.line.v.gp.prior_logpdf()
+        + locked.line.vσ.gp.prior_logpdf()
+        + norm.logpdf(x=locked.flux_cal.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
+    )
     return -1 * (ln_like + ln_prior)
