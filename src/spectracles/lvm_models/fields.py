@@ -110,6 +110,16 @@ class SumTwoFields(SpatialModel):
         return self.field_1(data) + self.field_2(data)
 
 
+class ScaledField(SpatialModel):
+    """A field scaled by a constant factor everywhere."""
+
+    scalar: AnyParameter
+    field: SpatialModel
+
+    def __call__(self, data: SpatialData) -> Array:
+        return self.scalar.val * self.field(data)
+
+
 # NOTE/TODO: The two above are basically the same. We should think about this more carefully to avoid redundant code but also not get mega confusing.
 # I think having a Field base class could be nice, then we could just define arithmetic operators over fields
 # Needs a thinko
