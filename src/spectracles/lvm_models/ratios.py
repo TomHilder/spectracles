@@ -305,6 +305,10 @@ class DoubleLineRatioModel(SpectralSpatialModel):
     def line_s(self, λ: Array, spatial_data: SpatialDataLVM):
         return self.line_s1(λ, spatial_data) + self.line_s2(λ, spatial_data)
 
+    # Convenience function for total A field
+    def line_s_A(self, spatial_data: SpatialDataLVM):
+        return self.line_s1.A(spatial_data) + self.line_s2.A(spatial_data)
+
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> tuple[Array, Array]:
         """Return the model flux for both lines at the given wavelengths and spatial data."""
         comp_s = self.line_s(λ, spatial_data) + self.cont_s(λ, spatial_data)
