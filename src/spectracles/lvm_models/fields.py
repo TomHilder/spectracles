@@ -98,3 +98,18 @@ class FieldPlusScatter(SpatialModel):
 
     def __call__(self, data: SpatialData) -> Array:
         return self.base_field(data) + self.scatter(data)
+
+
+class SumTwoFields(SpatialModel):
+    """A spatial field model that has two sub-fields, and returns their sum everywhere."""
+
+    field_1: SpatialModel
+    field_2: SpatialModel
+
+    def __call__(self, data: SpatialData) -> Array:
+        return self.field_1(data) + self.field_2(data)
+
+
+# NOTE/TODO: The two above are basically the same. We should think about this more carefully to avoid redundant code but also not get mega confusing.
+# I think having a Field base class could be nice, then we could just define arithmetic operators over fields
+# Needs a thinko
