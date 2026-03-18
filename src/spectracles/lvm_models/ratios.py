@@ -176,9 +176,9 @@ class DoubleLineRatioModel(SpectralSpatialModel):
     """Mode of three emission lines. Two, stronger lines, with a total flux spatial field. The single, weaker line, is represented via a line ratio field multiplied by the total flux spatial field of the stronger lines. lines_1 are the total contributions from the stronger lines (denominator) and line_2 is the weaker line (numerator). TODO: update"""
 
     # Emission lines
-    s_line_1: EmissionLineVCal
-    s_line_2: EmissionLineVCal
-    w_line: EmissionLineVCal
+    line_s1: EmissionLineVCal
+    line_s2: EmissionLineVCal
+    line_w: EmissionLineVCal
 
     # Continuum level
     cont_s: WindowConstant
@@ -267,6 +267,7 @@ class DoubleLineRatioModel(SpectralSpatialModel):
             v=lw_v,
             vσ=lw_vσ,
             σ_lsf=σ_lsf_w_,
+            v_bary=v_bary_,
             v_syst=v_syst_w,
             v_cal=v_cal_w,
         )
@@ -276,7 +277,7 @@ class DoubleLineRatioModel(SpectralSpatialModel):
             λ_min=line_s_λ_window[0],
             λ_max=line_s_λ_window[1],
         )
-        self.cont_2 = WindowConstant(
+        self.cont_w = WindowConstant(
             const=PerSpaxel(n_spaxels=n_spaxels),
             λ_min=line_w_λ_window[0],
             λ_max=line_w_λ_window[1],
@@ -295,10 +296,14 @@ class DoubleLineRatioModel(SpectralSpatialModel):
                 tile_values=Parameter(jnp.zeros((n_tiles,)), fixed=True),
                 ifu_values=Parameter(jnp.zeros((3,)), fixed=True),
             )
-        # Convenience function
 
+    # Convenience function for ratio
     def log10_ratio(self, spatial_data: SpatialDataLVM):
         return self.line_w.A.log10_ratio(spatial_data)
+
+    # Convenience function for line_s total
+    def line_s(self, λ: Array, spatial_data: SpatialDataLVM):
+        return self.line_s1(λ, spatial_data) + self.line_s2(λ, spatial_data)
 
     def __call__(self, λ: Array, spatial_data: SpatialDataLVM) -> tuple[Array, Array]:
         """Return the model flux for both lines at the given wavelengths and spatial data."""
@@ -371,10 +376,10 @@ def neg_ln_posterior_double(
     # Other priors
     ln_prior = (
         ln_prior
-        + norm.logpdf(x=locked_model.flux_cal_1.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
+        + norm.logpdf(x=locked_model.flux_cal_s.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
     )
     ln_prior = (
         ln_prior
-        + norm.logpdf(x=locked_model.flux_cal_2.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
+        + norm.logpdf(x=locked_model.flux_cal_w.f_cal_raw.tile_values.val, loc=0, scale=0.1).sum()
     )
     return -1 * (ln_like + ln_prior)
