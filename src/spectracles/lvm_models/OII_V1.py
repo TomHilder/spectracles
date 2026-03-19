@@ -61,25 +61,25 @@ class OIIV1Model(SpectralSpatialModel):
     """
 
     # O II V1 multiplet lines
-    oii_4638 = EmissionLineVCal
-    oii_4641 = EmissionLineVCal
-    oii_4649 = EmissionLineVCal
-    oii_4650 = EmissionLineVCal
-    oii_4661 = EmissionLineVCal
-    oii_4673 = EmissionLineVCal
-    oii_4676 = EmissionLineVCal
-    oii_4696 = EmissionLineVCal
+    oii_4638: EmissionLineVCal
+    oii_4641: EmissionLineVCal
+    oii_4649: EmissionLineVCal
+    oii_4650: EmissionLineVCal
+    oii_4661: EmissionLineVCal
+    oii_4673: EmissionLineVCal
+    oii_4676: EmissionLineVCal
+    oii_4696: EmissionLineVCal
 
     # Contaminating lines
-    nii_4643 = EmissionLineVCal
-    feiii_4658 = EmissionLineVCal
+    nii_4643: EmissionLineVCal
+    feiii_4658: EmissionLineVCal
 
     # Bright line (ratio denominator)
-    line_s = EmissionLineVCal
+    line_s: EmissionLineVCal
 
     # Continuum near each window
-    cont_w = WindowConstant
-    cont_s = WindowConstant
+    cont_w: WindowConstant
+    cont_s: WindowConstant
 
     # Calibration/Nuisances
     flux_cal_s: FluxCalFactor
@@ -123,6 +123,10 @@ class OIIV1Model(SpectralSpatialModel):
         σ_lsf_nii_4643_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_nii_4643)
         σ_lsf_feiii_4658_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_feiii_4658)
         σ_lsf_line_s_ = PerSpaxel(n_spaxels=n_spaxels, spaxel_values=σ_lsf_line_s)
+        # Line centres
+        μ_oii_ = tuple(Known(μ_v1[i]) for i in range(8))
+        μ_nii_4643_ = Known(μ_nii_4643)
+        μ_feiii_4658_ = Known(μ_feiii_4658)
         # Systematics / calibration corrections
         v_cal_s_ = WaveCalVelocity(
             C_v_cal=C_v_cal_s,
@@ -135,17 +139,17 @@ class OIIV1Model(SpectralSpatialModel):
         v_cal_oii_ = tuple(
             WaveCalVelocity(
                 C_v_cal=C_v_cal_w_,
-                μ=Known(μ_v1[i]),
+                μ=μ_oii_[i],
             )
             for i in range(8)
         )
         v_cal_nii_4643_ = WaveCalVelocity(
             C_v_cal=C_v_cal_w_,
-            μ=Known(μ_nii_4643),
+            μ=μ_nii_4643_,
         )
         v_cal_feiii_4658_ = WaveCalVelocity(
             C_v_cal=C_v_cal_w_,
-            μ=Known(μ_feiii_4658),
+            μ=μ_feiii_4658_,
         )
         # Emission lines
         self.line_s = EmissionLineVCal(
@@ -165,14 +169,14 @@ class OIIV1Model(SpectralSpatialModel):
         )
         # Are the kinematics coupled, or independent?
         if share_kinematics:
-            v1_v = self.line_s1.v
-            v1_vσ = self.line_s1.vσ
+            v1_v = self.line_s.v
+            v1_vσ = self.line_s.vσ
         else:
             v1_v = GPField(kernel=v_kernel, n_modes=n_modes)
             v1_vσ = PositiveGPField(kernel=v_kernel, n_modes=n_modes)
         oii_lines = tuple(
             EmissionLineVCal(
-                μ=Known(μ_v1[i]),
+                μ=μ_oii_[i],
                 A=ScaledField(
                     scalar=frac_intensities_oii_v1[i],
                     field=oii_v1_ratio,
@@ -195,7 +199,7 @@ class OIIV1Model(SpectralSpatialModel):
         self.oii_4676 = oii_lines[6]
         self.oii_4696 = oii_lines[7]
         self.nii_4643 = EmissionLineVCal(
-            μ=Known(μ_nii_4643),
+            μ=μ_nii_4643_,
             A=ScaledField(
                 scalar=nii_oii_v1_ratio,  # NII 4643 / OII V1 ratio
                 field=oii_v1_ratio,
@@ -208,7 +212,7 @@ class OIIV1Model(SpectralSpatialModel):
             v_cal=v_cal_nii_4643_,
         )
         self.feiii_4658 = EmissionLineVCal(
-            μ=Known(μ_feiii_4658),
+            μ=μ_feiii_4658_,
             A=ScaledField(
                 scalar=feiii_oii_v1_ratio,  # FeIII 4658 / OII V1 ratio
                 field=oii_v1_ratio,
