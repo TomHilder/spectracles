@@ -173,7 +173,7 @@ class LineRatioModel(SpectralSpatialModel):
 
 
 class DoubleLineRatioModel(SpectralSpatialModel):
-    """Mode of three emission lines. Two, stronger lines, with a total flux spatial field. The single, weaker line, is represented via a line ratio field multiplied by the total flux spatial field of the stronger lines. lines_1 are the total contributions from the stronger lines (denominator) and line_2 is the weaker line (numerator). TODO: update"""
+    """Mode of three emission lines. Two, stronger lines, with a total flux spatial field. The single, weaker line, is represented via a line ratio field multiplied by the total flux spatial field of the stronger lines. lines_1 are the total contributions from the stronger lines (denominator) and line_2 is the weaker line (numerator). TODO: update description."""
 
     # Emission lines
     line_s1: EmissionLineVCal
