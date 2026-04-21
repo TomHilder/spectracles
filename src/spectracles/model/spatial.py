@@ -113,6 +113,7 @@ class FourierBasis(SpatialModel):
 class FourierGP(SpatialModel):
     coefficients: Parameter
     kernel: Kernel
+    zeromode: Parameter
     n_modes: tuple[int, int]
     _freqs: Array
     _shape_info: tuple[int, int, int]
@@ -122,6 +123,7 @@ class FourierGP(SpatialModel):
         n_modes: tuple[int, int],
         kernel: Kernel,
         coefficients: Parameter | None = None,
+        zeromode: Parameter | None = None,
     ):
         # Model specfication
         self.n_modes = n_modes
@@ -130,6 +132,11 @@ class FourierGP(SpatialModel):
         self.kernel = kernel
         # Initialise parameters
         self.coefficients = init_parameter(coefficients, dims=n_modes)
+        # Zero-mode: scalar added to the field after NUFFT. Defaults to a fixed
+        # zero so kernels with non-zero DC (e.g. Matern) behave as before. Kernels
+        # that zero their DC (e.g. LogLogLinear) require a non-trivial zeromode
+        # Parameter to represent the field's spatial mean.
+        self.zeromode = zeromode if zeromode is not None else Parameter(0.0, fixed=True)
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
@@ -144,11 +151,13 @@ class FourierGP(SpatialModel):
             data.y,
             **FINUFFT_KWDS,
         ).real
-        return model_eval
+        return model_eval + self.zeromode.val
 
     def prior_logpdf(self) -> Array:
         fw = self.kernel.feature_weights(self._freqs)
-        log_normalisation = -jnp.log(fw).sum()
+        # DC-safe: kernels with zero DC contribute no Jacobian term for that mode.
+        safe_fw = jnp.where(fw > 0, fw, 1.0)
+        log_normalisation = jnp.where(fw > 0, -jnp.log(safe_fw), 0.0).sum()
         return norm.logpdf(x=self.coefficients.val).sum() + log_normalisation
 
 
