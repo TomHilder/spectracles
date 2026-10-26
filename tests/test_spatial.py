@@ -130,6 +130,43 @@ class TestFourierGP:
         out = gp(data)
         assert out.shape == (n,)
 
+    @pytest.mark.parametrize("length_scale", [0.3, 3.0])
+    def test_realised_covariance(self, length_scale):
+        # The field is linear in its N(0, 1) coefficients, f = J c, so its exact
+        # covariance is J J^T. It must have variance s^2 and equal the stationary
+        # kernel s^2 sum_k fw_k^2 cos(k.r) / sum_k fw_k^2 (the zero mode must not
+        # carry extra variance). Long length scales make the zero mode dominant.
+        import equinox as eqx
+        import jax
+
+        with jax.enable_x64(True):
+            var = 2.5
+            kernel = Matern32(
+                length_scale=Parameter(initial=length_scale), variance=Parameter(initial=var)
+            )
+            gp = FourierGP(n_modes=self.n_modes, kernel=kernel)
+            data = SpatialDataGeneric(
+                x=jnp.linspace(-3.0, 3.0, 9), y=jnp.linspace(-1.0, 2.0, 9), idx=jnp.arange(9)
+            )
+
+            def field(c):
+                return eqx.tree_at(lambda g: g.coefficients.val, gp, c)(data)
+
+            jac = jax.jacfwd(field)(jnp.zeros(self.n_modes, dtype=jnp.float64))
+            jac = jac.reshape(data.x.shape[0], -1)
+            cov = jac @ jac.T
+
+            fx, fy = get_freqs(self.n_modes)
+            fw2 = kernel.feature_weights(jnp.sqrt(fx**2 + fy**2)) ** 2
+            dx = data.x[:, None] - data.x[None, :]
+            dy = data.y[:, None] - data.y[None, :]
+            phase = fx.ravel() * dx[..., None] + fy.ravel() * dy[..., None]
+            expected = var * (fw2.ravel() * jnp.cos(phase)).sum(-1) / fw2.sum()
+
+            # NUFFT eps is 1e-10; the zero-mode error this guards against is O(fw_0^2)
+            assert jnp.allclose(jnp.diag(cov), var, rtol=0, atol=1e-8)
+            assert jnp.allclose(cov, expected, rtol=0, atol=1e-8)
+
 
 class TestFourierBasis:
     def setup_method(self):

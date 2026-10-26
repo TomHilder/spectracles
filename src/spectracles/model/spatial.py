@@ -52,6 +52,11 @@ def conjugate_symmetry(
     shape_info: tuple[int, int, int],
 ) -> Array:
     m, h, p = shape_info
+    # The zero mode (centre, index h for odd n_modes) is its own conjugate
+    # partner, so f + conj(flip(f)) below adds it to itself, while each +-k pair
+    # combines two independent coefficients. Scale it by 1/sqrt(2) so its
+    # variance matches the other modes (otherwise k(0) = s^2 (1 + fw_0^2 / 2)).
+    c = c.at[h].multiply(1 / jnp.sqrt(2))
     f = 0.5 * jnp.hstack(
         [c[: h + 1], jnp.zeros(p - h - 1)],
     ) + 0.5j * jnp.hstack(
