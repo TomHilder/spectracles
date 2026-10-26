@@ -7,7 +7,7 @@ authors = [
     { name = "Thomas Hilder", email = "Thomas.Hilder@monash.edu" },
     { name = "Andrew R. Casey", email = "Andrew.Casey@monash.edu" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "dill>=0.3.8",
     "equinox>=0.13.0",
