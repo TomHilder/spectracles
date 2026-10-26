@@ -24,7 +24,8 @@ class PhaseConfig:
     Attributes:
         n_steps: Number of optimization steps to run in this phase.
         optimiser: An optax optimizer (e.g., `optax.adam(0.01)`).
-        Δloss_criterion: Convergence criterion for loss change (default 1e2).
+        Δloss_criterion: Early-stopping threshold on the loss change over 50 steps
+            (default 1e2). None disables early stopping.
         fix_status_updates: Dict mapping parameter paths to their fixed status.
             True means fixed (not optimized), False means free.
         param_val_updates: Dict mapping parameter paths to new values to set
@@ -42,7 +43,7 @@ class PhaseConfig:
     n_steps: int
     optimiser: GradientTransformation
     # exit_strategy: ExitStrategy = field(default=None)
-    Δloss_criterion: float = field(default=1e2)
+    Δloss_criterion: float | None = field(default=1e2)
     fix_status_updates: dict[str, bool] = field(default_factory=dict)
     param_val_updates: dict[str, Array] = field(default_factory=dict)
 

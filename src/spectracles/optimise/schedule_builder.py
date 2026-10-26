@@ -457,6 +457,10 @@ def build_schedule(
         default_optimizer: Default optimizer type ("sgd" or "adam").
         managed: If True, return a ManagedOptimiserSchedule with state tracking.
         get_filter_spec_fn: Function to get filter spec for optimization.
+        Δloss_criterion: Early-stopping threshold applied to every phase. From
+            step 100, every 50 steps, a phase exits early if the loss changed by
+            less than this over the last 50 steps. None (default) disables early
+            stopping.
         key: PRNG key for random initializations. Required if any init_normal
             or init_uniform specs are used.
 

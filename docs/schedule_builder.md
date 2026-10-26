@@ -123,9 +123,29 @@ schedule = build_schedule(
     params,                         # Dict of pattern -> ParamSpec
     default_optimizer="adam",       # "adam" or "sgd"
     managed=False,                  # Return ManagedOptimiserSchedule if True
+    get_filter_spec_fn=get_opt_filter_spec,  # Selects which leaves are optimised
+    Δloss_criterion=None,           # Early-stopping threshold (None = off)
     key=None,                       # PRNG key for random initialization
 )
 ```
+
+## Early Stopping
+
+Pass `Δloss_criterion` to let phases exit before their full `n_steps`. From step
+100 onwards, every 50 steps, a phase stops if the loss changed by less than
+`Δloss_criterion` over the previous 50 steps:
+
+```python
+schedule = sp.build_schedule(
+    model, loss_fn,
+    phases=[(5000, 0.1), (5000, 0.01)],
+    params={"**": sp.free_in(0, 1)},
+    Δloss_criterion=1e-2,
+)
+```
+
+The same threshold applies to every phase. `build_schedule` defaults to `None`
+(no early stopping). A `PhaseConfig` constructed directly defaults to `1e2`.
 
 ## Shared Parameters
 

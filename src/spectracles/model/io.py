@@ -18,7 +18,7 @@ def save_model(model: ShareModule, file: Path, overwrite: bool = False, **dump_k
         model (ShareModule): The model to save.
         file (Path): The file to save the model to.
         overwrite (bool): Whether to overwrite the file if it exists. Defaults to False.
-        dump_kwargs: Additional arguments to pass to dill.dump.
+        **dump_kwargs (Any): Additional arguments to pass to dill.dump.
 
     Raises:
         FileExistsError: If the file already exists and overwrite is False.
@@ -55,7 +55,7 @@ def load_model(file: Path, **load_kwargs) -> ShareModule:
 
     Args:
         file (Path): The file to load the model from.
-        load_kwargs: Additional arguments to pass to dill.load.
+        **load_kwargs (Any): Additional arguments to pass to dill.load.
 
     Returns:
         ShareModule: The loaded model.

@@ -1,8 +1,9 @@
 name: Docs
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"  # Same trigger as release.yml, which publishes to PyPI without creating a GitHub release
   workflow_dispatch:  # Allow manual trigger
 
 permissions:

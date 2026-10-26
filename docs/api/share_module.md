@@ -4,16 +4,14 @@
 
 ## Building Models
 
-Use `build_model()` to wrap your Equinox model in a ShareModule:
+Use `build_model()` to construct your Equinox model and wrap it in a ShareModule.
+Pass the model class followed by its constructor arguments:
 
 ```python
 import spectracles as sp
 
-# Your Equinox model with shared components
-model = MyModel(shared_component=inner, ...)
-
-# Wrap in ShareModule to enable sharing utilities
-wrapped = sp.build_model(model)
+# Equivalent to wrapping MyModel(shared_component=inner, ...)
+model = sp.build_model(MyModel, shared_component=inner, ...)
 ```
 
 ## Inspecting the Model
