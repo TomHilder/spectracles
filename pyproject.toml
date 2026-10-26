@@ -44,6 +44,10 @@ source = "vcs"
 [tool.ruff]
 line-length = 99 # Sorry PEP8 I'm a rebel
 
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
 [tool.uv.sources]
 jax-finufft = { git = "https://github.com/flatironinstitute/jax-finufft.git" }
 
