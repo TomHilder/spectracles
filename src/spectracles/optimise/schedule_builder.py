@@ -63,7 +63,7 @@ class ParamSpec:
         init_specs: Dictionary mapping phase indices to InitSpec objects that
             describe how to initialize the parameter at the start of that phase.
 
-    Example:
+    Examples:
         >>> # Parameter free in phases 0 and 1, initialized to normal in phase 0
         >>> spec = free_in(0, 1) | init_normal(0, std=0.1)
         >>> spec.free_phases
@@ -128,7 +128,7 @@ def free_in(*phases: int) -> ParamSpec:
     Returns:
         ParamSpec with the specified free phases.
 
-    Example:
+    Examples:
         >>> spec = free_in(0, 1, 2)  # Free in phases 0, 1, and 2
     """
     return ParamSpec(free_phases=set(phases))
@@ -146,7 +146,7 @@ def free_after(phase: int) -> ParamSpec:
     Returns:
         ParamSpec with a marker for late resolution.
 
-    Example:
+    Examples:
         >>> spec = free_after(1)  # Free in phases 1, 2, 3, ...
     """
     # We use a negative phase index as a sentinel for "free_after"
@@ -163,7 +163,7 @@ def free_until(phase: int) -> ParamSpec:
     Returns:
         ParamSpec with the specified free phases.
 
-    Example:
+    Examples:
         >>> spec = free_until(2)  # Free in phases 0, 1, and 2
     """
     return ParamSpec(free_phases=set(range(phase + 1)))
@@ -183,7 +183,7 @@ def fixed_in(*phases: int) -> ParamSpec:
     Returns:
         ParamSpec with a marker for "fixed in these phases".
 
-    Example:
+    Examples:
         >>> spec = fixed_in(0)  # Fixed only in phase 0, free elsewhere
     """
     # Use a special marker (frozenset in the init_specs) to indicate "fixed_in"
@@ -204,7 +204,7 @@ def init_normal(phase: int, mean: float = 0.0, std: float = 1.0) -> ParamSpec:
     Returns:
         ParamSpec with the initialization specification.
 
-    Example:
+    Examples:
         >>> spec = free_in(0, 1) | init_normal(0, std=0.1)
     """
     return ParamSpec(init_specs={phase: InitSpec(kind="normal", mean=mean, std=std)})
@@ -220,7 +220,7 @@ def init_value(phase: int, value: float) -> ParamSpec:
     Returns:
         ParamSpec with the initialization specification.
 
-    Example:
+    Examples:
         >>> spec = free_after(1) | init_value(1, 1.5)
     """
     return ParamSpec(init_specs={phase: InitSpec(kind="value", value=value)})
@@ -237,7 +237,7 @@ def init_uniform(phase: int, low: float = 0.0, high: float = 1.0) -> ParamSpec:
     Returns:
         ParamSpec with the initialization specification.
 
-    Example:
+    Examples:
         >>> spec = free_in(0) | init_uniform(0, low=-1, high=1)
     """
     return ParamSpec(init_specs={phase: InitSpec(kind="uniform", low=low, high=high)})
@@ -467,7 +467,7 @@ def build_schedule(
     Returns:
         An OptimiserSchedule or ManagedOptimiserSchedule ready to run.
 
-    Example:
+    Examples:
         >>> schedule = build_schedule(
         ...     model, loss_fn,
         ...     phases=[

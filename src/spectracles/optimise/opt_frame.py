@@ -211,7 +211,7 @@ class OptimiserFrame:
                 ...
             }
 
-        Example:
+        Examples:
             >>> summary = frame.get_gradient_summary(x=x_data, y=y_data)
             >>> for path, info in summary.items():
             ...     print(f"{path}: norm={info['norm']:.2e}")

@@ -31,7 +31,7 @@ class PhaseConfig:
         param_val_updates: Dict mapping parameter paths to new values to set
             at the start of this phase.
 
-    Example:
+    Examples:
         >>> config = PhaseConfig(
         ...     n_steps=100,
         ...     optimiser=optax.adam(0.01),
@@ -112,7 +112,7 @@ class OptimiserSchedule:
         model_history: List of models, one for initial state plus one after
             each completed phase.
 
-    Example:
+    Examples:
         >>> schedule = OptimiserSchedule(
         ...     model, loss_fn,
         ...     phase_configs=[
@@ -229,7 +229,7 @@ class ManagedOptimiserSchedule:
         current_phase_index: Index of the next phase to run.
         initial_model: The original model (kept for reset functionality).
 
-    Example:
+    Examples:
         >>> schedule = ManagedOptimiserSchedule(model, loss_fn, phase_configs)
         >>>
         >>> # Run phases one at a time

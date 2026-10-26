@@ -148,7 +148,7 @@ def contains_shared(obj: Any) -> bool:
     Returns:
         True if the object contains any Shared values, False otherwise.
 
-    Example:
+    Examples:
         >>> model = build_model(MyModel, ...)
         >>> if contains_shared(model.line_1):
         ...     # Use locked model for this sub-component
@@ -507,7 +507,7 @@ class ShareModule(Module):
             A dictionary mapping parent paths to lists of paths that share
             with them. Only items that are actually shared are included.
 
-        Example:
+        Examples:
             >>> model.get_sharing_summary()
             {'line_1.v': ['line_2.v']}
         """
@@ -548,7 +548,7 @@ class ShareModule(Module):
             A list of parameter path strings (e.g., ['line.A.coefficients',
             'line.v.coefficients']).
 
-        Example:
+        Examples:
             >>> model.get_parameter_paths()
             ['line_1.A.coefficients', 'line_1.v.coefficients', 'line_2.A.coefficients']
             >>> model.get_parameter_paths(show_shared=True)
@@ -611,7 +611,7 @@ class ShareModule(Module):
             - 'n_unique_params': int - Number of unique parameters
             - 'errors': list[str] - List of error messages (empty if valid)
 
-        Example:
+        Examples:
             >>> result = model.validate_sharing(raise_on_error=False)
             >>> if not result['valid']:
             ...     print("Errors:", result['errors'])
@@ -770,7 +770,7 @@ class ShareModule(Module):
         Returns:
             A new ShareModule with all parameters fixed.
 
-        Example:
+        Examples:
             >>> model = build_model(MyModel, ...)
             >>> frozen_model = model.fix_all()
             >>> # All parameters are now fixed
@@ -793,7 +793,7 @@ class ShareModule(Module):
         Returns:
             A new ShareModule with all parameters free.
 
-        Example:
+        Examples:
             >>> frozen_model = model.fix_all()
             >>> unfrozen_model = frozen_model.free_all()
             >>> # All parameters are now free
@@ -821,7 +821,7 @@ class ShareModule(Module):
             show_knowns: If False (default), exclude Known parameters from the
                 summary. If True, include them with status 'known'.
 
-        Example:
+        Examples:
             >>> model.get_parameter_summary()
             Parameter Summary
             ──────────────────────────────────────────────────────────────────
