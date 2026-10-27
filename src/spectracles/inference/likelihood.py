@@ -32,6 +32,7 @@ class GaussianLikelihood(eqx.Module):
     data: Array  # (n_used,) the used pixels only
     std_inv: Array  # (n_used,)
     index: Array  # (n_used,) flat indices of the used pixels
+    log_norm: Array  # the constant part of the log-likelihood
     shape: tuple[int, ...] = eqx.field(static=True)
 
     def __init__(self, data: ArrayLike, ivar: ArrayLike, mask: ArrayLike | None = None):
@@ -49,6 +50,7 @@ class GaussianLikelihood(eqx.Module):
         self.index = jnp.asarray(index)
         self.data = jnp.asarray(data.ravel()[index])
         self.std_inv = jnp.sqrt(jnp.asarray(ivar.ravel()[index]))
+        self.log_norm = jnp.sum(jnp.log(self.std_inv)) - 0.5 * index.size * LOG_2PI
 
     @property
     def n_used(self) -> int:
@@ -63,8 +65,8 @@ class GaussianLikelihood(eqx.Module):
 
     def log_likelihood(self, pred: Array) -> Array:
         """Gaussian log-likelihood of a prediction, with full normalisation."""
-        r = (self.data - self.compress(pred)) * self.std_inv
-        return -0.5 * jnp.sum(r**2) + jnp.sum(jnp.log(self.std_inv)) - 0.5 * r.size * LOG_2PI
+        r = self.normalised_residual(pred)
+        return -0.5 * jnp.sum(r**2) + self.log_norm
 
     def normalised_residual(self, pred: Array) -> Array:
         """(data - pred) / σ on the used pixels."""

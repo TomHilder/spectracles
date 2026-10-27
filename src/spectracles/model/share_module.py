@@ -22,8 +22,8 @@ from spectracles.model.parameter import AnyParameter, is_constrained, is_paramet
 from spectracles.tree.path_utils import (
     GetAttrKey,
     LeafPath,
-    _match_pattern,
     get_duplicated_leaves,
+    resolve_patterns_to_parents,
     leafpath_to_str,
     str_to_leafpath,
     use_path_get_leaf,
@@ -604,6 +604,7 @@ class ShareModule(Module):
         1. All Shared objects reference valid parent parameters
         2. Parent parameters exist and have the expected shape
         3. No orphaned Shared objects exist
+        4. All locations of a shared parameter have the same fixed status and prior
 
         Args:
             raise_on_error: If True (default), raises ValueError on validation
@@ -659,6 +660,15 @@ class ShareModule(Module):
                 dupl_param = use_path_get_leaf(self.model, dupl_path[:-1])
 
                 if is_parameter(parent_param) and is_parameter(dupl_param):
+                    parent_prior = getattr(parent_param, "prior", None)
+                    dupl_prior = getattr(dupl_param, "prior", None)
+                    if parent_prior != dupl_prior:
+                        errors.append(
+                            f"Shared parameters have different priors: "
+                            f"'{leafpath_to_str(parent_path[:-1])}' has {parent_prior!r} but "
+                            f"'{leafpath_to_str(dupl_path[:-1])}' has {dupl_prior!r}. A shared "
+                            f"parameter is one parameter and must have one prior."
+                        )
                     if parent_param.fix != dupl_param.fix:
                         parent_path_str = leafpath_to_str(parent_path[:-1])
                         dupl_path_str = leafpath_to_str(dupl_path[:-1])
@@ -864,38 +874,32 @@ class ShareModule(Module):
         if self._locked:
             raise ValueError("Cannot set priors on a locked model.")
 
-        # Shared (child) paths resolve to their parent: they are the same parameter
-        child_to_parent = {
-            child: parent
-            for parent, children in self.get_sharing_summary(level="parameter").items()
-            for child in children
-        }
-        candidates = self.get_parameter_paths(show_shared=True, show_knowns=False)
-
-        # Resolve every pattern to parent paths, checking for conflicts
-        assigned: dict[str, tuple[Any, str]] = {}
         for pattern, value in spec.items():
             if not (isinstance(value, Prior) or value == "fixed"):
                 raise TypeError(
                     f"with_priors: value for '{pattern}' must be a Prior or \"fixed\", "
                     f"got {value!r}."
                 )
-            matched = [p for p in candidates if _match_pattern(pattern, p)]
-            if not matched:
+
+        # Resolve every pattern to parent paths (a shared parameter is one
+        # parameter), then check that each parameter is asked for one thing
+        child_to_parent = self._child_to_parent()
+        resolved = resolve_patterns_to_parents(
+            spec,
+            self.get_parameter_paths(show_shared=True, show_knowns=False),
+            child_to_parent,
+            context="with_priors (Known values are excluded)",
+        )
+        assigned: dict[str, Any] = {}
+        for target, entries in resolved.items():
+            values = {v for _, v in entries}
+            if len(values) > 1:
+                described = ", ".join(f"'{pat}' gives {v!r}" for pat, v in entries)
                 raise ValueError(
-                    f"with_priors: pattern '{pattern}' did not match any parameters "
-                    f"(Known values are excluded). Available paths: {candidates}"
+                    f"with_priors: conflicting specs for parameter '{target}': {described}. "
+                    f"A shared parameter is one parameter and has one prior."
                 )
-            for path in matched:
-                target = child_to_parent.get(path, path)
-                if target in assigned and assigned[target][0] != value:
-                    other_value, other_pattern = assigned[target]
-                    raise ValueError(
-                        f"with_priors: conflicting specs for parameter '{target}': "
-                        f"'{other_pattern}' gives {other_value!r} but '{pattern}' gives "
-                        f"{value!r}. A shared parameter is one parameter and has one prior."
-                    )
-                assigned[target] = (value, pattern)
+            assigned[target] = entries[0][1]
 
         # Work on the restored model, where shared locations hold the same value
         # array; each parameter is then replaced at all its locations by one new
@@ -907,7 +911,7 @@ class ShareModule(Module):
 
         new_model = restored
         to_fix = []
-        for target, (value, _) in assigned.items():
+        for target, value in assigned.items():
             if value == "fixed":
                 to_fix.append(target)
                 continue
@@ -928,7 +932,18 @@ class ShareModule(Module):
         result = type(self)(new_model, locked=False)
         if to_fix:
             result = result.set_fixed_status(to_fix, [True] * len(to_fix))
+        # Rebuilding loses module identity, so keep the component-level sharing
+        # record (the module structure and paths are unchanged)
+        object.__setattr__(result, "_shared_components", dict(self._shared_components))
         return result  # type: ignore[no-any-return]
+
+    def _child_to_parent(self) -> dict[str, str]:
+        """Mapping from each shared (child) parameter path to its parent path."""
+        return {
+            child: parent
+            for parent, children in self.get_sharing_summary(level="parameter").items()
+            for child in children
+        }
 
     def get_parameter_summary(
         self, show_shared: bool = True, show_knowns: bool = False

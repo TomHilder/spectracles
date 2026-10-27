@@ -94,13 +94,25 @@ def get_duplicated_leaves(
 # ---- Glob matching of dotted parameter paths ----
 
 
+def _match_parts(pattern_parts: list[str], path_parts: list[str]) -> bool:
+    """Match path components against pattern components ('**' = zero or more)."""
+    if not pattern_parts:
+        return not path_parts
+    head, rest = pattern_parts[0], pattern_parts[1:]
+    if head == "**":
+        # '**' absorbs zero or more components
+        return any(_match_parts(rest, path_parts[i:]) for i in range(len(path_parts) + 1))
+    if not path_parts:
+        return False
+    return fnmatch(path_parts[0], head) and _match_parts(rest, path_parts[1:])
+
 
 def _match_pattern(pattern: str, path: str) -> bool:
-    """Match a glob pattern against a parameter path.
+    """Match a glob pattern against a dotted parameter path.
 
     Supports:
-    - '*' matches any single path component
-    - '**' matches any number of components (including zero)
+    - '*' (and other fnmatch wildcards) within a single path component
+    - '**' as a whole component, matching any number of components (including zero)
     - Exact matches
 
     Args:
@@ -110,65 +122,54 @@ def _match_pattern(pattern: str, path: str) -> bool:
     Returns:
         True if the pattern matches the path.
     """
-    # Handle ** (recursive match)
-    if "**" in pattern:
-        # Split on ** and handle each part
-        parts = pattern.split("**")
-        if len(parts) == 2:
-            prefix, suffix = parts
-            prefix = prefix.rstrip(".")
-            suffix = suffix.lstrip(".")
-
-            # Check prefix
-            if prefix and not (
-                path.startswith(prefix)
-                or fnmatch(path.split(".")[0], prefix.split(".")[0] if prefix else "*")
-            ):
-                if prefix:
-                    prefix_parts = prefix.split(".")
-                    path_parts = path.split(".")
-                    if len(path_parts) < len(prefix_parts):
-                        return False
-                    for pp, pat in zip(path_parts, prefix_parts):
-                        if not fnmatch(pp, pat):
-                            return False
-
-            # Check suffix
-            if suffix:
-                suffix_parts = suffix.split(".")
-                path_parts = path.split(".")
-                if len(path_parts) < len(suffix_parts):
-                    return False
-                # Match from the end
-                for pp, pat in zip(reversed(path_parts), reversed(suffix_parts)):
-                    if not fnmatch(pp, pat):
-                        return False
-
-            # If we got here with valid prefix/suffix checks, it matches
-            if not prefix and not suffix:
-                return True  # "**" alone matches everything
-            if not prefix:
-                # Just suffix - check if path ends with suffix pattern
-                return _simple_match(suffix, ".".join(path.split(".")[-len(suffix.split(".")) :]))
-            if not suffix:
-                # Just prefix - check if path starts with prefix pattern
-                return _simple_match(prefix, ".".join(path.split(".")[: len(prefix.split("."))]))
-            return True
-
-    # Use simple matching for non-recursive patterns
-    return _simple_match(pattern, path)
+    return _match_parts(pattern.split("."), path.split("."))
 
 
 def _simple_match(pattern: str, path: str) -> bool:
-    """Simple glob matching where * matches a single component."""
+    """Simple glob matching where * matches a single component (no '**')."""
     pattern_parts = pattern.split(".")
     path_parts = path.split(".")
-
     if len(pattern_parts) != len(path_parts):
         return False
+    return all(fnmatch(p, pat) for pat, p in zip(pattern_parts, path_parts))
 
-    for pat, p in zip(pattern_parts, path_parts):
-        if not fnmatch(p, pat):
-            return False
 
-    return True
+def resolve_patterns_to_parents(
+    patterns: dict[str, Any],
+    candidates: list[str],
+    child_to_parent: dict[str, str],
+    context: str,
+) -> dict[str, list[tuple[str, Any]]]:
+    """Expand glob patterns to parent parameter paths.
+
+    Patterns are matched against `candidates` (which may include shared, child
+    paths); each match is mapped to its parent path, since a shared parameter
+    is one parameter.
+
+    Args:
+        patterns: Mapping from glob pattern to a value.
+        candidates: Paths to match against.
+        child_to_parent: Mapping from shared (child) paths to their parent path.
+        context: Name used in error messages (e.g. "with_priors").
+
+    Returns:
+        Mapping from parent path to the list of (pattern, value) that matched it,
+        in the order the patterns were given.
+
+    Raises:
+        ValueError: If a pattern matches nothing.
+    """
+    resolved: dict[str, list[tuple[str, Any]]] = {}
+    for pattern, value in patterns.items():
+        matched = [p for p in candidates if _match_pattern(pattern, p)]
+        if not matched:
+            raise ValueError(
+                f"{context}: pattern '{pattern}' did not match any parameters. "
+                f"Available paths: {candidates}"
+            )
+        for path in matched:
+            parent = child_to_parent.get(path, path)
+            entries = resolved.setdefault(parent, [])
+            if (pattern, value) not in entries:
+                entries.append((pattern, value))
+    return resolved

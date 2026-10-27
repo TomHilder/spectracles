@@ -346,3 +346,13 @@ def test_stages_callables_work_with_nifty(line_posterior):
             _parse_point_estimates(keys, ξ)
             frozen_lh, liquid = lh.freeze(primals=ξ, point_estimates=keys)
             np.testing.assert_allclose(frozen_lh(liquid), lh(ξ), rtol=1e-12)
+
+
+def test_stages_rejects_too_many_iterations(line_posterior):
+    with pytest.raises(ValueError, match="999"):
+        stages(line_posterior.latent, {"offset.tile_values": free_after(1)}, n_iterations=1000)
+
+
+def test_stages_returns_one_callable_per_key(line_posterior):
+    st = stages(line_posterior.latent, STAGE_SPEC, n_iterations=6)
+    assert st["constants"] is st["point_estimates"]

@@ -12,7 +12,7 @@ from typing import Any
 from spectracles.inference.latent import LatentSpace
 from spectracles.inference.posterior import Posterior
 from spectracles.optimise.schedule_builder import ParamSpec, _resolve_free_phases
-from spectracles.tree.path_utils import _match_pattern
+from spectracles.tree.path_utils import resolve_patterns_to_parents
 
 
 def _import_nifty():
@@ -86,15 +86,11 @@ def stages(latent: LatentSpace, spec: dict[str, ParamSpec], n_iterations: int) -
     if n_iterations < 1:
         raise ValueError(f"n_iterations must be at least 1, got {n_iterations}.")
 
-    # Shared (child) paths resolve to their parent, the latent key
-    child_to_parent = {
-        child: parent
-        for parent, children in latent.model.get_sharing_summary(level="parameter").items()
-        for child in children
-    }
-    candidates = list(latent.paths) + [c for c, p in child_to_parent.items() if p in latent.paths]
+    # schedule_builder encodes free_after(p) as -p - 1 and fixed_in(p) as -1000 - p,
+    # which collide from p = 999 on
+    if n_iterations > 999:
+        raise ValueError(f"stages supports at most 999 iterations, got {n_iterations}.")
 
-    expanded: dict[str, ParamSpec] = {}
     for pattern, param_spec in spec.items():
         if not isinstance(param_spec, ParamSpec):
             raise TypeError(
@@ -112,26 +108,21 @@ def stages(latent: LatentSpace, spec: dict[str, ParamSpec], n_iterations: int) -
                 f"stages: '{pattern}' refers to iteration {_max_phase_index(param_spec)}, "
                 f"but there are only {n_iterations} iterations."
             )
-        matched = [p for p in candidates if _match_pattern(pattern, p)]
-        if not matched:
-            raise ValueError(
-                f"stages: pattern '{pattern}' did not match any latent parameter. "
-                f"Latent paths: {latent.paths}"
-            )
-        for path in matched:
-            key = child_to_parent.get(path, path)
-            expanded[key] = expanded[key] | param_spec if key in expanded else param_spec
 
+    # Shared (child) paths resolve to their parent, the latent key
+    child_to_parent = latent.model._child_to_parent()
+    candidates = list(latent.paths) + [c for c, p in child_to_parent.items() if p in latent.paths]
+    resolved = resolve_patterns_to_parents(spec, candidates, child_to_parent, context="stages")
+    expanded: dict[str, ParamSpec] = {}
+    for key, entries in resolved.items():
+        combined = entries[0][1]
+        for _, param_spec in entries[1:]:
+            combined = combined | param_spec
+        expanded[key] = combined
     order = [p for p in latent.paths if p in expanded]
 
     def frozen(nit: int) -> tuple[str, ...]:
         n = max(n_iterations, nit + 1)
         return tuple(p for p in order if nit not in _resolve_free_phases(expanded[p], n))
 
-    def constants(nit):
-        return frozen(nit)
-
-    def point_estimates(nit):
-        return frozen(nit)
-
-    return {"constants": constants, "point_estimates": point_estimates}
+    return {"constants": frozen, "point_estimates": frozen}

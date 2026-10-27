@@ -138,6 +138,8 @@ class FourierGP(SpatialModel):
         self.kernel = kernel
         # Initialise parameters. The coefficients are whitened (the kernel scales
         # them), so their prior is a standard normal by construction.
+        # A user-supplied Parameter is kept as is (same object, so sharing it
+        # between GPs still works), with whatever prior it has.
         self.coefficients = init_parameter(coefficients, dims=n_modes, prior=StdNormal())
         # Zero-mode: scalar added to the field after NUFFT. Defaults to a fixed
         # zero so kernels with non-zero DC (e.g. Matern) behave as before. Kernels

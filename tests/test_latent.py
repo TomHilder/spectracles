@@ -331,3 +331,23 @@ def test_posterior_summary_accepts_nifty_samples(tiny_gp_model):
     for p in latent.paths:
         vals = jax.vmap(latent.priors[p].transform)(stacked[p])
         np.testing.assert_allclose(out[p]["mean"], vals.mean(0), rtol=1e-12)
+
+
+# ---- Regression from the stage 7 code review: values outside the support ----
+
+
+def test_from_model_value_outside_support_falls_back_with_warning():
+    model = ShareModule(
+        TwoParams(
+            a=Parameter(dims=1, prior=LogNormal(1.0, 0.5)),
+            b=Parameter(0.3, prior=Normal(0.0, 1.0)),
+        )
+    )  # a defaults to 0, outside LogNormal's support
+    latent = LatentSpace(model)
+    with pytest.warns(UserWarning, match="outside the prior's support: \\['a'\\]"):
+        ξ = latent.from_model(model)
+    np.testing.assert_array_equal(ξ["a"], 0.0)
+    np.testing.assert_allclose(ξ["b"], 0.3, rtol=RTOL)
+    assert list(ξ) == latent.paths
+    with pytest.raises(ValueError, match="outside"):
+        latent.from_model(model, fallback="raise")

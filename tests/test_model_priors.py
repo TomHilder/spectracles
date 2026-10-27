@@ -382,3 +382,81 @@ def test_repr_and_tree_show_priors():
     assert "1 with priors" in repr(model)
     assert "~LogNormal(2, 1)" in capture(model.print_model_tree)
     assert "with priors" not in repr(make_outer())
+
+
+# ---- Regressions from the stage 7 code review ----
+
+
+@pytest.mark.parametrize(
+    "pattern, path, expected",
+    [
+        ("gp.**.ls", "gp2.k.ls", False),  # the prefix must match whole components
+        ("gp.**.ls", "gp.k.ls", True),
+        ("gp.**.ls", "gp.ls", True),  # ** matches zero components
+        ("gp.**.ls", "gp.a.b.ls", True),
+        ("a.**.a", "a", False),  # prefix and suffix may not overlap
+        ("a.**.a", "a.a", True),
+        ("line_1.**", "line_10.x", False),
+        ("**", "x.y.z", True),
+        ("*.p", "inner.p", True),
+        ("*.p", "a.inner.p", False),
+    ],
+)
+def test_glob_matching(pattern, path, expected):
+    from spectracles.tree.path_utils import _match_pattern
+
+    assert _match_pattern(pattern, path) is expected
+
+
+def test_with_priors_glob_does_not_leak_to_similar_names():
+    class Similar(eqx.Module):
+        gp: Inner
+        gp2: Inner
+
+    model = ShareModule(
+        Similar(
+            gp=Inner(p=Parameter(1.0), k=Known(0.0)), gp2=Inner(p=Parameter(1.0), k=Known(0.0))
+        )
+    )
+    assert set(model.with_priors({"gp.**.p": Normal(0.0, 1.0)}).get_priors()) == {"gp.p"}
+
+
+def test_value_level_sharing_with_different_priors_is_an_error():
+    from spectracles.inference import LatentSpace
+
+    m = TwoParams(
+        a=Parameter(1.0, prior=LogNormal(1.0, 0.1)), b=Parameter(1.0, prior=Normal(-5.0, 1.0))
+    )
+    m = eqx.tree_at(lambda t: t.b.val, m, m.a.val)  # share the value array only
+    model = ShareModule(m)
+    result = model.validate_sharing(raise_on_error=False)
+    assert not result["valid"] and any("different priors" in e for e in result["errors"])
+    with pytest.raises(ValueError, match="different priors"):
+        LatentSpace(model)
+
+
+def test_with_priors_keeps_component_level_sharing():
+    from .priors_models import make_line_model
+
+    model = make_line_model()
+    before = model.get_sharing_summary(level="component")
+    assert before == {"line_1.v.kernel": ["line_2.v.kernel"]}
+    after = model.with_priors({"offset.tile_values": Normal(0.0, 0.2)})
+    assert after.get_sharing_summary(level="component") == before
+    after = after.with_priors({"line_1.v.kernel.variance": "fixed"})
+    assert after.get_sharing_summary(level="component") == before
+
+
+def test_user_coefficients_without_prior_give_a_helpful_error():
+    from spectracles.inference import LatentSpace
+
+    kernel = Matern32(
+        length_scale=Parameter(1.0, prior=LogNormal(1.0, 0.3)),
+        variance=Parameter(1.0, prior=LogNormal(1.0, 0.3)),
+    )
+    gp = FourierGP(n_modes=(5, 5), kernel=kernel, coefficients=Parameter(dims=(5, 5)))
+    with pytest.raises(ValueError, match="StdNormal"):
+        LatentSpace(build_model(GPModel, gp))
+    # Sharing user-supplied coefficients between GPs still works (same object)
+    coeffs = Parameter(dims=(5, 5), prior=StdNormal())
+    assert FourierGP(n_modes=(5, 5), kernel=kernel, coefficients=coeffs).coefficients is coeffs

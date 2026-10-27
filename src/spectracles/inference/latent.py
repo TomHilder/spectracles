@@ -5,6 +5,7 @@ latents, keyed by its (parent) parameter path. Its value is `prior.transform(ξ[
 Shared parameters are one parameter, so they have one entry, at the parent path.
 """
 
+import math
 import warnings
 from typing import Any, Literal
 
@@ -48,6 +49,8 @@ class LatentSpace:
             )
         if model._locked:
             raise ValueError("LatentSpace requires an unlocked model.")
+        # A shared parameter must have one prior (and one fixed status) everywhere
+        model.validate_sharing(raise_on_error=True)
         self.model = model
 
         paths, priors, shapes = [], {}, {}
@@ -68,9 +71,15 @@ class LatentSpace:
 
         errors = []
         if no_prior:
+            hint = ""
+            if any(p.endswith("coefficients") for p in no_prior):
+                hint = (
+                    " (FourierGP coefficients are whitened, so their prior is StdNormal: "
+                    "pass Parameter(..., prior=StdNormal()) when supplying your own)"
+                )
             errors.append(
                 "free parameters without a prior (give them one with Parameter(prior=...) "
-                f"or model.with_priors, or fix them): {no_prior}"
+                f"or model.with_priors, or fix them): {no_prior}{hint}"
             )
         if constrained:
             errors.append(
@@ -85,13 +94,12 @@ class LatentSpace:
         self.shapes: dict[str, jax.ShapeDtypeStruct] = shapes
 
     def __repr__(self) -> str:
-        n = sum(int(jnp.prod(jnp.array(s.shape))) for s in self.shapes.values())
-        return f"LatentSpace({len(self.paths)} parameters, {n} latent dimensions)"
+        return f"LatentSpace({len(self.paths)} parameters, {self.size} latent dimensions)"
 
     @property
     def size(self) -> int:
         """Total number of latent dimensions."""
-        return sum(int(jnp.prod(jnp.array(s.shape))) for s in self.shapes.values())
+        return sum(math.prod(s.shape) for s in self.shapes.values())
 
     def to_model(self, ξ: Latent) -> ShareModule:
         """The model with every free parameter set to `prior.transform(ξ[path])`.
@@ -108,31 +116,45 @@ class LatentSpace:
     ) -> Latent:
         """The latents ξ that reproduce `model`'s current free parameter values.
 
-        Needs each prior's inverse transform. For priors without one, `fallback`
-        decides: "zero" sets ξ = 0 (the prior median) and warns, listing those
-        parameters; "raise" raises.
+        Needs each prior's inverse transform. For priors without one, and for
+        values outside a prior's support (e.g. 0 for a LogNormal, which gives a
+        non-finite latent), `fallback` decides: "zero" sets ξ = 0 (the prior
+        median) and warns, listing those parameters; "raise" raises.
         """
         if fallback not in ("zero", "raise"):
             raise ValueError(f"fallback must be 'zero' or 'raise', got {fallback!r}.")
         locked = model.get_locked_model() if not model._locked else model
-        missing = [p for p in self.paths if not self.priors[p].has_inverse]
-        if missing and fallback == "raise":
-            raise ValueError(f"These parameters' priors have no inverse transform: {missing}")
-        ξ = {}
+        no_inverse = [p for p in self.paths if not self.priors[p].has_inverse]
+        if no_inverse and fallback == "raise":
+            raise ValueError(f"These parameters' priors have no inverse transform: {no_inverse}")
+        ξ, outside = {}, []
         for p in self.paths:
+            if p in no_inverse:
+                continue
             val = use_path_get_leaf(locked.model, str_to_leafpath(p)).val
-            if p in missing:
-                ξ[p] = jnp.zeros(self.shapes[p].shape, self.shapes[p].dtype)
+            ξ_p = self.priors[p].inverse(val)
+            if not bool(jnp.all(jnp.isfinite(ξ_p))):
+                outside.append(p)
             else:
-                ξ[p] = self.priors[p].inverse(val)
-        if missing:
+                ξ[p] = ξ_p
+        if outside and fallback == "raise":
+            raise ValueError(
+                f"These parameters' values are outside their prior's support: {outside}"
+            )
+        for p in no_inverse + outside:
+            ξ[p] = jnp.zeros(self.shapes[p].shape, self.shapes[p].dtype)
+        messages = []
+        if no_inverse:
+            messages.append(f"priors with no inverse transform: {no_inverse}")
+        if outside:
+            messages.append(f"values outside the prior's support: {outside}")
+        if messages:
             warnings.warn(
-                "from_model: these parameters' priors have no inverse transform, so their "
-                f"latents were set to 0 (the prior median): {missing}",
+                "from_model: latents set to 0 (the prior median) for " + "; ".join(messages),
                 UserWarning,
                 stacklevel=2,
             )
-        return ξ
+        return {p: ξ[p] for p in self.paths}
 
     def sample(self, key: PRNGKeyArray) -> Latent:
         """Draw latents from the prior, i.e. independent standard normals."""
