@@ -65,8 +65,8 @@ def test_nifty_forward_equals_spectracles_forward(line_posterior):
     for p in post.latent.paths:
         assert tree(lh.domain)[p].shape == post.latent.shapes[p].shape
     for ξ in make_xi_points(post.latent):
-        np.testing.assert_array_equal(
-            lh.forward(vec(ξ)), post.likelihood.compress(post.predict(ξ))
+        np.testing.assert_allclose(
+            lh.forward(vec(ξ)), post.likelihood.compress(post.predict(ξ)), rtol=RTOL, atol=ATOL
         )
 
 
@@ -145,9 +145,10 @@ def test_map_objective_is_negative_log_density(line_posterior):
 
     v, g = jax.value_and_grad(loss)(ξ)
     v_ref, g_ref = post.value_and_grad(ξ)
-    assert float(v) == -float(v_ref)
+    assert float(v) == pytest.approx(-float(v_ref), rel=RTOL)
+    # Separately compiled, so equal to machine precision rather than bitwise
     for p in post.latent.paths:
-        np.testing.assert_array_equal(g[p], -g_ref[p])
+        np.testing.assert_allclose(g[p], -g_ref[p], rtol=RTOL, atol=ATOL)
 
 
 # ---- F7, F8: the metric MGVI and geoVI see ----
