@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 import numpy as np
+
 from spectracles.model.data import SpatialDataGeneric, convert_to_flat_array
 
 

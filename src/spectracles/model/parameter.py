@@ -1,6 +1,6 @@
 """parameter.py - Parameter objects for use with the modelling framework."""
 
-from typing import Callable
+from collections.abc import Callable
 
 import jax.numpy as jnp
 from equinox import Module, field
@@ -91,6 +91,7 @@ class Parameter(Module):
     def debug_repr(self) -> str:
         """Return the full equinox-style repr for debugging."""
         import equinox as eqx
+
         return eqx.tree_pformat(self)
 
 
@@ -210,8 +211,11 @@ class ConstrainedParameter(Module):
         # Check if unconstrained_val is a Shared sentinel (in unlocked ShareModule context)
         if isinstance(self.unconstrained_val, Shared):
             text = parameter_repr_parts(
-                "ConstrainedParameter", "", self.fix, constraint_str,
-                shared_path=self.unconstrained_val.parent_path
+                "ConstrainedParameter",
+                "",
+                self.fix,
+                constraint_str,
+                shared_path=self.unconstrained_val.parent_path,
             )
         else:
             value_str = format_array_value(self.val)
@@ -223,6 +227,7 @@ class ConstrainedParameter(Module):
     def debug_repr(self) -> str:
         """Return the full equinox-style repr for debugging."""
         import equinox as eqx
+
         return eqx.tree_pformat(self)
 
 
@@ -247,8 +252,8 @@ class Known(Parameter):
             format_array_value,
             known_repr_parts,
             render_to_string,
-            styled_type,
             styled_shared,
+            styled_type,
         )
         from spectracles.model.share_module import Shared
 

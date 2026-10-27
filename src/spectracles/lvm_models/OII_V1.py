@@ -10,14 +10,11 @@ from .. import (
     Kernel,
     Parameter,
     PerSpaxel,
-    SpatialData,
     SpatialDataLVM,
     SpectralSpatialModel,
     WindowConstant,
-    l_bounded,
 )
-from ..model.spatial import PerIFU, PerTile, PerTilePinned, SpatialModel
-from .fields import FieldFromRatio, GPField, PositiveGPField, ScaledField, SumTwoFields
+from .fields import FieldFromRatio, GPField, PositiveGPField, ScaledField
 from .likelihood import ln_likelihood
 from .line_single import EmissionLineVCal, WaveCalVelocity
 from .ratios import FluxCalFactor

@@ -1,8 +1,7 @@
 """share_module.py - Models built on equinox and jax that can have parameters that are shared between leaves of the model tree. Module refers to equinox Modules not Python modules."""
 
-from typing import Any, Callable, Dict
-
-from typing_extensions import Self
+from collections.abc import Callable
+from typing import Any, Self
 
 import matplotlib.pyplot as plt
 from equinox import Module, filter, is_inexact_array, tree_at
@@ -23,8 +22,8 @@ from spectracles.tree.path_utils import (
     GetAttrKey,
     LeafPath,
     get_duplicated_leaves,
-    resolve_patterns_to_parents,
     leafpath_to_str,
+    resolve_patterns_to_parents,
     str_to_leafpath,
     use_path_get_leaf,
     use_paths_get_leaves,
@@ -120,7 +119,7 @@ class Shared:
         self.parent_path = parent_path
 
     def __repr__(self) -> str:
-        from spectracles.model.formatting import shared_repr_parts, render_to_string
+        from spectracles.model.formatting import render_to_string, shared_repr_parts
 
         if self.parent_path:
             text = shared_repr_parts(self.parent_path)
@@ -210,14 +209,21 @@ class ShareModule(Module):
     # Sharing metadata
     _dupl_leaf_ids: list[int]
     _dupl_leaf_paths: list[LeafPath]
-    _parent_leaf_paths: Dict[int, LeafPath]
+    _parent_leaf_paths: dict[int, LeafPath]
     _shared_components: dict[str, list[str]]
 
     # Is this instance locked?
     _locked: bool = False
 
     # Keep track of attributes to avoid recursion
-    _attr_names = {"model", "_dupl_leaf_ids", "_dupl_leaf_paths", "_parent_leaf_paths", "_shared_components", "_locked"}
+    _attr_names = {
+        "model",
+        "_dupl_leaf_ids",
+        "_dupl_leaf_paths",
+        "_parent_leaf_paths",
+        "_shared_components",
+        "_locked",
+    }
 
     def __init__(self, model: Module, locked: bool = False):
         # Detect module-level sharing BEFORE any tree manipulation
@@ -291,13 +297,14 @@ class ShareModule(Module):
             object.__setattr__(self, key, value)
 
     def __repr__(self) -> str:
+        from rich.text import Text
+
         from spectracles.model.formatting import (
             create_model_tree,
             render_to_string,
             styled_type,
         )
         from spectracles.model.parameter import Known
-        from rich.text import Text
 
         # Count parameters
         n_unique = len(self._parent_leaf_paths)
@@ -470,7 +477,7 @@ class ShareModule(Module):
 
         # Create an ID map to keep track of which arrays we've already copied
         # This ensures we create exactly one copy of each unique array
-        id_to_copy_map: Dict[int, Array] = {}
+        id_to_copy_map: dict[int, Array] = {}
 
         def deep_copy_with_sharing(x):
             if is_inexact_array(x):
@@ -494,9 +501,7 @@ class ShareModule(Module):
         cls = type(self)
         return cls(copied_model, locked=self._locked)
 
-    def get_sharing_summary(
-        self, level: str = "component"
-    ) -> dict[str, list[str]]:
+    def get_sharing_summary(self, level: str = "component") -> dict[str, list[str]]:
         """
         Get a summary of what is shared in the model.
 
@@ -636,9 +641,7 @@ class ShareModule(Module):
                         f"object, which indicates a bug in sharing detection."
                     )
             except (AttributeError, KeyError) as e:
-                errors.append(
-                    f"Parent path '{leafpath_to_str(parent_path)}' is invalid: {e}"
-                )
+                errors.append(f"Parent path '{leafpath_to_str(parent_path)}' is invalid: {e}")
 
         # Check that all duplicate paths reference valid parents
         for dupl_id, dupl_path in zip(self._dupl_leaf_ids, self._dupl_leaf_paths):
@@ -697,9 +700,7 @@ class ShareModule(Module):
 
         return result
 
-    def set(
-        self, params: list[str], values: list[Array], allow_set_knowns: bool = False
-    ) -> Self:
+    def set(self, params: list[str], values: list[Array], allow_set_knowns: bool = False) -> Self:
         """
         Return a new model with updated parameter values. Can only be used to
         update values of Parameters or ConstrainedParameters. The model must
@@ -945,9 +946,7 @@ class ShareModule(Module):
             for child in children
         }
 
-    def get_parameter_summary(
-        self, show_shared: bool = True, show_knowns: bool = False
-    ) -> None:
+    def get_parameter_summary(self, show_shared: bool = True, show_knowns: bool = False) -> None:
         """
         Print a summary table of all parameters with their status.
 
@@ -978,7 +977,6 @@ class ShareModule(Module):
         from spectracles.model.parameter import (
             ConstrainedParameter,
             Known,
-            Parameter,
         )
 
         console = get_console()
@@ -991,7 +989,7 @@ class ShareModule(Module):
         sharing_summary = self.get_sharing_summary(level="parameter")
 
         # Create reverse lookup: shared_path -> parent_path
-        shared_to_parent: Dict[str, str] = {}
+        shared_to_parent: dict[str, str] = {}
         for parent_path, shared_paths in sharing_summary.items():
             for shared_path in shared_paths:
                 shared_to_parent[shared_path] = parent_path
@@ -1161,6 +1159,7 @@ class ShareModule(Module):
                 ← line_2.v.coefficients
         """
         from rich.text import Text
+
         from spectracles.model.formatting import get_console
 
         console = get_console()
@@ -1202,7 +1201,7 @@ class ShareModule(Module):
         self,
         ax: Axes | None = None,
         show: bool = True,
-        label_func: Callable[[DiGraph], Dict[int, str]] | None = None,
+        label_func: Callable[[DiGraph], dict[int, str]] | None = None,
         nx_draw_kwds: dict = DEFAULT_NX_KWDS,
         sharing_level: str = "component",
     ) -> None:
@@ -1306,9 +1305,7 @@ def build_model(cls: Callable[..., Module], *args, **kwargs) -> ShareModule:
     return parent_model(cls(*args, **kwargs))
 
 
-def get_digraph(
-    module: ShareModule, sharing_level: str = "component"
-) -> tuple[DiGraph, int]:
+def get_digraph(module: ShareModule, sharing_level: str = "component") -> tuple[DiGraph, int]:
     """
     Build a directed graph representation of the model structure.
 
@@ -1357,9 +1354,7 @@ def get_digraph(
                 # This component is shared - resolve to the parent component
                 parent_path_str = component_sharing[current_prefix]
                 # Get the actual parent component object using the shared path utilities
-                parent_component = use_path_get_leaf(
-                    module, str_to_leafpath(parent_path_str)
-                )
+                parent_component = use_path_get_leaf(module, str_to_leafpath(parent_path_str))
                 # Add node for the parent component (using its id so edges merge)
                 graph.add_node(
                     id(parent_component),

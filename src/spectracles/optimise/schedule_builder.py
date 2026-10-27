@@ -30,8 +30,9 @@ Supports glob-style pattern matching for parameter paths:
     - "**" matches any number of components
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Literal, Optional, Union
+from typing import Literal
 
 import jax.numpy as jnp
 import jax.random as jr
@@ -109,7 +110,7 @@ class InitSpec:
     """
 
     kind: Literal["normal", "value", "uniform"]
-    value: Optional[float] = None
+    value: float | None = None
     mean: float = 0.0
     std: float = 1.0
     low: float = 0.0
@@ -347,20 +348,20 @@ def _resolve_free_phases(spec: ParamSpec, n_phases: int) -> set[int]:
 
 
 PhaseSpec = tuple[int, float]  # (n_steps, learning_rate)
-PhaseSpecFull = tuple[int, float, Optional[GradientTransformation]]  # (n_steps, lr, optimizer)
+PhaseSpecFull = tuple[int, float, GradientTransformation | None]  # (n_steps, lr, optimizer)
 
 
 def build_schedule(
     model: ShareModule,
     loss_fn: Callable[..., float],
-    phases: list[Union[PhaseSpec, PhaseSpecFull]],
+    phases: list[PhaseSpec | PhaseSpecFull],
     params: dict[str, ParamSpec],
     default_optimizer: Literal["sgd", "adam"] = "adam",
     managed: bool = False,
     get_filter_spec_fn: Callable[[ShareModule], Callable] = get_opt_filter_spec,
-    Δloss_criterion: Optional[float] = None,
-    key: Optional[PRNGKeyArray] = None,
-) -> Union[OptimiserSchedule, ManagedOptimiserSchedule]:
+    Δloss_criterion: float | None = None,
+    key: PRNGKeyArray | None = None,
+) -> OptimiserSchedule | ManagedOptimiserSchedule:
     """Build an optimization schedule using a parameter-centric specification.
 
     This function provides a declarative way to specify which parameters should

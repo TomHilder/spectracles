@@ -1,7 +1,8 @@
 """opt_frame.py - Frame for optimising a model using an optimiser and a loss function."""
 # TODO: typing!
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import jax.numpy as jnp
 from equinox import (
@@ -13,15 +14,13 @@ from equinox import (
     is_array,
     partition,
 )
-from jax import lax
 from jax.tree_util import tree_map
-
-from spectracles.tree.path_utils import leafpath_to_str, leaves_with_path
 from optax import GradientTransformation  # type: ignore[import]
 from tqdm import tqdm
 
 from spectracles.model.parameter import is_parameter, is_trainable
 from spectracles.model.share_module import ShareModule
+from spectracles.tree.path_utils import leafpath_to_str, leaves_with_path
 
 
 def get_opt_filter_spec(model: ShareModule) -> Callable:
@@ -85,9 +84,7 @@ class OptimiserFrame:
             # Split varying and constant parts of model
             vary_model, fixed_model = partition(model, filter_spec)
             # Calculate the loss and gradients
-            loss, grad = get_loss(
-                vary_model, fixed_model, loss_fn, *loss_args, **loss_kwargs
-            )
+            loss, grad = get_loss(vary_model, fixed_model, loss_fn, *loss_args, **loss_kwargs)
             # Optimiser updates step
             updates, opt_state = optimiser.update(
                 grad,
@@ -167,9 +164,7 @@ class OptimiserFrame:
         try:
             loss_output = self.loss_fn(self.model, *loss_args, **loss_kwargs)
         except Exception as e:
-            raise ValueError(
-                "Evaluating provided loss function causes an Exception."
-            ) from e
+            raise ValueError("Evaluating provided loss function causes an Exception.") from e
         if jnp.any(jnp.isnan(loss_output)):
             raise ValueError("Loss function outputs NaN.")
 
@@ -184,9 +179,7 @@ class OptimiserFrame:
             pbar.set_description(f"Optimising (Δloss trend: {trend:.2e})")
         return jnp.abs(trend) < Δloss
 
-    def get_gradient_summary(
-        self, *loss_args, **loss_kwargs
-    ) -> dict[str, dict[str, Any]]:
+    def get_gradient_summary(self, *loss_args, **loss_kwargs) -> dict[str, dict[str, Any]]:
         """
         Compute gradients and return a summary with norms per parameter.
 
@@ -216,6 +209,7 @@ class OptimiserFrame:
             >>> for path, info in summary.items():
             ...     print(f"{path}: norm={info['norm']:.2e}")
         """
+
         # Compute gradients
         @filter_value_and_grad
         def get_loss(vary_model, fixed_model, loss_fn, *inner_args, **inner_kwargs):
@@ -225,9 +219,7 @@ class OptimiserFrame:
         filter_spec = self.get_filter_spec(self.model)
         vary_model, fixed_model = partition(self.model, filter_spec)
 
-        _, grad = get_loss(
-            vary_model, fixed_model, self.loss_fn, *loss_args, **loss_kwargs
-        )
+        _, grad = get_loss(vary_model, fixed_model, self.loss_fn, *loss_args, **loss_kwargs)
 
         # Extract gradient arrays with their paths
         grad_leaves = leaves_with_path(grad, is_leaf=is_array)
@@ -263,6 +255,7 @@ class OptimiserFrame:
             **loss_kwargs: Keyword arguments to pass to the loss function.
         """
         from rich.table import Table
+
         from spectracles.model.formatting import get_console
 
         console = get_console()

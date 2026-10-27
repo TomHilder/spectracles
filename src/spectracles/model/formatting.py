@@ -2,27 +2,27 @@
 
 from typing import Any
 
-from rich.console import Console
-from rich.text import Text
-from rich.tree import Tree
-from rich.table import Table
-from rich.theme import Theme
-import jax.numpy as jnp
 from jaxtyping import Array
-
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
+from rich.theme import Theme
+from rich.tree import Tree
 
 # Catppuccin Mocha-inspired theme
-THEME = Theme({
-    "type": "#89b4fa",       # Blue - class/type names
-    "value": "#cdd6f4",      # Text - values
-    "free": "#a6e3a1",       # Green - free parameters
-    "fixed": "#f9e2af",      # Yellow - fixed parameters
-    "shared": "#cba6f7",     # Mauve - shared references
-    "tree": "#6c7086",       # Overlay0 - tree branches
-    "dim": "#6c7086",        # Overlay0 - dimmed text
-    "error": "#f38ba8",      # Red - errors/warnings
-    "success": "#a6e3a1",    # Green - success
-})
+THEME = Theme(
+    {
+        "type": "#89b4fa",  # Blue - class/type names
+        "value": "#cdd6f4",  # Text - values
+        "free": "#a6e3a1",  # Green - free parameters
+        "fixed": "#f9e2af",  # Yellow - fixed parameters
+        "shared": "#cba6f7",  # Mauve - shared references
+        "tree": "#6c7086",  # Overlay0 - tree branches
+        "dim": "#6c7086",  # Overlay0 - dimmed text
+        "error": "#f38ba8",  # Red - errors/warnings
+        "success": "#a6e3a1",  # Green - success
+    }
+)
 
 # Console with theme, but force_terminal=False to allow graceful fallback
 # force_jupyter=False prevents Rich from using IPython's display() in interactive environments

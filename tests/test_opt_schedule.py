@@ -3,6 +3,7 @@
 import jax.numpy as jnp
 import optax  # type: ignore[import]
 import pytest
+
 from spectracles.model.share_module import build_model
 from spectracles.optimise.opt_schedule import (
     ManagedOptimiserSchedule,
@@ -12,7 +13,7 @@ from spectracles.optimise.opt_schedule import (
     PhaseState,
 )
 
-from .test_models import SimpleModel, SharedLeafModel
+from .test_models import SharedLeafModel, SimpleModel
 
 
 class TestPhaseConfig:

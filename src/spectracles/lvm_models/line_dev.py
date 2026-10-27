@@ -18,7 +18,7 @@ from spectracles import (
 from spectracles.lvm_models.constants import C_KMS
 from spectracles.lvm_models.likelihood import ln_likelihood
 from spectracles.model.data import SpatialData
-from spectracles.model.spatial import PerIFU, PerIFUAndTile, PerTile
+from spectracles.model.spatial import PerIFU, PerTile
 
 A_LOWER = 0.0
 

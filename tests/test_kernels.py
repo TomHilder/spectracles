@@ -1,6 +1,7 @@
 """test_kernels.py - tests for the spectracles.model.kernels module."""
 
 import jax.numpy as jnp
+
 from spectracles.model.kernels import (
     Matern12,
     Matern32,

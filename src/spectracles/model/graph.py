@@ -43,6 +43,7 @@ def print_graph(
     """
     from rich.text import Text
     from rich.tree import Tree
+
     from spectracles.model.formatting import get_console
 
     console = get_console()

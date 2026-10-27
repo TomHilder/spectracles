@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import pytest
 from equinox import is_array
 from jax.tree_util import tree_map
+
 from spectracles.model.parameter import Parameter
 from spectracles.model.share_module import (
     Shared,
@@ -23,7 +24,6 @@ from spectracles.tree.path_utils import (
 from .test_models import (
     ComplexSharedModel,
     NestedModel,
-    SharedBranchModel,
     SharedLeafModel,
     SimpleModel,
 )
@@ -264,7 +264,6 @@ def assert_array_equal_but_different(x, y):
     #
     # Since we can't directly modify JAX arrays, this test is disabled
     # and we only check for equality
-    pass
 
 
 class TestContainsShared:

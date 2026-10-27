@@ -1,6 +1,7 @@
 """test.io - tests for the spectracles.model.io module."""
 
 import pytest
+
 from spectracles.model.io import MODELFILE_EXT, load_model, save_model
 from spectracles.model.share_module import ShareModule, build_model
 

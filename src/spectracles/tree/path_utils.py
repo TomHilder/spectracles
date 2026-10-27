@@ -79,7 +79,7 @@ def get_duplicated_leaves(
     for path, leaf in leaves:
         leaf_id = id(leaf)
         # If id already seen:
-        if leaf_id in parent_leaf_paths.keys():
+        if leaf_id in parent_leaf_paths:
             # Remember path to duplicated leaf
             dupl_leaf_paths.append(path)
             dupl_leaf_ids.append(leaf_id)
