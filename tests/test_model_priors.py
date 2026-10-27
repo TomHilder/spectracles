@@ -306,18 +306,24 @@ def _three_sgd_steps(model, data, target):
     return np.asarray(frame.loss_history), out
 
 
-def test_optimiser_frame_identical_with_and_without_priors():
+def test_optimiser_frame_same_with_and_without_priors():
     data = gp_data()
     target = jnp.sin(data.x) * jnp.cos(data.y)
     loss_a, out_a = _three_sgd_steps(make_gp_model(with_priors=False), data, target)
     loss_b, out_b = _three_sgd_steps(make_gp_model(with_priors=True), data, target)
-    np.testing.assert_array_equal(loss_a, loss_b)
+    # Equal to machine precision, not bitwise: priors change the model's static
+    # structure, so JIT compiles a separate program, and XLA may order floating-point
+    # operations differently (seen on Linux CI: 1-ULP differences)
+    np.testing.assert_allclose(loss_a, loss_b, rtol=1e-13)
     # Compare parameter values (ShareModule's own leaves include id-keyed metadata)
     la, lb = out_a.get_locked_model().model, out_b.get_locked_model().model
     for path in out_a.get_parameter_paths(show_knowns=True):
         leaf_path = str_to_leafpath(path)
-        np.testing.assert_array_equal(
-            use_path_get_leaf(la, leaf_path).val, use_path_get_leaf(lb, leaf_path).val
+        np.testing.assert_allclose(
+            use_path_get_leaf(la, leaf_path).val,
+            use_path_get_leaf(lb, leaf_path).val,
+            rtol=1e-13,
+            atol=1e-18,
         )
 
 
