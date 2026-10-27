@@ -3,7 +3,11 @@
 import tempfile
 from pathlib import Path
 
+import jax
 import pytest
+
+# Float64 throughout, so cross-backend comparisons can be tight
+jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture

@@ -21,6 +21,11 @@ dependencies = [
     "tqdm>=4.67.1",
 ]
 
+[project.optional-dependencies]
+nifty = [
+    "nifty[re]>=9.2",
+]
+
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
@@ -53,7 +58,9 @@ jax-finufft = { git = "https://github.com/flatironinstitute/jax-finufft.git" }
 
 [dependency-groups]
 dev = [
+    "blackjax>=1.7",
     "mypy>=1.17.1",
+    "nifty[re]>=9.2",
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.8",
