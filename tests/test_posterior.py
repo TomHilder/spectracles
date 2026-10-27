@@ -11,7 +11,10 @@ from spectracles.inference import GaussianLikelihood, LatentSpace, Posterior
 
 from .conftest import make_xi_points
 
-RTOL = 1e-6
+# Tolerances: one decade looser than what these checks achieve on CPU float64
+# (rtol 1e-14 with atol 1e-12 for near-zero components; probed in P1.1 stage 7)
+RTOL = 1e-13
+ATOL = 1e-11
 
 
 # ---- E1: prior only ----
@@ -118,7 +121,8 @@ def test_gradient_matches_finite_differences(line_posterior):
         minus = {p: ξ[p] - h * d[p] for p in ξ}
         fd = (post.log_density(plus) - post.log_density(minus)) / (2 * h)
         directional = sum(jnp.sum(grad[p] * d[p]) for p in ξ)
-        assert float(directional) == pytest.approx(float(fd), rel=RTOL, abs=1e-6)
+        # Central differences with h = 1e-5: truncation error limits this to ~1e-6
+        assert float(directional) == pytest.approx(float(fd), rel=1e-6, abs=1e-6)
 
 
 # ---- Posterior construction ----

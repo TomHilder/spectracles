@@ -12,7 +12,10 @@ from scipy import stats
 
 from spectracles.priors import Laplace, LogNormal, Normal, Prior, StdNormal, Uniform
 
-RTOL = 1e-6
+# Tolerances: one decade looser than what these checks achieve on CPU float64
+# (rtol 1e-14 with atol 1e-12 for near-zero components; probed in P1.1 stage 7)
+RTOL = 1e-13
+ATOL = 1e-11
 
 XI_GRID = jnp.linspace(-5.0, 5.0, 101)
 
@@ -64,8 +67,9 @@ def test_lognormal_formula(mean, std):
 def test_laplace_is_quantile_of_normal_cdf(alpha):
     # Independent reference: the Laplace quantile function applied to Φ(ξ)
     ref = stats.laplace.ppf(stats.norm.cdf(np.asarray(XI_GRID)), loc=0.0, scale=alpha)
+    # scipy's reference loses precision in the tails (achieved rtol 1e-10)
     np.testing.assert_allclose(
-        Laplace(alpha).transform(XI_GRID), ref, rtol=RTOL, atol=1e-12 * alpha
+        Laplace(alpha).transform(XI_GRID), ref, rtol=1e-9, atol=1e-12 * alpha
     )
 
 
@@ -115,7 +119,7 @@ def test_inverse_availability():
 @pytest.mark.parametrize("prior", INVERTIBLE, ids=repr)
 def test_inverse_round_trip(prior):
     ξ = jnp.linspace(-6.0, 6.0, 61)
-    np.testing.assert_allclose(prior.inverse(prior.transform(ξ)), ξ, rtol=RTOL, atol=1e-9)
+    np.testing.assert_allclose(prior.inverse(prior.transform(ξ)), ξ, rtol=RTOL, atol=ATOL)
     x = prior.transform(ξ)
     np.testing.assert_allclose(prior.transform(prior.inverse(x)), x, rtol=RTOL)
 
@@ -132,7 +136,7 @@ def test_inverse_matches_nifty(prior):
         ref = normal_invprior(prior.mean, prior.std)(x)
     else:
         ref = lognormal_invprior(prior.mean, prior.std)(x)
-    np.testing.assert_allclose(prior.inverse(x), ref, rtol=RTOL, atol=1e-9)
+    np.testing.assert_allclose(prior.inverse(x), ref, rtol=RTOL, atol=ATOL)
 
 
 # ---- A4: moments ----

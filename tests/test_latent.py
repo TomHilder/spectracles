@@ -18,7 +18,10 @@ from .conftest import make_xi_points
 from .priors_models import gp_data, line_data, line_forward, make_line_model
 from .test_model_priors import TwoParams, make_outer
 
-RTOL = 1e-6
+# Tolerances: one decade looser than what these checks achieve on CPU float64
+# (rtol 1e-14 with atol 1e-12 for near-zero components; probed in P1.1 stage 7)
+RTOL = 1e-13
+ATOL = 1e-11
 
 LINE_PATHS = [
     "line_1.log_A.coefficients",
@@ -167,7 +170,7 @@ def test_round_trip_all_invertible(tiny_gp_model):
     for ξ in make_xi_points(latent):
         back = latent.from_model(latent.to_model(ξ))
         for p in latent.paths:
-            np.testing.assert_allclose(back[p], ξ[p], rtol=RTOL, atol=1e-9)
+            np.testing.assert_allclose(back[p], ξ[p], rtol=RTOL, atol=ATOL)
     m = latent.to_model(make_xi_points(latent)[0])
     m2 = latent.to_model(latent.from_model(m))
     for p in latent.paths:
@@ -197,7 +200,7 @@ def test_from_model_fallback_zero_warns(tiny_line_model):
     np.testing.assert_array_equal(back["scatter.spaxel_values"], 0.0)
     for p in latent.paths:
         if p != "scatter.spaxel_values":
-            np.testing.assert_allclose(back[p], ξ[p], rtol=RTOL, atol=1e-9)
+            np.testing.assert_allclose(back[p], ξ[p], rtol=RTOL, atol=ATOL)
 
 
 def test_from_model_fallback_raise(tiny_line_model):

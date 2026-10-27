@@ -20,7 +20,10 @@ from spectracles.priors import Normal
 
 from .conftest import make_xi_points
 
-RTOL = 1e-6
+# Tolerances: one decade looser than what these checks achieve on CPU float64
+# (rtol 1e-14 with atol 1e-12 for near-zero components; probed in P1.1 stage 7)
+RTOL = 1e-13
+ATOL = 1e-11
 
 
 def jft():
@@ -89,7 +92,7 @@ def test_nifty_gradient_matches(line_posterior):
         g_nifty = tree(jax.grad(lambda x: lh(x))(vec(ξ)))
         g_ours = jax.grad(post.log_likelihood)(ξ)
         for p in post.latent.paths:
-            np.testing.assert_allclose(-g_nifty[p], g_ours[p], rtol=RTOL, atol=1e-10)
+            np.testing.assert_allclose(-g_nifty[p], g_ours[p], rtol=RTOL, atol=ATOL)
 
 
 # ---- F4: NIFTy's own NUTS target ----
@@ -110,7 +113,7 @@ def test_nifty_blackjax_target_equals_ours(line_posterior):
         g_theirs = tree(jax.grad(target)(vec(ξ)))
         g_ours = jax.grad(post.log_density)(ξ)
         for p in post.latent.paths:
-            np.testing.assert_allclose(g_theirs[p], g_ours[p], rtol=RTOL, atol=1e-10)
+            np.testing.assert_allclose(g_theirs[p], g_ours[p], rtol=RTOL, atol=ATOL)
 
 
 # ---- F5: BlackJAX accepts our target (no steps) ----
@@ -160,7 +163,7 @@ def test_nifty_metric_is_likelihood_fisher(line_posterior):
         ours = masked_vjp(post, ξ, std_inv**2 * Jt)
         theirs = tree(lh.metric(vec(ξ), vec(t)))
         for p in post.latent.paths:
-            np.testing.assert_allclose(theirs[p], ours[p], rtol=RTOL, atol=1e-10)
+            np.testing.assert_allclose(theirs[p], ours[p], rtol=RTOL, atol=ATOL)
 
 
 def test_nifty_left_sqrt_metric(line_posterior):
@@ -173,14 +176,14 @@ def test_nifty_left_sqrt_metric(line_posterior):
     theirs = tree(lh.left_sqrt_metric(vec(ξ), u))
     ours = masked_vjp(post, ξ, std_inv * u)
     for p in post.latent.paths:
-        np.testing.assert_allclose(theirs[p], ours[p], rtol=RTOL, atol=1e-10)
+        np.testing.assert_allclose(theirs[p], ours[p], rtol=RTOL, atol=ATOL)
     # ...and composing it with σ⁻¹ J gives the metric
     t = post.latent.sample(random.PRNGKey(6))
     _, Jt = masked_jvp(post, ξ, t)
     composed = tree(lh.left_sqrt_metric(vec(ξ), std_inv * Jt))
     metric = tree(lh.metric(vec(ξ), vec(t)))
     for p in post.latent.paths:
-        np.testing.assert_allclose(composed[p], metric[p], rtol=RTOL, atol=1e-10)
+        np.testing.assert_allclose(composed[p], metric[p], rtol=RTOL, atol=ATOL)
 
 
 # ---- F9: linear-Gaussian identity ----
@@ -202,10 +205,10 @@ def test_linear_gaussian_hessian_equals_metric_plus_identity(linear_gaussian):
     metric = jnp.stack(
         [tree(lh.metric(vec(ξ), vec({path: e.reshape(shape)})))[path].ravel() for e in basis]
     )
-    np.testing.assert_allclose(neg_hessian, metric + jnp.eye(n), rtol=RTOL, atol=1e-9)
+    np.testing.assert_allclose(neg_hessian, metric + jnp.eye(n), rtol=RTOL, atol=ATOL)
     # Exactly Gaussian: the Hessian doesn't depend on ξ
     other = make_xi_points(post.latent, n=2, seed=7)[1][path].ravel()
-    np.testing.assert_allclose(-jax.hessian(f)(other), neg_hessian, rtol=RTOL, atol=1e-9)
+    np.testing.assert_allclose(-jax.hessian(f)(other), neg_hessian, rtol=RTOL, atol=ATOL)
 
 
 # ---- F10, F11: path keys as NIFTy staging selectors ----
