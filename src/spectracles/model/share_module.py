@@ -1080,7 +1080,7 @@ class ShareModule(Module):
         # summary of a model without priors is unchanged
         show_priors = any(info["prior"] != "-" for info in params_info)
 
-        table.add_column("Path", style="white")
+        table.add_column("Path", style="white", overflow="fold")
         table.add_column("Shape", style="dim")
         table.add_column("Bounds", style="dim")
         if show_priors:

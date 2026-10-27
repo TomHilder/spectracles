@@ -213,7 +213,7 @@ class LatentSpace:
             border_style="dim",
             title_style="bold",
         )
-        table.add_column("Path", style="white")
+        table.add_column("Path", style="white", overflow="fold")
         table.add_column("Shape", style="dim")
         table.add_column("Prior", style="dim")
         table.add_column("Posterior mean ± std")
