@@ -58,6 +58,7 @@ jax-finufft = { git = "https://github.com/flatironinstitute/jax-finufft.git" }
 
 [dependency-groups]
 dev = [
+    "astropy>=8.0.2",
     "blackjax>=1.7",
     "mypy>=1.17.1",
     "nifty[re]>=9.2",

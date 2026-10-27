@@ -61,6 +61,20 @@ pip install -e .
 - **JAX integration** - Built on equinox, fully compatible with JAX transformations
 - **Rich output** - Pretty-printed model trees and gradient diagnostics
 
+## Status and plans
+
+- **Experimental: `spectracles.lvm_models`.** The LVM-specific models are not
+  covered by the stability promise. They are being ported to the new prior and
+  latent-space API one at a time.
+- **Planned: one way to fit.** Models can currently be fitted two ways:
+  - with `OptimiserFrame` and schedules, using `prior_logpdf` losses;
+  - through the latent space (`Posterior.log_density` with NIFTy.re, BlackJAX
+    or optax).
+
+  These will be unified later. Optimisation will move to the latent space,
+  schedules and VI stages will share one vocabulary, and the `prior_logpdf`
+  losses will be deprecated.
+
 ## Documentation
 
 Full documentation: [tomhilder.github.io/spectracles](https://tomhilder.github.io/spectracles/)

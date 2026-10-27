@@ -8,6 +8,18 @@ Spectrospatial modelling with JAX and Equinox.
 pip install spectracles
 ```
 
+## Status
+
+!!! warning "Experimental: `spectracles.lvm_models`"
+    The LVM-specific models are not covered by the stability promise. They are
+    being ported to priors and the latent space one at a time.
+
+!!! note "Planned: one way to fit"
+    Models can currently be fitted two ways: with `OptimiserFrame` and
+    schedules (using `prior_logpdf` losses), or through the latent space
+    (`spectracles.inference.Posterior` with NIFTy.re, BlackJAX or optax). These
+    will be unified later.
+
 ## Quick Start
 
 ```python

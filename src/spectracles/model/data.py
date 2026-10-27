@@ -1,7 +1,7 @@
 """data.py - Data structures used as arguments for model evaluations/predictions."""
 
 import jax.numpy as jnp
-from equinox import Module, field
+from equinox import AbstractVar, Module, field
 from jaxtyping import Array
 
 
@@ -9,20 +9,36 @@ def convert_to_flat_array(array: Array) -> Array:
     return jnp.asarray(array).flatten()
 
 
-class SpatialDataGeneric(Module):
+class SpatialData(Module):
+    """Base class for the spatial data that spatial models are evaluated at.
+
+    Subclasses must provide `x`, `y` (sky coordinates in model units) and `idx`
+    (each point's index, e.g. its spaxel), all flat arrays. Declare them with
+    `field(converter=convert_to_flat_array)` to flatten inputs, and add any
+    other per-point fields a model needs:
+
+        class MySpatialData(SpatialData):
+            x: Array = field(converter=convert_to_flat_array)
+            y: Array = field(converter=convert_to_flat_array)
+            idx: Array = field(converter=convert_to_flat_array)
+            exposure_idx: Array = field(converter=convert_to_flat_array)
+    """
+
+    x: AbstractVar[Array]
+    y: AbstractVar[Array]
+    idx: AbstractVar[Array]
+
+
+class SpatialDataGeneric(SpatialData):
     x: Array = field(converter=convert_to_flat_array)
     y: Array = field(converter=convert_to_flat_array)
     idx: Array = field(converter=convert_to_flat_array)
 
 
-class SpatialDataLVM(Module):
+class SpatialDataLVM(SpatialData):
     x: Array = field(converter=convert_to_flat_array)
     y: Array = field(converter=convert_to_flat_array)
     idx: Array = field(converter=convert_to_flat_array)
     tile_idx: Array = field(converter=convert_to_flat_array)
     ifu_idx: Array = field(converter=convert_to_flat_array)
     fib_idx: Array = field(converter=convert_to_flat_array)
-
-
-# TODO: This is bad. We want users to be able to write their own SpatialDataFoo class, but with the current setup the typing doesn't strictly allow this. Really this should be a Protocol or subclassing sitation. Not worth refactoring right now.
-SpatialData = SpatialDataGeneric | SpatialDataLVM
