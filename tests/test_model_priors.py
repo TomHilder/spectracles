@@ -27,6 +27,7 @@ from spectracles import (
 from spectracles.model.formatting import get_console
 from spectracles.model.spatial import MultiFourierGP
 from spectracles.priors import Laplace, LogNormal, Normal, Prior, StdNormal, Uniform
+from spectracles.tree.path_utils import str_to_leafpath, use_path_get_leaf
 
 
 class TwoParams(eqx.Module):
@@ -311,8 +312,13 @@ def test_optimiser_frame_identical_with_and_without_priors():
     loss_a, out_a = _three_sgd_steps(make_gp_model(with_priors=False), data, target)
     loss_b, out_b = _three_sgd_steps(make_gp_model(with_priors=True), data, target)
     np.testing.assert_array_equal(loss_a, loss_b)
-    for la, lb in zip(jax.tree.leaves(out_a), jax.tree.leaves(out_b)):
-        np.testing.assert_array_equal(la, lb)
+    # Compare parameter values (ShareModule's own leaves include id-keyed metadata)
+    la, lb = out_a.get_locked_model().model, out_b.get_locked_model().model
+    for path in out_a.get_parameter_paths(show_knowns=True):
+        leaf_path = str_to_leafpath(path)
+        np.testing.assert_array_equal(
+            use_path_get_leaf(la, leaf_path).val, use_path_get_leaf(lb, leaf_path).val
+        )
 
 
 def test_schedule_builder_and_fix_all_with_priors():
