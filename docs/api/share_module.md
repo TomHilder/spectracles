@@ -101,6 +101,24 @@ model = model.fix_all()
 model = model.free_all()
 ```
 
+## Priors
+
+```python
+# sketch
+from spectracles.priors import Laplace, LogNormal
+
+model = model.with_priors(
+    {
+        "**.kernel.length_scale": LogNormal(0.5, 0.2),
+        "offset.spaxel_values": Laplace(0.02),
+        "line.σ_lsf.spaxel_values": "fixed",
+    }
+)
+model.get_priors()  # {path: prior} for every parameter that has one
+```
+
+See [Priors and inference](../inference.md) for the full workflow.
+
 ## Validation
 
 ```python
@@ -120,6 +138,8 @@ info = model.validate_sharing()
         - plot_model_graph
         - set
         - set_fixed_status
+        - with_priors
+        - get_priors
         - fix_all
         - free_all
         - validate_sharing

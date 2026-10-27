@@ -6,6 +6,7 @@ Spectrospatial modelling with JAX and Equinox.
 
 ```bash
 pip install spectracles
+pip install "spectracles[nifty]"   # optional: MGVI / geoVI through NIFTy.re
 ```
 
 ## Status
@@ -17,18 +18,32 @@ pip install spectracles
 !!! note "Planned: one way to fit"
     Models can currently be fitted two ways: with `OptimiserFrame` and
     schedules (using `prior_logpdf` losses), or through the latent space
-    (`spectracles.inference.Posterior` with NIFTy.re, BlackJAX or optax). These
+    ([`Posterior`](inference.md) with NIFTy.re, BlackJAX or optax). These
     will be unified later.
 
 ## Quick Start
 
+Build a model from spectracles components inside your own Equinox module, then
+fit it one of two ways.
+
+**Bayesian inference** (priors on parameters, then MGVI/geoVI, NUTS or MAP on
+one posterior). See [Priors and inference](inference.md):
+
 ```python
-import spectracles as sp
+# sketch
+from spectracles.inference import GaussianLikelihood, LatentSpace, Posterior
+from spectracles.nifty import to_nifty
 
-# Build a model
-model = sp.build_model(MyModel, ...)
+model = sp.build_model(MyModel, ...)  # parameters declared with prior=...
+posterior = Posterior(LatentSpace(model), forward, GaussianLikelihood(flux, ivar, mask))
+samples, _ = jft.optimize_kl(to_nifty(posterior), ...)  # MGVI / geoVI
+```
 
-# Create an optimization schedule
+**Optimisation schedules** (point estimates with your own loss). See the
+[Schedule Builder](schedule_builder.md):
+
+```python
+# sketch
 schedule = sp.build_schedule(
     model,
     loss_fn,
@@ -38,7 +53,5 @@ schedule = sp.build_schedule(
         "*.kernel.*": sp.free_after(1),
     },
 )
-
-# Run optimization
 schedule.run_all(x=data_x, y=data_y)
 ```
