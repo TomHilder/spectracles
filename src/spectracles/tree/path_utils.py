@@ -1,5 +1,6 @@
 """path_utils.py - utilities for handling paths in PyTree structures."""
 
+from fnmatch import fnmatch
 from typing import Any, TypeAlias
 
 from equinox import filter
@@ -88,3 +89,86 @@ def get_duplicated_leaves(
             parent_leaf_paths[leaf_id] = path
 
     return dupl_leaf_ids, dupl_leaf_paths, parent_leaf_paths
+
+
+# ---- Glob matching of dotted parameter paths ----
+
+
+
+def _match_pattern(pattern: str, path: str) -> bool:
+    """Match a glob pattern against a parameter path.
+
+    Supports:
+    - '*' matches any single path component
+    - '**' matches any number of components (including zero)
+    - Exact matches
+
+    Args:
+        pattern: Glob pattern (e.g., "gp.*.coefficients", "**.lengthscale")
+        path: Parameter path to match (e.g., "gp.kernel.lengthscale")
+
+    Returns:
+        True if the pattern matches the path.
+    """
+    # Handle ** (recursive match)
+    if "**" in pattern:
+        # Split on ** and handle each part
+        parts = pattern.split("**")
+        if len(parts) == 2:
+            prefix, suffix = parts
+            prefix = prefix.rstrip(".")
+            suffix = suffix.lstrip(".")
+
+            # Check prefix
+            if prefix and not (
+                path.startswith(prefix)
+                or fnmatch(path.split(".")[0], prefix.split(".")[0] if prefix else "*")
+            ):
+                if prefix:
+                    prefix_parts = prefix.split(".")
+                    path_parts = path.split(".")
+                    if len(path_parts) < len(prefix_parts):
+                        return False
+                    for pp, pat in zip(path_parts, prefix_parts):
+                        if not fnmatch(pp, pat):
+                            return False
+
+            # Check suffix
+            if suffix:
+                suffix_parts = suffix.split(".")
+                path_parts = path.split(".")
+                if len(path_parts) < len(suffix_parts):
+                    return False
+                # Match from the end
+                for pp, pat in zip(reversed(path_parts), reversed(suffix_parts)):
+                    if not fnmatch(pp, pat):
+                        return False
+
+            # If we got here with valid prefix/suffix checks, it matches
+            if not prefix and not suffix:
+                return True  # "**" alone matches everything
+            if not prefix:
+                # Just suffix - check if path ends with suffix pattern
+                return _simple_match(suffix, ".".join(path.split(".")[-len(suffix.split(".")) :]))
+            if not suffix:
+                # Just prefix - check if path starts with prefix pattern
+                return _simple_match(prefix, ".".join(path.split(".")[: len(prefix.split("."))]))
+            return True
+
+    # Use simple matching for non-recursive patterns
+    return _simple_match(pattern, path)
+
+
+def _simple_match(pattern: str, path: str) -> bool:
+    """Simple glob matching where * matches a single component."""
+    pattern_parts = pattern.split(".")
+    path_parts = path.split(".")
+
+    if len(pattern_parts) != len(path_parts):
+        return False
+
+    for pat, p in zip(pattern_parts, path_parts):
+        if not fnmatch(p, pat):
+            return False
+
+    return True

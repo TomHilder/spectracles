@@ -35,7 +35,9 @@ INVERTIBLE = [p for p in ALL_PRIORS if p.has_inverse]
 
 @pytest.mark.parametrize("mean, std", [(0.0, 1.0), (-2.5, 0.3)])
 def test_normal_formula(mean, std):
-    np.testing.assert_allclose(Normal(mean, std).transform(XI_GRID), mean + std * XI_GRID, rtol=RTOL)
+    np.testing.assert_allclose(
+        Normal(mean, std).transform(XI_GRID), mean + std * XI_GRID, rtol=RTOL
+    )
 
 
 def test_std_normal_is_identity():
@@ -62,7 +64,9 @@ def test_lognormal_formula(mean, std):
 def test_laplace_is_quantile_of_normal_cdf(alpha):
     # Independent reference: the Laplace quantile function applied to Φ(ξ)
     ref = stats.laplace.ppf(stats.norm.cdf(np.asarray(XI_GRID)), loc=0.0, scale=alpha)
-    np.testing.assert_allclose(Laplace(alpha).transform(XI_GRID), ref, rtol=RTOL, atol=1e-12 * alpha)
+    np.testing.assert_allclose(
+        Laplace(alpha).transform(XI_GRID), ref, rtol=RTOL, atol=1e-12 * alpha
+    )
 
 
 @pytest.mark.parametrize("low, high", [(0.0, 1.0), (-3.0, 7.0)])
@@ -116,7 +120,9 @@ def test_inverse_round_trip(prior):
     np.testing.assert_allclose(prior.transform(prior.inverse(x)), x, rtol=RTOL)
 
 
-@pytest.mark.parametrize("prior", [p for p in INVERTIBLE if not isinstance(p, StdNormal)], ids=repr)
+@pytest.mark.parametrize(
+    "prior", [p for p in INVERTIBLE if not isinstance(p, StdNormal)], ids=repr
+)
 def test_inverse_matches_nifty(prior):
     pytest.importorskip("nifty.re")
     from nifty.re.num import lognormal_invprior, normal_invprior
@@ -147,7 +153,9 @@ def _assert_mean_std(x, mean, std, n_sigma=5.0):
     assert abs(x.var() - std**2) < n_sigma * se_var
 
 
-@pytest.mark.parametrize("prior", [Normal(-2.5, 0.3), LogNormal(1.0, 0.5), LogNormal(0.3, 0.15)], ids=repr)
+@pytest.mark.parametrize(
+    "prior", [Normal(-2.5, 0.3), LogNormal(1.0, 0.5), LogNormal(0.3, 0.15)], ids=repr
+)
 def test_mean_and_std(prior):
     _assert_mean_std(_draws(prior), prior.mean, prior.std)
 

@@ -67,6 +67,9 @@ def print_graph(
             else:
                 text.append(node_type, style="type")
             text.append(")", style="dim")
+            prior = node_data.get("prior")
+            if prior is not None:
+                text.append(f" ~{prior}", style="dim")
         return text
 
     def build_tree(node_id: int, tree: Tree) -> None:

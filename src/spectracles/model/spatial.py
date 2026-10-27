@@ -11,6 +11,7 @@ from jaxtyping import Array
 from spectracles.model.data import SpatialData
 from spectracles.model.kernels import Kernel
 from spectracles.model.parameter import AnyParameter, Parameter, init_parameter
+from spectracles.priors import StdNormal
 
 # NOTE: List of current obvious foot guns:
 # - n_modes must always be two odd integers, but this is not enforced
@@ -135,8 +136,9 @@ class FourierGP(SpatialModel):
         fx, fy = get_freqs(n_modes)
         self._freqs = jnp.sqrt(fx**2 + fy**2)
         self.kernel = kernel
-        # Initialise parameters
-        self.coefficients = init_parameter(coefficients, dims=n_modes)
+        # Initialise parameters. The coefficients are whitened (the kernel scales
+        # them), so their prior is a standard normal by construction.
+        self.coefficients = init_parameter(coefficients, dims=n_modes, prior=StdNormal())
         # Zero-mode: scalar added to the field after NUFFT. Defaults to a fixed
         # zero so kernels with non-zero DC (e.g. Matern) behave as before. Kernels
         # that zero their DC (e.g. LogLogLinear) require a non-trivial zeromode
@@ -193,7 +195,9 @@ class MultiFourierGP(SpatialModel):
         self._freqs = jnp.sqrt(fx**2 + fy**2)
         self.kernels = kernels
         # Initialise parameters
-        self.coefficients = init_parameter(coefficients, dims=(n_components, *n_modes))
+        self.coefficients = init_parameter(
+            coefficients, dims=(n_components, *n_modes), prior=StdNormal()
+        )
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)

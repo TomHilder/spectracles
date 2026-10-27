@@ -22,6 +22,7 @@ from spectracles.model.parameter import AnyParameter, is_constrained, is_paramet
 from spectracles.tree.path_utils import (
     GetAttrKey,
     LeafPath,
+    _match_pattern,
     get_duplicated_leaves,
     leafpath_to_str,
     str_to_leafpath,
@@ -332,6 +333,10 @@ class ShareModule(Module):
             header.append(f"{n_free} free", style="free")
             header.append(", ", style="dim")
             header.append(f"{n_fixed} fixed", style="fixed")
+            n_priors = len(self.get_priors())
+            if n_priors > 0:
+                header.append(", ", style="dim")
+                header.append(f"{n_priors} with priors", style="dim")
 
         header.append(")", style="dim")
 
@@ -807,6 +812,124 @@ class ShareModule(Module):
         # Set all to free
         return self.set_fixed_status(all_paths, [False] * len(all_paths))
 
+    def get_priors(self) -> dict[str, Any]:
+        """
+        Get the priors of all (unique, non-Known) parameters that have one.
+
+        Returns:
+            A dictionary mapping parameter paths to their Prior, in tree order.
+            Shared parameters appear once, under their parent path.
+        """
+        priors = {}
+        for path in self.get_parameter_paths(show_shared=False, show_knowns=False):
+            param = use_path_get_leaf(self.model, str_to_leafpath(path))
+            prior = getattr(param, "prior", None)
+            if prior is not None:
+                priors[path] = prior
+        return priors
+
+    def with_priors(self, spec: dict[str, Any]) -> Self:
+        """
+        Return a new model with priors set (or parameters fixed) by path or glob.
+
+        Patterns use the same glob syntax as `build_schedule` ('*' matches one
+        path component, '**' any number). Values are a `spectracles.priors.Prior`
+        or the string "fixed". Patterns are matched against all non-Known
+        parameter paths, including shared ones: a shared parameter is one
+        parameter, so a pattern on any of its paths sets that one parameter.
+
+        Args:
+            spec: Mapping from path pattern to a Prior or "fixed".
+
+        Returns:
+            A new ShareModule; the original is unchanged. Parameter values and
+            free/fixed status are kept (except where "fixed" is given).
+
+        Raises:
+            ValueError: If a pattern matches nothing, if two patterns ask for
+                different things on the same parameter, or if a prior is given
+                for a ConstrainedParameter.
+            TypeError: If a value is neither a Prior nor "fixed".
+
+        Examples:
+            >>> model = model.with_priors({
+            ...     "**.kernel.length_scale": LogNormal(0.3, 0.15),
+            ...     "flux_cal.tile_values": Normal(0.0, 0.01),
+            ...     "line.σ_lsf.spaxel_values": "fixed",
+            ... })
+        """
+        from spectracles.model.parameter import Parameter
+        from spectracles.priors import Prior
+
+        if self._locked:
+            raise ValueError("Cannot set priors on a locked model.")
+
+        # Shared (child) paths resolve to their parent: they are the same parameter
+        child_to_parent = {
+            child: parent
+            for parent, children in self.get_sharing_summary(level="parameter").items()
+            for child in children
+        }
+        candidates = self.get_parameter_paths(show_shared=True, show_knowns=False)
+
+        # Resolve every pattern to parent paths, checking for conflicts
+        assigned: dict[str, tuple[Any, str]] = {}
+        for pattern, value in spec.items():
+            if not (isinstance(value, Prior) or value == "fixed"):
+                raise TypeError(
+                    f"with_priors: value for '{pattern}' must be a Prior or \"fixed\", "
+                    f"got {value!r}."
+                )
+            matched = [p for p in candidates if _match_pattern(pattern, p)]
+            if not matched:
+                raise ValueError(
+                    f"with_priors: pattern '{pattern}' did not match any parameters "
+                    f"(Known values are excluded). Available paths: {candidates}"
+                )
+            for path in matched:
+                target = child_to_parent.get(path, path)
+                if target in assigned and assigned[target][0] != value:
+                    other_value, other_pattern = assigned[target]
+                    raise ValueError(
+                        f"with_priors: conflicting specs for parameter '{target}': "
+                        f"'{other_pattern}' gives {other_value!r} but '{pattern}' gives "
+                        f"{value!r}. A shared parameter is one parameter and has one prior."
+                    )
+                assigned[target] = (value, pattern)
+
+        # Work on the restored model, where shared locations hold the same value
+        # array; each parameter is then replaced at all its locations by one new
+        # Parameter object, so sharing is re-detected and the copies stay identical
+        restored = tree_at(self._where, self.model, self._get(self.model))
+        parent_to_children: dict[str, list[str]] = {}
+        for child, parent in child_to_parent.items():
+            parent_to_children.setdefault(parent, []).append(child)
+
+        new_model = restored
+        to_fix = []
+        for target, (value, _) in assigned.items():
+            if value == "fixed":
+                to_fix.append(target)
+                continue
+            old = use_path_get_leaf(restored, str_to_leafpath(target))
+            if type(old) is not Parameter:
+                raise ValueError(
+                    f"with_priors: '{target}' is a {type(old).__name__}; only a plain "
+                    f"Parameter can have a prior (the prior's transform sets the support)."
+                )
+            new_param = Parameter(old.val, fixed=old.fix, prior=value)
+            paths = [target] + parent_to_children.get(target, [])
+            new_model = tree_at(
+                lambda m, paths=paths: [use_path_get_leaf(m, str_to_leafpath(p)) for p in paths],
+                new_model,
+                [new_param] * len(paths),
+            )
+
+        result = type(self)(new_model, locked=False)
+        if to_fix:
+            result = result.set_fixed_status(to_fix, [True] * len(to_fix))
+        return result  # type: ignore[no-any-return]
+
     def get_parameter_summary(
         self, show_shared: bool = True, show_knowns: bool = False
     ) -> None:
@@ -912,6 +1035,10 @@ class ShareModule(Module):
             # Get parent (for shared params)
             parent = shared_to_parent.get(path, "-")
 
+            # Get prior
+            prior = getattr(param, "prior", None)
+            prior_str = repr(prior) if prior is not None else "-"
+
             params_info.append(
                 {
                     "path": path,
@@ -919,6 +1046,7 @@ class ShareModule(Module):
                     "bounds": bounds,
                     "status": status,
                     "parent": parent,
+                    "prior": prior_str,
                     "is_shared": is_shared,
                     "is_known": is_known,
                 }
@@ -933,9 +1061,15 @@ class ShareModule(Module):
             title_style="bold",
         )
 
+        # Only show the Prior column if some parameter has a prior, so the
+        # summary of a model without priors is unchanged
+        show_priors = any(info["prior"] != "-" for info in params_info)
+
         table.add_column("Path", style="white")
         table.add_column("Shape", style="dim")
         table.add_column("Bounds", style="dim")
+        if show_priors:
+            table.add_column("Prior", style="dim")
         if show_shared:
             table.add_column("Status", justify="center")
             table.add_column("Shared from", style="#cba6f7")  # Mauve/shared color
@@ -951,21 +1085,13 @@ class ShareModule(Module):
             else:  # known
                 status_text = Text("known", style="dim")
 
+            row = [info["path"], info["shape"], info["bounds"]]
+            if show_priors:
+                row.append(info["prior"])
+            row.append(status_text)
             if show_shared:
-                table.add_row(
-                    info["path"],
-                    info["shape"],
-                    info["bounds"],
-                    status_text,
-                    info["parent"],
-                )
-            else:
-                table.add_row(
-                    info["path"],
-                    info["shape"],
-                    info["bounds"],
-                    status_text,
-                )
+                row.append(info["parent"])
+            table.add_row(*row)
 
         console.print(table)
 
@@ -1251,12 +1377,14 @@ def get_digraph(
                         f"sharing_level must be 'component' or 'parameter', got '{sharing_level}'"
                     )
             # If it was a shared leaf, then the following will actually do nothing, as desired
+            prior = getattr(leaf, "prior", None) if is_parameter(leaf) else None
             graph.add_node(
                 id(leaf),
                 name=entry.name,
                 type=leaf.__class__.__name__,
                 is_param=is_parameter(leaf),
                 is_root=False,
+                prior=repr(prior) if prior is not None else None,
             )
             # Connect edges then set leaf to parent for next loop
             graph.add_edge(id(parent), id(leaf))
