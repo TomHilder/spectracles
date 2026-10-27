@@ -125,6 +125,7 @@ def parameter_repr_parts(
     is_fixed: bool,
     constraint_str: str | None = None,
     shared_path: str | None = None,
+    prior_str: str | None = None,
 ) -> Text:
     """Build a styled parameter repr.
 
@@ -134,6 +135,7 @@ def parameter_repr_parts(
         is_fixed: Whether the parameter is fixed
         constraint_str: Optional constraint description (e.g., "x > 0")
         shared_path: If this value is shared, the parent path
+        prior_str: Optional prior description (e.g., "LogNormal(0.3, 0.15)")
 
     Returns:
         Rich Text object with styled repr
@@ -157,6 +159,11 @@ def parameter_repr_parts(
         text.append_text(styled_fixed())
     else:
         text.append_text(styled_free())
+
+    # Add prior if present
+    if prior_str:
+        text.append(", ", style="dim")
+        text.append(f"~{prior_str}", style="dim")
 
     text.append(")", style="dim")
     return text

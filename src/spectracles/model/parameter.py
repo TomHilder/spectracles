@@ -3,8 +3,10 @@
 from typing import Callable
 
 import jax.numpy as jnp
-from equinox import Module
+from equinox import Module, field
 from jaxtyping import Array
+
+from spectracles.priors import Prior
 
 
 class BoundsError(Exception):
@@ -37,20 +39,35 @@ def _array_from_user(
     return param_vals
 
 
+def _check_prior(prior: Prior | None) -> Prior | None:
+    if prior is not None and not isinstance(prior, Prior):
+        raise TypeError(
+            f"prior must be a spectracles.priors.Prior or None, got {type(prior).__name__}."
+        )
+    return prior
+
+
 class Parameter(Module):
-    """A parameter in a statistical model, which may be fixed or free."""
+    """A parameter in a statistical model, which may be fixed or free, and may have a prior.
+
+    The prior is a static field: it is part of the model's structure, not an
+    array leaf, so it is never optimised and never mistaken for a shared array.
+    """
 
     val: Array
     fix: bool
+    prior: Prior | None = field(static=True, default=None)
 
     def __init__(
         self,
         initial: Array | None = None,
         dims: int | tuple | None = None,
         fixed: bool = False,
+        prior: Prior | None = None,
     ):
         self.fix = fixed
         self.val = _array_from_user(dims, initial)
+        self.prior = _check_prior(prior)
 
     def __repr__(self) -> str:
         from spectracles.model.formatting import (
@@ -61,13 +78,14 @@ class Parameter(Module):
         from spectracles.model.share_module import Shared
 
         # Check if val is a Shared sentinel (in unlocked ShareModule context)
+        prior_str = repr(self.prior) if self.prior is not None else None
         if isinstance(self.val, Shared):
             text = parameter_repr_parts(
-                "Parameter", "", self.fix, shared_path=self.val.parent_path
+                "Parameter", "", self.fix, shared_path=self.val.parent_path, prior_str=prior_str
             )
         else:
             value_str = format_array_value(self.val)
-            text = parameter_repr_parts("Parameter", value_str, self.fix)
+            text = parameter_repr_parts("Parameter", value_str, self.fix, prior_str=prior_str)
         return render_to_string(text)
 
     def debug_repr(self) -> str:
@@ -96,7 +114,14 @@ class ConstrainedParameter(Module):
         lower: float | None = None,
         upper: float | None = None,
         log: bool = False,
+        prior: Prior | None = None,
     ):
+        if prior is not None:
+            raise ValueError(
+                "ConstrainedParameter cannot have a prior: the prior's transform already "
+                "sets the support. Use a Parameter with a prior instead (e.g. LogNormal "
+                "for a positive parameter)."
+            )
         self.fix = fixed
         # Store bounds for repr
         self._lower = lower
@@ -211,7 +236,10 @@ class Known(Parameter):
         self,
         value: float | Array | None = None,
         dims: int | tuple | None = None,
+        prior: Prior | None = None,
     ):
+        if prior is not None:
+            raise ValueError("Known values are constants and cannot have a prior.")
         super().__init__(initial=value, dims=dims, fixed=True)
 
     def __repr__(self) -> str:
