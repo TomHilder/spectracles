@@ -13,13 +13,16 @@ import jax.numpy as jnp
 # Build model
 model = sp.build_model(MyModel, value=1.0)
 
+
 # Loss function
 def loss_fn(model, x, y):
     return jnp.mean((model(x) - y) ** 2)
 
+
 # Single phase, single parameter
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[(100, 0.1)],
     params={
         "param": sp.free_in(0),
@@ -36,20 +39,19 @@ Common pattern: warm up some parameters first, then refine others.
 
 ```python
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[
-        (200, 0.1),   # Phase 0: High LR warm-up
+        (200, 0.1),  # Phase 0: High LR warm-up
         (100, 0.01),  # Phase 1: Lower LR refinement
         (50, 0.001),  # Phase 2: Fine-tuning
     ],
     params={
         # Coefficients: optimize throughout
         "*.coefficients": sp.free_in(0, 1, 2),
-
         # Kernel parameters: freeze during warm-up
         "*.kernel.lengthscale": sp.free_after(1),
         "*.kernel.variance": sp.free_after(1),
-
         # Noise: only fine-tune at the end
         "noise": sp.free_in(2),
     },
@@ -64,7 +66,8 @@ Sometimes you want to reset a parameter partway through:
 import jax.random as jr
 
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[
         (100, 0.1),  # Phase 0
         (100, 0.1),  # Phase 1: restart amplitude
@@ -72,10 +75,8 @@ schedule = sp.build_schedule(
     ],
     params={
         "gp.coefficients": sp.free_in(0, 1, 2),
-
         # Reset amplitude to random values at phase 1
         "line.amplitude": sp.free_in(0, 1, 2) | sp.init_normal(1, mean=0.0, std=0.5),
-
         # Set width to specific value at phase 1
         "line.width": sp.free_after(1) | sp.init_value(1, 1.0),
     },
@@ -89,15 +90,14 @@ Match multiple parameters with glob patterns:
 
 ```python
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[(100, 0.1), (50, 0.01)],
     params={
         # All coefficients in any submodule
         "*.coefficients": sp.free_in(0, 1),
-
         # All kernel parameters (lengthscale, variance, etc.)
         "*.kernel.*": sp.free_after(1),
-
         # Any parameter named 'noise' at any depth
         "**.noise": sp.free_in(1),
     },
@@ -123,11 +123,12 @@ Override the default optimizer per-phase:
 import optax
 
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[
-        (100, 0.1),                      # Uses default (adam)
-        (50, 0.01, optax.sgd(0.01)),     # Explicit SGD
-        (50, 0.001, optax.adamw(0.001)), # AdamW with weight decay
+        (100, 0.1),  # Uses default (adam)
+        (50, 0.01, optax.sgd(0.01)),  # Explicit SGD
+        (50, 0.001, optax.adamw(0.001)),  # AdamW with weight decay
     ],
     params={
         "*.coefficients": sp.free_in(0, 1, 2),
@@ -142,7 +143,8 @@ Use `ManagedOptimiserSchedule` for more control:
 
 ```python
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[
         (100, 0.1),
         (50, 0.01),
@@ -182,7 +184,8 @@ When parameters are shared, only specify the parent path:
 # Only specify the parent path
 
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[(100, 0.1)],
     params={
         "line_1.amplitude": sp.free_in(0),  # Parent path
@@ -192,7 +195,7 @@ schedule = sp.build_schedule(
 
 # Check available paths if unsure:
 print(model.get_parameter_paths(show_shared=False))  # Parent paths only
-print(model.get_parameter_paths(show_shared=True))   # All paths
+print(model.get_parameter_paths(show_shared=True))  # All paths
 ```
 
 ## Full Example: Spectral Line Fitting
@@ -209,34 +212,32 @@ model = sp.build_model(
     n_spectral=100,
 )
 
+
 def loss_fn(model, data):
     pred = model(data)
     return jnp.mean((pred - data.flux) ** 2)
 
+
 # Three-phase optimization strategy
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[
-        (500, 0.05),   # Phase 0: Establish spatial structure
-        (200, 0.01),   # Phase 1: Refine line parameters
+        (500, 0.05),  # Phase 0: Establish spatial structure
+        (200, 0.01),  # Phase 1: Refine line parameters
         (100, 0.001),  # Phase 2: Polish everything
     ],
     params={
         # Spatial coefficients: always free
         "spatial.*.coefficients": sp.free_in(0, 1, 2),
-
         # GP kernel: freeze initially, then optimize
         "spatial.*.kernel.*": sp.free_after(1),
-
         # Line amplitudes: reinitialize at phase 1
         "lines.*.amplitude": sp.free_in(0, 1, 2) | sp.init_normal(1, std=0.1),
-
         # Line positions: fix until final polish
         "lines.*.center": sp.free_in(2),
-
         # Line widths: optimize from phase 1
         "lines.*.width": sp.free_after(1) | sp.init_value(1, 1.0),
-
         # Continuum: always free
         "continuum.*": sp.free_in(0, 1, 2),
     },

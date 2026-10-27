@@ -88,7 +88,7 @@ def _detect_shared_modules(model: Module) -> dict[str, list[str]]:
 
         # Traverse child modules
         # Get all public attributes that are Modules
-        for attr_name in vars(obj).keys():
+        for attr_name in vars(obj):
             if attr_name.startswith("_"):
                 continue
             try:
@@ -216,14 +216,16 @@ class ShareModule(Module):
     _locked: bool = False
 
     # Keep track of attributes to avoid recursion
-    _attr_names = {
-        "model",
-        "_dupl_leaf_ids",
-        "_dupl_leaf_paths",
-        "_parent_leaf_paths",
-        "_shared_components",
-        "_locked",
-    }
+    _attr_names = frozenset(
+        {
+            "model",
+            "_dupl_leaf_ids",
+            "_dupl_leaf_paths",
+            "_parent_leaf_paths",
+            "_shared_components",
+            "_locked",
+        }
+    )
 
     def __init__(self, model: Module, locked: bool = False):
         # Detect module-level sharing BEFORE any tree manipulation
@@ -365,7 +367,7 @@ class ShareModule(Module):
         """Recursively add model attributes to the tree."""
         from rich.text import Text
 
-        for attr_name in vars(obj).keys():
+        for attr_name in vars(obj):
             if attr_name.startswith("_"):
                 continue
 
@@ -379,7 +381,7 @@ class ShareModule(Module):
             # Check if it's a parameter
             if is_parameter(attr):
                 # Get the repr of the parameter (already styled)
-                node = tree.add(Text(f"{attr_name}: ", style="value") + Text(repr(attr)))
+                tree.add(Text(f"{attr_name}: ", style="value") + Text(repr(attr)))
             # Check if it's a nested Module (but not a parameter)
             elif isinstance(attr, Module) and not is_parameter(attr):
                 # Create a subtree for nested modules
@@ -630,7 +632,7 @@ class ShareModule(Module):
         errors: list[str] = []
 
         # Check that all parent paths are valid
-        for leaf_id, parent_path in self._parent_leaf_paths.items():
+        for parent_path in self._parent_leaf_paths.values():
             try:
                 parent_leaf = use_path_get_leaf(self.model, parent_path)
                 # If the model is unlocked, the parent should be an actual array
@@ -727,7 +729,7 @@ class ShareModule(Module):
                 param_path = str_to_leafpath(param_str)
                 param = use_path_get_leaf(self, param_path)
                 if isinstance(param, Known):
-                    raise ValueError(
+                    raise ValueError(  # noqa: TRY004 (a value problem; API raises ValueError)
                         f"Cannot set Known parameter '{param_str}'. "
                         f"Known parameters are constants. Use allow_set_knowns=True "
                         f"to override this check."

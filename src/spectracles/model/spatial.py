@@ -20,7 +20,7 @@ from spectracles.priors import StdNormal
 #     repeated in the shape info right now, since I didn't implement n_modes
 #     != n_requested_modes yet.
 
-FINUFFT_KWDS = dict(eps=1e-10)
+FINUFFT_KWDS = {"eps": 1e-10}
 
 
 def get_freqs_1D(n_modes: int) -> Array:

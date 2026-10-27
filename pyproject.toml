@@ -49,6 +49,10 @@ source = "vcs"
 [tool.ruff]
 line-length = 99 # Sorry PEP8 I'm a rebel
 
+[tool.ruff.lint.per-file-ignores]
+# Experimental LVM model module; renaming it would break imports
+"src/spectracles/lvm_models/OII_V1.py" = ["N999"]
+
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
@@ -64,7 +68,7 @@ dev = [
     "nifty[re]>=9.2",
     "pytest>=8.4.1",
     "pytest-cov>=6.2.1",
-    "ruff>=0.12.8",
+    "ruff>=0.17.2",
     "types-networkx>=3.4.0.20240928",
     "types-tqdm>=4.67.0.20250809",
 ]

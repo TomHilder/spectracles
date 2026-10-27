@@ -169,7 +169,7 @@ class ConstrainedParameter(Module):
         try:
             self.unconstrained_val = self.backward_transform(_array_from_user(dims, initial))
         # Initial is outside bounds either
-        except BoundsError as e:
+        except BoundsError:
             # Because we auto-initialised with zeros which is outside the bounds
             if init_none_flag:
                 if log:
@@ -185,7 +185,7 @@ class ConstrainedParameter(Module):
                     )
             # Or because the user asked for an initial value outside the bounds
             else:
-                raise e
+                raise
 
         # Final check that we haven't become a nan somehow
         if jnp.any(jnp.isnan(self.unconstrained_val)):

@@ -615,14 +615,12 @@ class TestManagedOptimiserSchedule:
         schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
-        first_run_final = schedule.model_history[-1]
         first_run_losses = schedule.loss_history.copy()
 
         # Reset and run again
         schedule.reset()
         schedule.run_all(x=self.x, y=self.y)
 
-        second_run_final = schedule.model_history[-1]
         second_run_losses = schedule.loss_history
 
         # Both runs should produce similar results (fresh optimizer state)

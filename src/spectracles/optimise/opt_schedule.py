@@ -12,7 +12,7 @@ from optax import GradientTransformation  # type: ignore[import]
 from spectracles.model.share_module import ShareModule
 from spectracles.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
 
-ExitStrategy = Literal[None, "placeholder"]
+ExitStrategy = Literal["placeholder"] | None
 
 
 @dataclass(frozen=True)
@@ -334,10 +334,10 @@ class ManagedOptimiserSchedule:
             if phase_idx == self.current_phase_index:
                 self.current_phase_index += 1
 
-        except Exception as e:
+        except Exception:
             # Reset state on failure
             self.phase_states[phase_idx] = PhaseState.PENDING
-            raise e
+            raise
 
     def run_phase(self, phase: Phase, *loss_args, **loss_kwargs) -> None:
         """Run a single phase in the schedule."""

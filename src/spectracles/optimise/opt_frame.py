@@ -34,7 +34,7 @@ class OptimiserFrame:
         loss_fn: Callable[..., float],
         optimiser: GradientTransformation,
         get_filter_spec_fn: Callable[[ShareModule], Callable] = get_opt_filter_spec,
-        Δloss_criterion: float = None,
+        Δloss_criterion: float | None = None,
     ):
         # Check sensible input first
         if not isinstance(model, ShareModule):
@@ -133,17 +133,16 @@ class OptimiserFrame:
             loss.append(loss_)
 
             # Check for convergence
-            if self.Δloss_criterion is not None:
-                if i >= 100 and i % 50 == 0:
-                    if self._check_convergence(
-                        loss_history=loss,
-                        Δloss=self.Δloss_criterion,
-                        pbar=pbar,
-                    ):
-                        print(
-                            f"Early exit based on Δloss_criterion of {self.Δloss_criterion:.2e} at step {i}."
-                        )
-                        break
+            check_now = self.Δloss_criterion is not None and i >= 100 and i % 50 == 0
+            if check_now and self._check_convergence(
+                loss_history=loss,
+                Δloss=self.Δloss_criterion,
+                pbar=pbar,
+            ):
+                print(
+                    f"Early exit based on Δloss_criterion of {self.Δloss_criterion:.2e} at step {i}."
+                )
+                break
         # Save results
         self.opt_state = opt_state_
         self.model = model_
@@ -159,7 +158,7 @@ class OptimiserFrame:
     def _verify_loss_fn(self, *loss_args, **loss_kwargs):
         # Check the loss function is callable
         if not callable(self.loss_fn):
-            raise ValueError("Loss function is not callable.")
+            raise ValueError("Loss function is not callable.")  # noqa: TRY004 (API raises ValueError)
         # Check the loss function doesn't output nan or raise Exceptions
         try:
             loss_output = self.loss_fn(self.model, *loss_args, **loss_kwargs)

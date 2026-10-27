@@ -51,7 +51,7 @@ class TestLeafHelperFunctions:
         model = ComplexSharedModel()
 
         # Get duplicated leaves
-        dupl_ids, dupl_paths, parent_paths = get_duplicated_parameters(model)
+        dupl_ids, dupl_paths, _ = get_duplicated_parameters(model)
 
         # There should be 3 duplicates
         assert len(dupl_ids) == 3
@@ -70,7 +70,7 @@ class TestLeafHelperFunctions:
         _, _, parent_paths = get_duplicated_parameters(model)
 
         # Use the path to get the parameter
-        param_path = list(parent_paths.values())[0]
+        param_path = next(iter(parent_paths.values()))
         param = use_path_get_leaf(model, param_path)
 
         # Check it's the right parameter's value
@@ -174,7 +174,7 @@ class TestShareModule:
 
         # Access non-existent attribute
         with pytest.raises(AttributeError):
-            shared_model.nonexistent
+            _ = shared_model.nonexistent
 
     def test_call_with_shared_leaves(self):
         # Test call with shared leaves
@@ -500,7 +500,7 @@ class TestSharingSummary:
 
         # Should have one parent (inner1.param) with multiple duplicates
         assert len(summary) == 1
-        parent_path = list(summary.keys())[0]
+        parent_path = next(iter(summary))
         assert "inner1.param" == parent_path
 
         # Should have 3 duplicates: param, inner2.param, inner3.inner1.param

@@ -30,7 +30,8 @@ model = sp.build_model(MyModel, ...)
 
 # Create an optimization schedule
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[(100, 0.1), (50, 0.01)],
     params={
         "*.coefficients": sp.free_in(0, 1),

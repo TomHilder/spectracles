@@ -1,6 +1,7 @@
 """io.py - Model object serialisation and deserialisation."""
 
 from pathlib import Path
+from pickle import PicklingError
 from warnings import catch_warnings, filterwarnings
 
 from dill import PicklingWarning, dump, load  # type: ignore[import]
@@ -28,9 +29,8 @@ def save_model(model: ShareModule, file: Path, overwrite: bool = False, **dump_k
     # Ensure always the same file extension
     file = file.with_suffix(MODELFILE_EXT)
     # Check that the file doesn't exist already
-    if file.exists():
-        if not overwrite:
-            raise FileExistsError("File already exists. Overwrite with overwrite=True.")
+    if file.exists() and not overwrite:
+        raise FileExistsError("File already exists. Overwrite with overwrite=True.")
     # Check that model has the right type
     if not isinstance(model, ShareModule):
         raise TypeError(
@@ -44,7 +44,7 @@ def save_model(model: ShareModule, file: Path, overwrite: bool = False, **dump_k
             try:
                 dump(model, f, **dump_kwargs)
             except PicklingWarning:
-                raise Exception(
+                raise PicklingError(
                     "Above warning raised by dill when saving. Likely, you need to move your model class into it's own file and import it."
                 )
 

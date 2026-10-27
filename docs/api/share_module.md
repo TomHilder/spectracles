@@ -82,10 +82,7 @@ model.plot_model_graph(sharing_level="parameter")
 model = model.set("line_1.A.coefficients", new_value)
 
 # Set multiple parameters
-model = model.set(
-    ["path.to.param1", "path.to.param2"],
-    [value1, value2]
-)
+model = model.set(["path.to.param1", "path.to.param2"], [value1, value2])
 ```
 
 ### Fixing/Freeing Parameters

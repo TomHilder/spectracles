@@ -71,7 +71,7 @@ def get_duplicated_leaves(
     leaves = leaves_with_path(filtered_tree)
 
     # Create a dictionary to keep track of the parent leaves
-    parent_leaf_paths: dict[int, LeafPath] = dict()
+    parent_leaf_paths: dict[int, LeafPath] = {}
     dupl_leaf_paths = []
     dupl_leaf_ids = []
 

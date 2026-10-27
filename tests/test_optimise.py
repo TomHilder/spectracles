@@ -294,7 +294,7 @@ class TestGradientDiagnostics:
         assert len(summary) >= 1
 
         # Check structure of summary entries
-        for path, info in summary.items():
+        for info in summary.values():
             assert "norm" in info
             assert "max" in info
             assert "min" in info

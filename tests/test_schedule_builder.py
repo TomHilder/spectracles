@@ -483,9 +483,6 @@ class TestBuildScheduleWithSharing:
             pred = model(x)
             return jnp.mean((pred - y) ** 2)
 
-        x = jnp.array([1.0, 2.0, 3.0])
-        y = x
-
         # Get the parent paths to verify
         parent_paths = model.get_parameter_paths(show_shared=False)
 
