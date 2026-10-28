@@ -62,6 +62,15 @@ data = forward(latent.to_model(truth)) + noise * random.normal(k_noise, (N,))
 posterior = Posterior(latent, forward, GaussianLikelihood(data, jnp.full(N, noise**-2)))
 ```
 
+The model as a probabilistic graphical model (this needs the optional
+dependency: `pip install "spectracles[pgm]"`):
+
+```python
+posterior.plot_pgm().savefig("inference_pgm.png", dpi=150)
+```
+
+![The example's graphical model](img/inference_pgm.png)
+
 ## MGVI
 
 ```python

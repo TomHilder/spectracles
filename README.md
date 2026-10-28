@@ -57,6 +57,7 @@ pip install -e .
 
 - **Priors and inference** - Priors on parameters, and one posterior that MGVI/geoVI (NIFTy.re), NUTS (BlackJAX) and MAP (optax) all fit
 - **Staged VI** - Freeze parameter groups across VI iterations with the schedule-builder vocabulary
+- **Graphical models** - Draw a model or posterior as a probabilistic graphical model (optional, with daft)
 - **Parameter sharing** - Couple parameters across model components
 - **Declarative optimization schedules** - Specify which parameters are free/fixed per phase
 - **Glob patterns** - Use wildcards like `"gp.kernel.*"` to match parameters

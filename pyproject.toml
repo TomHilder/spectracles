@@ -25,6 +25,9 @@ dependencies = [
 nifty = [
     "nifty[re]>=9.2",
 ]
+pgm = [
+    "daft-pgm>=0.1.4",
+]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -64,6 +67,7 @@ jax-finufft = { git = "https://github.com/flatironinstitute/jax-finufft.git" }
 dev = [
     "astropy>=8.0.2",
     "blackjax>=1.7",
+    "daft-pgm>=0.1.4",
     "mypy>=1.17.1",
     "nifty[re]>=9.2",
     "pytest>=8.4.1",

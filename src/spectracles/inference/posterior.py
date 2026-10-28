@@ -7,6 +7,7 @@ function, in the same coordinates.
 """
 
 from collections.abc import Callable
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -80,3 +81,12 @@ class Posterior:
     def value_and_grad(self, ξ: Latent) -> tuple[Array, Latent]:
         """log_density and its gradient with respect to ξ."""
         return jax.value_and_grad(self.log_density)(as_latent_dict(ξ))
+
+    def plot_pgm(self, view: str = "parameter", **kwargs: Any) -> Any:
+        """Draw the probabilistic graphical model, including the data (needs daft).
+
+        See `spectracles.pgm.plot_pgm` for the views and options.
+        """
+        from spectracles.pgm import plot_pgm
+
+        return plot_pgm(self, view=view, **kwargs)

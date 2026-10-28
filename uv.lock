@@ -461,6 +461,20 @@ wheels = [
 ]
 
 [[package]]
+name = "daft-pgm"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9c/2a/be7d7c85d6b711ee1927e13cbccdf5ebe5e614d1e1e6e56c4558be430419/daft_pgm-0.1.4.tar.gz", hash = "sha256:ae44e58cbaa5714347a0f5e72bf96c25dfdee2f190f2ce165c494500c7f3e9ce", size = 374592, upload-time = "2025-02-22T01:03:07.499Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/10/8177be1c256b10b5a7b22efad96d74568ab4f4cdac22056e742f5284a409/daft_pgm-0.1.4-py3-none-any.whl", hash = "sha256:3fc02c05762dfada26727b2fa6ae3c0b6d96fc2f960c761a5fa8eb775ca3691d", size = 13316, upload-time = "2025-02-22T01:03:04.987Z" },
+]
+
+[[package]]
 name = "dill"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2102,11 +2116,15 @@ dependencies = [
 nifty = [
     { name = "nifty", extra = ["re"] },
 ]
+pgm = [
+    { name = "daft-pgm" },
+]
 
 [package.dev-dependencies]
 dev = [
     { name = "astropy" },
     { name = "blackjax" },
+    { name = "daft-pgm" },
     { name = "mypy" },
     { name = "nifty", extra = ["re"] },
     { name = "pytest" },
@@ -2118,6 +2136,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "daft-pgm", marker = "extra == 'pgm'", specifier = ">=0.1.4" },
     { name = "dill", specifier = ">=0.3.8" },
     { name = "equinox", specifier = ">=0.13.0" },
     { name = "jax", specifier = ">=0.5.3" },
@@ -2130,12 +2149,13 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
-provides-extras = ["nifty"]
+provides-extras = ["nifty", "pgm"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "astropy", specifier = ">=8.0.2" },
     { name = "blackjax", specifier = ">=1.7" },
+    { name = "daft-pgm", specifier = ">=0.1.4" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "nifty", extras = ["re"], specifier = ">=9.2" },
     { name = "pytest", specifier = ">=8.4.1" },

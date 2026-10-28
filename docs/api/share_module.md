@@ -136,6 +136,7 @@ info = model.validate_sharing()
         - get_sharing_summary
         - print_model_tree
         - plot_model_graph
+        - plot_pgm
         - set
         - set_fixed_status
         - with_priors

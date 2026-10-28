@@ -1198,6 +1198,16 @@ class ShareModule(Module):
             if output:
                 console.print(output)
 
+    def plot_pgm(self, view: str = "parameter", **kwargs: Any) -> Any:
+        """Draw the probabilistic graphical model of the model (needs daft).
+
+        See `spectracles.pgm.plot_pgm` for the views and options; a `Posterior`
+        has the same method, which also draws the data.
+        """
+        from spectracles.pgm import plot_pgm
+
+        return plot_pgm(self, view=view, **kwargs)
+
     def plot_model_graph(
         self,
         ax: Axes | None = None,

@@ -174,7 +174,12 @@ Parameter(0.4642, free, ~LogNormal(0.5, 0.2))
 5 parameters · 4 free, 1 fixed
 ```
 
-`print_model_tree()` and the model's repr also show priors. Missing or
+`print_model_tree()` and the model's repr also show priors, and
+`model.plot_pgm()` (or `posterior.plot_pgm()`, which adds the data) draws the
+model as a probabilistic graphical model: random parameters, their priors, the
+deterministic modules they feed, and plates for arrays. It needs
+`pip install "spectracles[pgm]"`; see the [API page](api/pgm.md) for the two
+views and the options. Missing or
 conflicting priors are caught when you build the latent space (next section),
 with every offending path listed. Before the `with_priors` call above, you would
 have seen:
