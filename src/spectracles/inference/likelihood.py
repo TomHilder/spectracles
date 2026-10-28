@@ -1,7 +1,7 @@
 """likelihood.py - Likelihoods shared by every inference backend.
 
-Each likelihood has a pure-JAX log-likelihood (used for NUTS and MAP) and maps to
-its NIFTy.re twin (used for MGVI/geoVI); tests check that the two agree.
+Each likelihood has a pure-JAX log-likelihood (used for NUTS and MAP) and an
+equivalent NIFTy.re likelihood, from `to_nifty` (used for MGVI/geoVI).
 """
 
 import math
@@ -73,7 +73,7 @@ class GaussianLikelihood(eqx.Module):
         return (self.data - self.compress(pred)) * self.std_inv
 
     def to_nifty(self):
-        """The NIFTy.re twin: `jft.Gaussian` on the used pixels.
+        """The equivalent NIFTy.re likelihood: `jft.Gaussian` on the used pixels.
 
         Its input is the compressed prediction (see `compress`).
         """

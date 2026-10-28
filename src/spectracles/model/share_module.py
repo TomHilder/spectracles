@@ -1076,8 +1076,7 @@ class ShareModule(Module):
             title_style="bold",
         )
 
-        # Only show the Prior column if some parameter has a prior, so the
-        # summary of a model without priors is unchanged
+        # Show the Prior column only if some parameter has a prior
         show_priors = any(info["prior"] != "-" for info in params_info)
 
         table.add_column("Path", style="white", overflow="fold")

@@ -2,9 +2,7 @@
 
 Every prior maps a standard-normal latent ξ ~ N(0, 1) to the parameter's value
 through a deterministic transform. Inference then happens in ξ, where the prior
-density is always -½|ξ|², so no prior log-density is ever needed. The transforms
-follow NIFTy.re's conventions exactly (see `nifty.re.num.stats_distributions`),
-but nothing here imports NIFTy.
+density is always -½|ξ|², so no prior log-density is ever needed.
 
 Hyperparameters are scalars, broadcast to the parameter's shape. Priors are
 frozen dataclasses so they are hashable and can live in static fields.
@@ -106,7 +104,7 @@ class Normal(Prior):
 class LogNormal(Prior):
     """Log-normal with mean `mean` and standard deviation `std` of the value itself.
 
-    Moment-matched as in NIFTy.re: value = exp(m + s ξ), with
+    Moment-matched: value = exp(m + s ξ), with
     s² = log(1 + (std/mean)²) and m = log(mean) - s²/2.
     """
 
@@ -145,8 +143,8 @@ class LogNormal(Prior):
 class Laplace(Prior):
     """Laplace with location 0 and scale `alpha`: p(x) = exp(-|x|/alpha) / (2 alpha).
 
-    Same construction as NIFTy.re's `LaplacePrior` (the Laplace quantile function
-    applied to Φ(ξ), written with `norm.logcdf` for stability in the tails).
+    The value is the Laplace quantile function applied to Φ(ξ), computed from
+    log Φ(ξ) for accuracy in the tails.
     """
 
     alpha: float

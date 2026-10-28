@@ -246,8 +246,6 @@ def init_uniform(phase: int, low: float = 0.0, high: float = 1.0) -> ParamSpec:
 
 # --- Path Matching ---
 
-# The glob matcher lives in tree.path_utils (shared with ShareModule.with_priors)
-
 
 def expand_patterns(
     patterns: dict[str, ParamSpec],
