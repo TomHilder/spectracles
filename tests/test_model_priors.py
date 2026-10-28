@@ -187,6 +187,18 @@ def test_equal_priors_do_not_merge_parameters():
 # ---- B6: with_priors ----
 
 
+def test_set_accepts_a_dict():
+    model = ShareModule(TwoParams(a=Parameter(1.0), b=Parameter(2.0)))
+    by_dict = model.set({"a": jnp.array([5.0]), "b": jnp.array([6.0])})
+    by_lists = model.set(["a", "b"], [jnp.array([5.0]), jnp.array([6.0])])
+    for p in ("a", "b"):
+        np.testing.assert_array_equal(getattr(by_dict, p).val, getattr(by_lists, p).val)
+    with pytest.raises(TypeError, match="not both"):
+        model.set({"a": jnp.array([5.0])}, [jnp.array([5.0])])
+    with pytest.raises(TypeError, match="values is required"):
+        model.set(["a"])
+
+
 def test_with_priors_exact_path():
     model = make_outer()
     new = model.with_priors({"a": Normal(0.0, 2.0)})

@@ -702,15 +702,22 @@ class ShareModule(Module):
 
         return result
 
-    def set(self, params: list[str], values: list[Array], allow_set_knowns: bool = False) -> Self:
+    def set(
+        self,
+        params: list[str] | dict[str, Array],
+        values: list[Array] | None = None,
+        allow_set_knowns: bool = False,
+    ) -> Self:
         """
         Return a new model with updated parameter values. Can only be used to
         update values of Parameters or ConstrainedParameters. The model must
         not be locked.
 
         Args:
-            params: List of parameter paths to update.
-            values: List of new values for each parameter.
+            params: List of parameter paths to update, or a dict from path to
+                new value (e.g. the output of `LatentSpace.to_params`), in which
+                case `values` is omitted.
+            values: List of new values for each parameter, when `params` is a list.
             allow_set_knowns: If False (default), raises an error when trying
                 to set Known parameters. Set to True to allow modifying Known
                 values (use with caution).
@@ -719,6 +726,13 @@ class ShareModule(Module):
             A new ShareModule with updated parameter values.
         """
         from spectracles.model.parameter import Known
+
+        if isinstance(params, dict):
+            if values is not None:
+                raise TypeError("Give either a dict of values, or paths and values, not both.")
+            params, values = list(params), list(params.values())
+        elif values is None:
+            raise TypeError("values is required when params is a list of paths.")
 
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")

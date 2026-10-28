@@ -55,7 +55,7 @@ def forward(m):
 
 
 # The truth is a draw from the prior, hyperparameters included
-truth = latent.sample(k_truth)
+truth = latent.sample_prior_latent(k_truth)
 noise = 0.05
 data = forward(latent.to_model(truth)) + noise * random.normal(k_noise, (N,))
 

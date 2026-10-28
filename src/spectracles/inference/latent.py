@@ -27,6 +27,13 @@ def as_latent_dict(ξ: Any) -> Latent:
     return ξ.tree if hasattr(ξ, "tree") else ξ
 
 
+def as_latent_samples(samples: Any) -> Latent:
+    """Like `as_latent_dict`, also accepting a NIFTy `Samples` object (stacked samples)."""
+    if hasattr(samples, "samples") and not isinstance(samples, dict):
+        samples = samples.samples
+    return as_latent_dict(samples)
+
+
 class LatentSpace:
     """The map from standard-normal latents ξ to a model's parameter values.
 
@@ -101,15 +108,24 @@ class LatentSpace:
         """Total number of latent dimensions."""
         return sum(math.prod(s.shape) for s in self.shapes.values())
 
+    def to_params(self, ξ: Any) -> dict[str, Array]:
+        """The free parameters' values at ξ: `prior.transform(ξ[path])` for each path.
+
+        Accepts one draw of the latents, draws stacked along a leading axis
+        (the values are then stacked the same way), or a NIFTy `Vector` or
+        `Samples` object. Keys are the latent paths; fixed parameters and Known
+        values are not included. Works under jit/grad/vmap.
+        """
+        ξ = as_latent_samples(ξ)
+        return {p: self.priors[p].transform(ξ[p]) for p in self.paths}
+
     def to_model(self, ξ: Latent) -> ShareModule:
-        """The model with every free parameter set to `prior.transform(ξ[path])`.
+        """The model with every free parameter set to its value at ξ (one draw).
 
         Shared parameters are written once, at their parent path. Fixed
         parameters and Known values keep their values. Works under jit/grad/vmap.
         """
-        ξ = as_latent_dict(ξ)
-        values = [self.priors[p].transform(ξ[p]) for p in self.paths]
-        return self.model.set(self.paths, values)  # type: ignore[no-any-return]
+        return self.model.set(self.to_params(as_latent_dict(ξ)))  # type: ignore[no-any-return]
 
     def from_model(
         self, model: ShareModule, fallback: Literal["zero", "raise"] = "zero"
@@ -156,17 +172,33 @@ class LatentSpace:
             )
         return {p: ξ[p] for p in self.paths}
 
-    def sample(self, key: PRNGKeyArray) -> Latent:
-        """Draw latents from the prior, i.e. independent standard normals."""
+    def sample_prior_latent(self, key: PRNGKeyArray, n: int | None = None) -> Latent:
+        """Draw latents from the prior, i.e. independent standard normals.
+
+        With `n`, returns n draws stacked along a leading axis of each array.
+        """
+        batch = () if n is None else (n,)
         keys = random.split(key, len(self.paths))
         return {
-            p: random.normal(k, self.shapes[p].shape, self.shapes[p].dtype)
+            p: random.normal(k, batch + self.shapes[p].shape, self.shapes[p].dtype)
             for p, k in zip(self.paths, keys)
         }
 
-    def prior_sample(self, key: PRNGKeyArray) -> ShareModule:
-        """A model with parameters drawn from their priors."""
-        return self.to_model(self.sample(key))
+    def sample_prior_params(self, key: PRNGKeyArray, n: int | None = None) -> dict[str, Array]:
+        """Draw the free parameters' values from their priors.
+
+        With `n`, returns n draws stacked along a leading axis of each array.
+        """
+        return self.to_params(self.sample_prior_latent(key, n))
+
+    def sample_prior_model(
+        self, key: PRNGKeyArray, n: int | None = None
+    ) -> ShareModule | list[ShareModule]:
+        """A model with parameters drawn from their priors; with `n`, a list of n models."""
+        ξ = self.sample_prior_latent(key, n)
+        if n is None:
+            return self.to_model(ξ)
+        return [self.to_model({p: v[i] for p, v in ξ.items()}) for i in range(n)]
 
     def zeros(self) -> Latent:
         """Latents at zero (every parameter at its prior median)."""
@@ -183,15 +215,12 @@ class LatentSpace:
         Returns:
             Dict from path to {"mean": array, "std": array} of the parameter values.
         """
-        if hasattr(samples, "samples") and not isinstance(samples, dict):
-            samples = samples.samples  # NIFTy Samples: stacked, offset by pos
-        stacked = as_latent_dict(samples)
-        summary = {}
-        for p in self.paths:
-            values = jax.vmap(self.priors[p].transform)(stacked[p])
-            summary[p] = {"mean": jnp.mean(values, axis=0), "std": jnp.std(values, axis=0)}
+        values = self.to_params(samples)
+        summary = {
+            p: {"mean": jnp.mean(v, axis=0), "std": jnp.std(v, axis=0)} for p, v in values.items()
+        }
         if print_table:
-            self._print_summary(summary, n=int(jnp.shape(stacked[self.paths[0]])[0]))
+            self._print_summary(summary, n=int(jnp.shape(values[self.paths[0]])[0]))
         return summary
 
     def _print_summary(self, summary: dict[str, Any], n: int) -> None:

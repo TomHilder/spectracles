@@ -204,18 +204,30 @@ LatentSpace(4 parameters, 743 latent dimensions)
 ['log_flux.coefficients', 'log_flux.kernel.length_scale', 'log_flux.kernel.variance', 'offset.spaxel_values']
 ```
 
-ξ is a dict keyed by parameter path. Useful methods:
+ξ is a dict keyed by parameter path. The latent space converts between three
+forms of the same draw: the latents ξ, the parameter values, and a model.
 
-- `latent.sample(key)` draws ξ from the prior;
-- `latent.to_model(ξ)` gives an ordinary model with those values;
-- `latent.prior_sample(key)` does both at once, which is useful for
-  prior-predictive checks: do maps drawn from your priors look plausible?
+- `latent.to_params(ξ)` gives the free parameters' values, a dict keyed by the
+  same paths;
+- `latent.to_model(ξ)` gives an ordinary model with those values (the same as
+  `model.set(latent.to_params(ξ))`);
 - `latent.from_model(model)` goes the other way, e.g. to start inference from
   an earlier fit.
 
+Draws from the prior come in the same three forms:
+`latent.sample_prior_latent(key)`, `latent.sample_prior_params(key)` and
+`latent.sample_prior_model(key)`. With `n=...`, the first two return n draws
+stacked along a leading axis (the layout posterior samples have too), and
+`sample_prior_model` returns a list of n models. These are useful for checking
+your priors, and for prior-predictive checks: do maps drawn from your priors
+look plausible? A `Posterior` has the same methods.
+
 ```python
-draw = latent.prior_sample(random.PRNGKey(1))
+draw = latent.sample_prior_model(random.PRNGKey(1))
 prior_map = draw(spaxels)  # a line-flux map drawn from the priors
+
+ls = latent.sample_prior_params(random.PRNGKey(2), n=1000)["log_flux.kernel.length_scale"]
+print(ls.shape, float(ls.mean()))  # 1000 prior draws of the length scale
 ```
 
 ## The posterior
@@ -229,7 +241,7 @@ import numpy as np
 
 from spectracles.inference import GaussianLikelihood, Posterior
 
-truth = latent.sample(random.PRNGKey(2))
+truth = latent.sample_prior_latent(random.PRNGKey(2))
 noise = 0.05
 rng = np.random.default_rng(0)
 flux = np.asarray(latent.to_model(truth)(spaxels)) + noise * rng.standard_normal(N_SPAXELS)
@@ -361,6 +373,7 @@ latent space:
 summary = latent.posterior_summary(samples)  # also returns {path: {"mean", "std"}}
 fitted = latent.to_model(samples.pos)  # the latent mean, as an ordinary model
 maps = jnp.stack([latent.to_model(s)(spaxels) for s in samples])  # one map per sample
+values = latent.to_params(samples)  # {path: stacked values}, e.g. for corner plots
 ```
 
 ```text

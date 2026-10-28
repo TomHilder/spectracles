@@ -106,6 +106,18 @@ def test_predict_is_forward_of_to_model(line_posterior):
         )
 
 
+def test_prior_draws_forwarded_and_no_bare_sample(line_posterior):
+    post, key = line_posterior, random.PRNGKey(9)
+    assert not hasattr(post, "sample") and not hasattr(post, "prior_sample")
+    for p, v in post.sample_prior_params(key, n=3).items():
+        np.testing.assert_array_equal(v, post.latent.sample_prior_params(key, n=3)[p])
+    ξ = post.sample_prior_latent(key)
+    np.testing.assert_array_equal(
+        post.to_params(ξ)[post.latent.paths[0]], post.latent.to_params(ξ)[post.latent.paths[0]]
+    )
+    assert len(post.sample_prior_model(key, n=2)) == 2
+
+
 # ---- E5: gradients vs finite differences ----
 
 
@@ -116,7 +128,7 @@ def test_gradient_matches_finite_differences(line_posterior):
     keys = random.split(random.PRNGKey(4), 10)
     h = 1e-5
     for k in keys:
-        d = post.latent.sample(k)
+        d = post.latent.sample_prior_latent(k)
         plus = {p: ξ[p] + h * d[p] for p in ξ}
         minus = {p: ξ[p] - h * d[p] for p in ξ}
         fd = (post.log_density(plus) - post.log_density(minus)) / (2 * h)

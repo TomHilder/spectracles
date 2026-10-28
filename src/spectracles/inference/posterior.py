@@ -7,6 +7,7 @@ function, in the same coordinates.
 """
 
 from collections.abc import Callable
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -68,11 +69,19 @@ class Posterior:
     def to_model(self, ξ: Latent) -> ShareModule:
         return self.latent.to_model(ξ)
 
-    def sample(self, key: PRNGKeyArray) -> Latent:
-        return self.latent.sample(key)
+    def to_params(self, ξ: Any) -> dict[str, Array]:
+        return self.latent.to_params(ξ)
 
-    def prior_sample(self, key: PRNGKeyArray) -> ShareModule:
-        return self.latent.prior_sample(key)
+    def sample_prior_latent(self, key: PRNGKeyArray, n: int | None = None) -> Latent:
+        return self.latent.sample_prior_latent(key, n)
+
+    def sample_prior_params(self, key: PRNGKeyArray, n: int | None = None) -> dict[str, Array]:
+        return self.latent.sample_prior_params(key, n)
+
+    def sample_prior_model(
+        self, key: PRNGKeyArray, n: int | None = None
+    ) -> ShareModule | list[ShareModule]:
+        return self.latent.sample_prior_model(key, n)
 
     def zeros(self) -> Latent:
         return self.latent.zeros()

@@ -159,7 +159,7 @@ def test_nifty_metric_is_likelihood_fisher(line_posterior):
     lh = to_nifty(post)
     std_inv = post.likelihood.std_inv
     for k, ξ in enumerate(make_xi_points(post.latent, n=3)):
-        t = post.latent.sample(random.PRNGKey(100 + k))
+        t = post.latent.sample_prior_latent(random.PRNGKey(100 + k))
         _, Jt = masked_jvp(post, ξ, t)
         ours = masked_vjp(post, ξ, std_inv**2 * Jt)
         theirs = tree(lh.metric(vec(ξ), vec(t)))
@@ -179,7 +179,7 @@ def test_nifty_left_sqrt_metric(line_posterior):
     for p in post.latent.paths:
         np.testing.assert_allclose(theirs[p], ours[p], rtol=RTOL, atol=ATOL)
     # ...and composing it with σ⁻¹ J gives the metric
-    t = post.latent.sample(random.PRNGKey(6))
+    t = post.latent.sample_prior_latent(random.PRNGKey(6))
     _, Jt = masked_jvp(post, ξ, t)
     composed = tree(lh.left_sqrt_metric(vec(ξ), std_inv * Jt))
     metric = tree(lh.metric(vec(ξ), vec(t)))

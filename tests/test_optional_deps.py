@@ -29,7 +29,7 @@ from tests.priors_models import line_data, line_forward, make_line_model, noisy_
 
 latent = LatentSpace(make_line_model())
 forward = line_forward(line_data())
-truth = latent.sample(random.PRNGKey(0))
+truth = latent.sample_prior_latent(random.PRNGKey(0))
 data, ivar, mask = noisy_data(forward(latent.to_model(truth)), 0.05, 0.1, seed=1)
 post = Posterior(latent, forward, GaussianLikelihood(data, ivar, mask))
 value, grad = jax.jit(jax.value_and_grad(post.log_density))(truth)

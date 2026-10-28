@@ -45,7 +45,7 @@ def line_posterior():
 
     latent = LatentSpace(make_line_model())
     forward = line_forward(line_data())
-    truth = latent.sample(random.PRNGKey(11))
+    truth = latent.sample_prior_latent(random.PRNGKey(11))
     data, ivar, mask = noisy_data(forward(latent.to_model(truth)), 0.05, 0.1, seed=5)
     return Posterior(latent, forward, GaussianLikelihood(data, ivar, mask))
 
@@ -65,7 +65,7 @@ def linear_gaussian():
     def forward(model):
         return model(data_xy)
 
-    truth = latent.sample(random.PRNGKey(2))
+    truth = latent.sample_prior_latent(random.PRNGKey(2))
     data, ivar, mask = noisy_data(forward(latent.to_model(truth)), 0.1, 0.0, seed=4)
     return Posterior(latent, forward, GaussianLikelihood(data, ivar, mask))
 
@@ -73,4 +73,4 @@ def linear_gaussian():
 def make_xi_points(latent, n=5, seed=123):
     from jax import random
 
-    return [latent.sample(k) for k in random.split(random.PRNGKey(seed), n)]
+    return [latent.sample_prior_latent(k) for k in random.split(random.PRNGKey(seed), n)]

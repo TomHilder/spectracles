@@ -117,7 +117,7 @@ def test_requires_unlocked_share_module(tiny_gp_model):
 
 def test_to_model_sets_transformed_values(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
-    ξ = latent.sample(random.PRNGKey(0))
+    ξ = latent.sample_prior_latent(random.PRNGKey(0))
     m = latent.to_model(ξ)
     for p in latent.paths:
         np.testing.assert_allclose(leaf(m, p).val, latent.priors[p].transform(ξ[p]), rtol=RTOL)
@@ -125,14 +125,14 @@ def test_to_model_sets_transformed_values(tiny_line_model):
 
 def test_to_model_leaves_fixed_and_known_untouched(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
-    m = latent.to_model(latent.sample(random.PRNGKey(0)))
+    m = latent.to_model(latent.sample_prior_latent(random.PRNGKey(0)))
     for p in ["line_1.σ", "line_2.σ", "line_1.μ", "line_2.μ"]:
         np.testing.assert_array_equal(leaf(m, p).val, leaf(tiny_line_model, p).val)
 
 
 def test_shared_parameter_written_once(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
-    ξ = latent.sample(random.PRNGKey(0))
+    ξ = latent.sample_prior_latent(random.PRNGKey(0))
     m = latent.to_model(ξ)
     for name in ("length_scale", "variance"):
         parent = leaf(m, f"line_1.v.kernel.{name}").val
@@ -152,7 +152,7 @@ def test_shared_parameter_written_once(tiny_line_model):
 
 def test_to_model_accepts_dict_like_with_tree(tiny_gp_model):
     latent = LatentSpace(tiny_gp_model)
-    ξ = latent.sample(random.PRNGKey(0))
+    ξ = latent.sample_prior_latent(random.PRNGKey(0))
 
     class Wrapper:
         tree = ξ
@@ -189,7 +189,7 @@ def test_from_model_no_warning_when_all_invertible(tiny_gp_model):
 
 def test_from_model_fallback_zero_warns(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
-    ξ = latent.sample(random.PRNGKey(0))
+    ξ = latent.sample_prior_latent(random.PRNGKey(0))
     m = latent.to_model(ξ)
     with pytest.warns(UserWarning) as record:
         back = latent.from_model(m)
@@ -214,12 +214,54 @@ def test_from_model_fallback_raise(tiny_line_model):
 # ---- D7: prior draws land the right prior on the right parameter ----
 
 
-def test_prior_sample_matches_to_model_of_sample(tiny_line_model):
+def test_sample_prior_model_matches_to_model_of_latent_draw(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     key = random.PRNGKey(7)
-    a, b = latent.prior_sample(key), latent.to_model(latent.sample(key))
+    a, b = latent.sample_prior_model(key), latent.to_model(latent.sample_prior_latent(key))
     for p in latent.paths:
         np.testing.assert_array_equal(leaf(a, p).val, leaf(b, p).val)
+
+
+def test_to_params_single_and_stacked(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    ξ = latent.sample_prior_latent(random.PRNGKey(3))
+    params = latent.to_params(ξ)
+    assert list(params) == latent.paths
+    for p in latent.paths:
+        np.testing.assert_array_equal(params[p], latent.priors[p].transform(ξ[p]))
+        assert params[p].shape == latent.shapes[p].shape
+    stacked = latent.sample_prior_latent(random.PRNGKey(4), n=5)
+    params = latent.to_params(stacked)
+    for p in latent.paths:
+        assert params[p].shape == (5, *latent.shapes[p].shape)
+        np.testing.assert_array_equal(
+            params[p][2], latent.to_params({q: v[2] for q, v in stacked.items()})[p]
+        )
+
+
+def test_to_model_is_set_of_to_params(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    ξ = latent.sample_prior_latent(random.PRNGKey(5))
+    a, b = latent.to_model(ξ), latent.model.set(latent.to_params(ξ))
+    for p in latent.paths:
+        np.testing.assert_array_equal(leaf(a, p).val, leaf(b, p).val)
+
+
+def test_sample_prior_with_n(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    key = random.PRNGKey(6)
+    ξ = latent.sample_prior_latent(key, n=4)
+    assert all(ξ[p].shape == (4, *latent.shapes[p].shape) for p in latent.paths)
+    params = latent.sample_prior_params(key, n=4)
+    for p in latent.paths:
+        np.testing.assert_array_equal(params[p], latent.to_params(ξ)[p])
+    models = latent.sample_prior_model(key, n=4)
+    assert isinstance(models, list) and len(models) == 4
+    for i, m in enumerate(models):
+        for p in latent.paths:
+            np.testing.assert_array_equal(leaf(m, p).val, params[p][i])
+    single = latent.sample_prior_params(key)
+    assert all(single[p].shape == latent.shapes[p].shape for p in latent.paths)
 
 
 def test_prior_draw_moments(tiny_line_model):
@@ -227,7 +269,7 @@ def test_prior_draw_moments(tiny_line_model):
     n = 2000
 
     def values(key):
-        m = latent.prior_sample(key)
+        m = latent.sample_prior_model(key)
         return {p: leaf(m, p).val for p in latent.paths}
 
     draws = jax.vmap(values)(random.split(random.PRNGKey(1), n))
@@ -272,7 +314,7 @@ def test_gradient_through_shared_parameter_is_sum_of_uses():
     forward = line_forward(spatial)
     tied = LatentSpace(make_line_model())
     untied = LatentSpace(make_line_model(untie_velocity_kernel=True))
-    ξ = tied.sample(random.PRNGKey(0))
+    ξ = tied.sample_prior_latent(random.PRNGKey(0))
     # The untied model gets the same latent for both copies of the velocity kernel
     ξ_untied = dict(ξ)
     for name in ("length_scale", "variance"):
@@ -322,7 +364,7 @@ def test_posterior_summary_from_stacked_dict():
 def test_posterior_summary_accepts_nifty_samples(tiny_gp_model):
     jft = pytest.importorskip("nifty.re")
     latent = LatentSpace(tiny_gp_model)
-    pos = latent.sample(random.PRNGKey(0))
+    pos = latent.sample_prior_latent(random.PRNGKey(0))
     residuals = jax.tree.map(lambda *x: jnp.stack(x), *make_xi_points(latent, n=4))
     samples = jft.Samples(pos=jft.Vector(pos), samples=jft.Vector(residuals))
     out = {}
