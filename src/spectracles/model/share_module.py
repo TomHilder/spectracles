@@ -194,7 +194,7 @@ class _SharedSubcomponentProxy:
     def __repr__(self):
         return repr(self._obj)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         # Delegate attribute access to the underlying object
         return getattr(self._obj, name)
 
@@ -259,7 +259,7 @@ class ShareModule(Module):
         else:
             self.model = tree_at(self._where, model, replace_fn=replace_fn)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         # Use the class attribute instead of instance attribute
         if name in self._attr_names or name.startswith("__"):
             raise AttributeError(f"{type(self).__name__} has no attribute {name}")

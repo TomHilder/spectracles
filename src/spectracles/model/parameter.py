@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import jax.numpy as jnp
 from equinox import Module, field
-from jaxtyping import Array
+from jaxtyping import Array, ArrayLike
 
 from spectracles.priors import Prior
 
@@ -21,7 +21,7 @@ def _to_float_array(x) -> Array:
 
 def _array_from_user(
     dims: int | tuple | None = None,
-    initial: float | Array | None = None,
+    initial: ArrayLike | None = None,
 ) -> Array:
     if initial is not None:
         param_vals = _to_float_array(initial).copy()
@@ -60,7 +60,7 @@ class Parameter(Module):
 
     def __init__(
         self,
-        initial: Array | None = None,
+        initial: ArrayLike | None = None,
         dims: int | tuple | None = None,
         fixed: bool = False,
         prior: Prior | None = None,
@@ -109,7 +109,7 @@ class ConstrainedParameter(Module):
 
     def __init__(
         self,
-        initial: Array | None = None,
+        initial: ArrayLike | None = None,
         dims: int | tuple | None = None,
         fixed: bool = False,
         lower: float | None = None,
@@ -239,7 +239,7 @@ class Known(Parameter):
 
     def __init__(
         self,
-        value: float | Array | None = None,
+        value: ArrayLike | None = None,
         dims: int | tuple | None = None,
         prior: Prior | None = None,
     ):
