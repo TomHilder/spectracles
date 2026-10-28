@@ -239,6 +239,16 @@ def test_to_params_single_and_stacked(tiny_line_model):
         )
 
 
+def test_to_params_keeps_chain_and_draw_axes(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    flat = latent.sample_prior_latent(random.PRNGKey(8), n=6)
+    chains = {p: v.reshape(2, 3, *v.shape[1:]) for p, v in flat.items()}
+    params, flat_params = latent.to_params(chains), latent.to_params(flat)
+    for p in latent.paths:
+        assert params[p].shape == (2, 3, *latent.shapes[p].shape)
+        np.testing.assert_array_equal(params[p].reshape(flat_params[p].shape), flat_params[p])
+
+
 def test_to_model_is_set_of_to_params(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     ξ = latent.sample_prior_latent(random.PRNGKey(5))

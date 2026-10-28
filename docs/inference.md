@@ -393,6 +393,51 @@ values = latent.to_params(samples)  # {path: stacked values}, e.g. for corner pl
 Uncertainties on any derived quantity come from evaluating it once per sample,
 as with `maps` above: take the mean and spread across samples.
 
+### With ArviZ
+
+`to_params` works on samples from any backend: NIFTy's `Samples`, BlackJAX
+positions, or anything else that gives ξ as a dict keyed by path. Any leading
+axes are kept, so draws stacked as `(draw, ...)` give values shaped
+`(draw, ...)`, and several chains stacked as `(chain, draw, ...)` give
+`(chain, draw, ...)`. That is the layout [ArviZ](https://www.arviz.org)
+expects, so its data structure is one call away:
+
+```python
+import arviz as az
+
+
+def for_arviz(values, chains=False):
+    """{path: array} -> ArviZ variables, adding a chain axis if there isn't one.
+    GP coefficients are left out: they are large and rarely wanted."""
+    return {p: v if chains else v[None] for p, v in values.items() if "coefficients" not in p}
+
+
+idata = az.from_dict(
+    {
+        "posterior": for_arviz(latent.to_params(samples)),
+        "prior": for_arviz(latent.sample_prior_params(random.PRNGKey(3), n=500)),
+    }
+)
+print(az.summary(idata, var_names=["log_flux.kernel.length_scale"], kind="stats"))
+```
+
+```text
+                                mean    sd eti89_lb eti89_ub
+log_flux.kernel.length_scale[0]  0.8  0.19     0.63     0.98
+```
+
+(ArviZ's `sd` is the n − 1 sample standard deviation, so with only a few
+samples it is a little larger than `posterior_summary`'s.)
+
+For NUTS chains run in parallel (e.g. with `jax.vmap` over BlackJAX), the
+positions are already stacked as `(chain, draw, ...)`: pass `chains=True`.
+
+!!! warning "Convergence diagnostics are for MCMC only"
+    MGVI and geoVI samples are not Markov chains: they come in antithetic
+    pairs around the latent mean. ArviZ will still compute R-hat and effective
+    sample sizes for them, but those numbers mean nothing for VI. Use ArviZ's
+    summaries and plots for VI samples, and its diagnostics only for NUTS.
+
 ## Two ways to fit
 
 spectracles also has an older optimisation path:
