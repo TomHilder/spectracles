@@ -155,7 +155,7 @@ model = model.with_priors({"offset.spaxel_values": Laplace(0.02)})
 Priors show up in the usual inspection tools:
 
 ```python
-print(repr(kernel.length_scale))
+print(kernel.length_scale)
 model.get_parameter_summary()
 ```
 
