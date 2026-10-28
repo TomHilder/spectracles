@@ -91,8 +91,8 @@ A prior is attached to the `Parameter` it describes:
 
 ```python
 kernel = Matern32(
-    length_scale=Parameter(0.5, prior=LogNormal(0.5, 0.2)),
-    variance=Parameter(1.0, prior=LogNormal(1.0, 0.5)),
+    length_scale=Parameter(prior=LogNormal(0.5, 0.2)),
+    variance=Parameter(prior=LogNormal(1.0, 0.5)),
 )
 model = build_model(
     LineMap,
@@ -110,6 +110,11 @@ The available priors are in `spectracles.priors`:
 | `LogNormal(mean, std)` | mean and standard deviation **of the value itself** | positive quantities: length scales, variances, amplitudes |
 | `Laplace(alpha)` | scale; location 0 | sparse corrections that are mostly near zero |
 | `Uniform(low, high)` | bounds | a bounded quantity with no preferred value |
+
+A parameter with a prior and no value starts at the prior's median (its
+latent value ξ = 0), which is also where `latent.zeros()` starts. Give a value,
+`Parameter(0.7, prior=...)`, only to start somewhere else; it is the parameter's
+value outside inference and the point `latent.from_model` maps back to ξ.
 
 Hyperparameters are plain numbers, applied to every element of the parameter.
 The note in [How it works](inference_design.md#limitations-and-extension-points)
@@ -155,7 +160,7 @@ model.get_parameter_summary()
 ```
 
 ```text
-Parameter(0.5, free, ~LogNormal(0.5, 0.2))
+Parameter(0.4642, free, ~LogNormal(0.5, 0.2))
                                         Parameter Summary
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━┓
 ┃ Path                         ┃ Shape    ┃ Bounds  ┃ Prior               ┃ Status ┃ Shared from ┃

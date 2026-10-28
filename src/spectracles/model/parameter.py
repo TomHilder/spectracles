@@ -66,8 +66,12 @@ class Parameter(Module):
         prior: Prior | None = None,
     ):
         self.fix = fixed
-        self.val = _array_from_user(dims, initial)
         self.prior = _check_prior(prior)
+        val = _array_from_user(dims, initial)
+        if initial is None and self.prior is not None:
+            # Start at the prior's median, T(0): where LatentSpace.zeros() starts too
+            val = jnp.asarray(self.prior.transform(jnp.zeros_like(val)), dtype=val.dtype)
+        self.val = val
 
     def __repr__(self) -> str:
         from spectracles.model.formatting import (

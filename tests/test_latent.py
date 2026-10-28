@@ -339,10 +339,10 @@ def test_posterior_summary_accepts_nifty_samples(tiny_gp_model):
 def test_from_model_value_outside_support_falls_back_with_warning():
     model = ShareModule(
         TwoParams(
-            a=Parameter(dims=1, prior=LogNormal(1.0, 0.5)),
+            a=Parameter(0.0, prior=LogNormal(1.0, 0.5)),  # outside LogNormal's support
             b=Parameter(0.3, prior=Normal(0.0, 1.0)),
         )
-    )  # a defaults to 0, outside LogNormal's support
+    )
     latent = LatentSpace(model)
     with pytest.warns(UserWarning, match="outside the prior's support: \\['a'\\]"):
         ξ = latent.from_model(model)

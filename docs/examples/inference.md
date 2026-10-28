@@ -38,8 +38,8 @@ class LogGP(eqx.Module):
 
 
 kernel = Matern32(
-    length_scale=Parameter(0.6, prior=LogNormal(0.6, 0.2)),
-    variance=Parameter(1.0, prior=LogNormal(1.0, 0.5)),
+    length_scale=Parameter(prior=LogNormal(0.6, 0.2)),
+    variance=Parameter(prior=LogNormal(1.0, 0.5)),
 )
 model = build_model(LogGP, FourierGP(n_modes=(15, 15), kernel=kernel))
 latent = LatentSpace(model)

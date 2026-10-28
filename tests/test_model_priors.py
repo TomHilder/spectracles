@@ -55,6 +55,29 @@ def test_default_is_no_prior():
     assert Known(1.0).prior is None
 
 
+@pytest.mark.parametrize(
+    "prior", [StdNormal(), Normal(3.0, 1.0), LogNormal(0.5, 0.2), Laplace(0.02), Uniform(1.0, 5.0)]
+)
+def test_no_initial_starts_at_prior_median(prior):
+    p = Parameter(dims=3, prior=prior)
+    assert p.val.shape == (3,)
+    np.testing.assert_array_equal(p.val, prior.transform(jnp.zeros(3)))
+
+
+def test_explicit_initial_overrides_prior_median():
+    np.testing.assert_array_equal(Parameter(0.7, prior=LogNormal(0.5, 0.2)).val, [0.7])
+    np.testing.assert_array_equal(Parameter().val, [0.0])  # no prior: zeros, as before
+
+
+def test_no_initial_is_where_latent_zeros_starts():
+    from spectracles.inference import LatentSpace
+
+    kernel = Matern32(Parameter(prior=LogNormal(0.5, 0.2)), Parameter(prior=Normal(1.0, 0.3)))
+    latent = LatentSpace(build_model(FourierGP, n_modes=(5, 5), kernel=kernel))
+    for v in latent.from_model(latent.model).values():
+        np.testing.assert_allclose(v, 0.0, atol=1e-12)
+
+
 def test_prior_must_be_a_prior():
     with pytest.raises(TypeError):
         Parameter(1.0, prior="LogNormal")  # type: ignore[arg-type]
