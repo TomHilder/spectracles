@@ -38,6 +38,16 @@ class Posterior:
     ):
         if not isinstance(latent, LatentSpace):
             raise TypeError(f"latent must be a LatentSpace, got {type(latent).__name__}.")
+        if isinstance(forward, ShareModule):
+            raise TypeError(
+                "forward must be a function from a model to a prediction, not the model "
+                "itself, e.g. forward=lambda m: m(spatial_data)."
+            )
+        if not callable(forward):
+            raise TypeError(
+                f"forward must be a function from a model to a prediction, got "
+                f"{type(forward).__name__}."
+            )
         self.latent = latent
         self.forward = forward
         self.likelihood = likelihood

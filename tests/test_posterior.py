@@ -99,6 +99,16 @@ def test_value_and_gradient_finite_with_nan_at_masked_data_points(line_posterior
 # ---- E4: the forward model is used as given ----
 
 
+def test_forward_must_be_a_function_not_the_model(line_posterior):
+    from spectracles.inference import Posterior
+
+    latent, likelihood = line_posterior.latent, line_posterior.likelihood
+    with pytest.raises(TypeError, match="not the model itself"):
+        Posterior(latent, latent.model, likelihood)
+    with pytest.raises(TypeError, match="function from a model"):
+        Posterior(latent, "forward", likelihood)  # type: ignore[arg-type]
+
+
 def test_predict_is_forward_of_to_model(line_posterior):
     for ξ in make_xi_points(line_posterior.latent):
         np.testing.assert_array_equal(
