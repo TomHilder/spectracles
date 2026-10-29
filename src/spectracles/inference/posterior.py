@@ -7,7 +7,7 @@ function, in the same coordinates.
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import jax
 import jax.numpy as jnp
@@ -86,6 +86,23 @@ class Posterior:
 
     def to_params(self, ξ: Any) -> dict[str, Array]:
         return self.latent.to_params(ξ)
+
+    def summary(
+        self,
+        samples: Any,
+        samples_type: Literal["latent", "params"] = "latent",
+        print_table: bool = True,
+        true_latents: Any = None,
+        true_params: Any = None,
+    ) -> dict[str, Any]:
+        """Summarise samples as parameter values: `LatentSpace.posterior_summary`."""
+        return self.latent.posterior_summary(
+            samples,
+            samples_type=samples_type,
+            print_table=print_table,
+            true_latents=true_latents,
+            true_params=true_params,
+        )
 
     def sample_prior_latent(self, key: PRNGKeyArray, n: int | None = None) -> Latent:
         return self.latent.sample_prior_latent(key, n)

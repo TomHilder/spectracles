@@ -120,6 +120,15 @@ def test_likelihood_subclass_must_implement_the_interface():
         Partial()  # type: ignore[abstract]
 
 
+def test_posterior_summary_calls_through(line_posterior):
+    post = line_posterior
+    stacked = post.sample_prior_latent(random.PRNGKey(12), n=10)
+    a = post.summary(stacked, print_table=False)
+    b = post.latent.posterior_summary(stacked, print_table=False)
+    for p in post.latent.paths:
+        np.testing.assert_array_equal(a[p]["mean"], b[p]["mean"])
+
+
 def test_forward_must_be_a_function_not_the_model(line_posterior):
     from spectracles.inference import Posterior
 

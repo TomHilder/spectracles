@@ -371,9 +371,23 @@ latent space:
 
 ```python
 summary = latent.posterior_summary(samples)  # also returns {path: {"mean", "std"}}
+summary = posterior.summary(samples)  # the same, from the posterior
 fitted = latent.to_model(samples.pos)  # the latent mean, as an ordinary model
 maps = jnp.stack([latent.to_model(s)(spaxels) for s in samples])  # one map per sample
 values = latent.to_params(samples)  # {path: stacked values}, e.g. for corner plots
+```
+
+For simulated data, give the truth with `true_latents=` (or `true_params=`): the
+table then adds the true values and z = (mean − truth) / std.
+
+`posterior_summary` takes latent samples, as inference returns them. For
+samples that are already parameter values (from `to_params` or
+`sample_prior_params`), say so with `samples_type="params"`; otherwise they
+would be transformed a second time:
+
+```python
+prior_values = latent.sample_prior_params(random.PRNGKey(4), n=500)
+prior_summary = latent.posterior_summary(prior_values, samples_type="params", print_table=False)
 ```
 
 ```text

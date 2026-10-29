@@ -81,7 +81,7 @@ samples, _ = jft.optimize_kl(
     sample_mode="linear_resample",  # "nonlinear_resample" for geoVI
     kl_kwargs={"minimize_kwargs": {"maxiter": 20}},
 )
-latent.posterior_summary(samples)
+posterior.summary(samples, true_latents=truth)  # with the truth, since we simulated the data
 ```
 
 To see the field, evaluate each sample on a grid:

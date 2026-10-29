@@ -249,6 +249,39 @@ def test_to_params_keeps_chain_and_draw_axes(tiny_line_model):
         np.testing.assert_array_equal(params[p].reshape(flat_params[p].shape), flat_params[p])
 
 
+def test_posterior_summary_of_latents_or_params(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    stacked = latent.sample_prior_latent(random.PRNGKey(9), n=20)
+    from_latents = latent.posterior_summary(stacked, print_table=False)
+    from_params = latent.posterior_summary(
+        latent.to_params(stacked), samples_type="params", print_table=False
+    )
+    for p in latent.paths:
+        np.testing.assert_allclose(from_params[p]["mean"], from_latents[p]["mean"])
+        np.testing.assert_allclose(from_params[p]["std"], from_latents[p]["std"])
+    with pytest.raises(ValueError, match="samples_type"):
+        latent.posterior_summary(stacked, samples_type="values", print_table=False)  # type: ignore[arg-type]
+
+
+def test_posterior_summary_with_truth(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    stacked = latent.sample_prior_latent(random.PRNGKey(10), n=20)
+    truth = latent.sample_prior_latent(random.PRNGKey(11))
+    by_latents = latent.posterior_summary(stacked, true_latents=truth, print_table=False)
+    by_params = latent.posterior_summary(
+        stacked, true_params=latent.to_params(truth), print_table=False
+    )
+    for p in latent.paths:
+        s = by_latents[p]
+        np.testing.assert_allclose(s["truth"], latent.to_params(truth)[p])
+        np.testing.assert_allclose(s["z"], (s["mean"] - s["truth"]) / s["std"])
+        np.testing.assert_allclose(by_params[p]["z"], s["z"])
+    with pytest.raises(ValueError, match="not both"):
+        latent.posterior_summary(stacked, true_latents=truth, true_params=truth, print_table=False)
+    with pytest.raises(ValueError, match="one draw"):
+        latent.posterior_summary(stacked, true_latents=stacked, print_table=False)
+
+
 def test_to_model_is_set_of_to_params(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     ξ = latent.sample_prior_latent(random.PRNGKey(5))

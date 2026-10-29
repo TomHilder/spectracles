@@ -120,16 +120,19 @@ class LatentSpace:
         ξ = self._checked(as_latent_samples(ξ))
         return {p: self.priors[p].transform(ξ[p]) for p in self.paths}
 
-    def _checked(self, ξ: Any) -> Latent:
+    def _checked(self, ξ: Any, what: str = "latents") -> Latent:
         """ξ after checking it is a dict with exactly this latent space's keys."""
+        expected = "latents ξ" if what == "latents" else what
         if isinstance(ξ, ShareModule | eqx.Module):
+            hint = (
+                " latent.from_model(model) gives a model's latents." if what == "latents" else ""
+            )
             raise TypeError(
-                "Expected latents ξ (a dict keyed by parameter path), got a model. "
-                "latent.from_model(model) gives a model's latents."
+                f"Expected {expected} (a dict keyed by parameter path), got a model.{hint}"
             )
         if not isinstance(ξ, dict):
             raise TypeError(
-                f"Expected latents ξ (a dict keyed by parameter path), got {type(ξ).__name__}."
+                f"Expected {expected} (a dict keyed by parameter path), got {type(ξ).__name__}."
             )
         missing = [p for p in self.paths if p not in ξ]
         unknown = [p for p in ξ if p not in self.priors]
@@ -139,9 +142,9 @@ class LatentSpace:
                 f"unknown {unknown}" if unknown else "",
             ]
             raise ValueError(
-                "These latents don't match the latent space: "
+                f"These {what} don't match the latent space: "
                 + "; ".join(p for p in parts if p)
-                + ". Latents from a different model?"
+                + ". From a different model?"
             )
         return ξ
 
@@ -244,18 +247,40 @@ class LatentSpace:
         """Latents at zero (every parameter at its prior median)."""
         return {p: jnp.zeros(s.shape, s.dtype) for p, s in self.shapes.items()}
 
-    def posterior_summary(self, samples: Any, print_table: bool = True) -> dict[str, Any]:
-        """Summarise samples of the latents as parameter values (mean and std).
+    def posterior_summary(
+        self,
+        samples: Any,
+        samples_type: Literal["latent", "params"] = "latent",
+        print_table: bool = True,
+        true_latents: Any = None,
+        true_params: Any = None,
+    ) -> dict[str, Any]:
+        """Summarise samples as parameter values (mean and std).
 
         Args:
-            samples: A NIFTy `Samples` object, or a dict from path to stacked
-                latent samples with a leading sample axis.
+            samples: Samples with a leading sample axis: by default latents (a
+                NIFTy `Samples` object, or a dict from path to stacked latents,
+                as inference returns them).
+            samples_type: "latent" (default) or "params". Use "params" for
+                samples that are already parameter values, e.g. from `to_params`
+                or `sample_prior_params`; with the default they would be
+                transformed a second time.
             print_table: Print a table like `get_parameter_summary`.
+            true_latents: Optionally, the true latents (one draw), e.g. for
+                simulated data. Adds the truth and z = (mean - truth) / std.
+            true_params: The same, given as parameter values. Give at most one
+                of `true_latents` and `true_params`.
 
         Returns:
-            Dict from path to {"mean": array, "std": array} of the parameter values.
+            Dict from path to {"mean": array, "std": array} of the parameter
+            values, with "truth" and "z" added when a truth is given.
         """
-        values = self.to_params(samples)
+        if samples_type == "latent":
+            values = self.to_params(samples)
+        elif samples_type == "params":
+            values = self._checked(as_latent_samples(samples), what="parameter values")
+        else:
+            raise ValueError(f'samples_type must be "latent" or "params", got {samples_type!r}.')
         if any(jnp.ndim(values[p]) <= len(self.shapes[p].shape) for p in self.paths):
             raise ValueError(
                 "posterior_summary needs samples stacked along a leading axis; got a single "
@@ -264,9 +289,32 @@ class LatentSpace:
         summary = {
             p: {"mean": jnp.mean(v, axis=0), "std": jnp.std(v, axis=0)} for p, v in values.items()
         }
+        truth = self._truth(true_latents, true_params)
+        if truth is not None:
+            for p, s in summary.items():
+                s["truth"] = truth[p]
+                s["z"] = jnp.where(s["std"] > 0, (s["mean"] - truth[p]) / s["std"], jnp.nan)
         if print_table:
             self._print_summary(summary, n=int(jnp.shape(values[self.paths[0]])[0]))
         return summary
+
+    def _truth(self, true_latents: Any, true_params: Any) -> dict[str, Array] | None:
+        """The true parameter values (one draw) from either form, or None."""
+        if true_latents is not None and true_params is not None:
+            raise ValueError("Give true_latents or true_params, not both.")
+        if true_latents is not None:
+            truth = self.to_params(as_latent_dict(true_latents))
+        elif true_params is not None:
+            truth = self._checked(as_latent_dict(true_params), what="parameter values")
+        else:
+            return None
+        for p in self.paths:
+            if jnp.shape(truth[p]) != self.shapes[p].shape:
+                raise ValueError(
+                    f"The truth must be one draw: '{p}' has shape {jnp.shape(truth[p])}, "
+                    f"expected {self.shapes[p].shape}."
+                )
+        return truth
 
     def _print_summary(self, summary: dict[str, Any], n: int) -> None:
         from rich.table import Table
@@ -280,6 +328,19 @@ class LatentSpace:
                 return pairs[0] if len(pairs) == 1 else "[" + ", ".join(pairs) + "]"
             return f"mean {jnp.mean(mean):.4g}, median std {jnp.median(std):.3g}"
 
+        def fmt_values(x: Array, fmt_one: str = ".4g") -> str:
+            if x.size <= ARRAY_DISPLAY_THRESHOLD:
+                items = [f"{v:{fmt_one}}" for v in x.ravel()]
+                return items[0] if len(items) == 1 else "[" + ", ".join(items) + "]"
+            return f"mean {jnp.mean(x):.4g}"
+
+        def fmt_z(z: Array) -> str:
+            if z.size <= ARRAY_DISPLAY_THRESHOLD:
+                return fmt_values(z, "+.2f")
+            return f"rms {jnp.sqrt(jnp.nanmean(z**2)):.2f}, max |z| {jnp.nanmax(jnp.abs(z)):.2f}"
+
+        with_truth = "truth" in summary[self.paths[0]]
+
         table = Table(
             title="Posterior Summary",
             show_header=True,
@@ -291,13 +352,18 @@ class LatentSpace:
         table.add_column("Shape", style="dim")
         table.add_column("Prior", style="dim")
         table.add_column("Posterior mean ± std")
+        if with_truth:
+            table.add_column("Truth")
+            table.add_column("z")
         for p in self.paths:
-            table.add_row(
-                p,
-                str(self.shapes[p].shape),
-                repr(self.priors[p]),
-                fmt(summary[p]["mean"], summary[p]["std"]),
-            )
+            s = summary[p]
+            row = [p, str(self.shapes[p].shape), repr(self.priors[p]), fmt(s["mean"], s["std"])]
+            if with_truth:
+                row += [fmt_values(s["truth"]), fmt_z(s["z"])]
+            table.add_row(*row)
         console = get_console()
         console.print(table)
-        console.print(Text(f"{n} samples · {len(self.paths)} parameters", style="dim"))
+        footer = f"{n} samples · {len(self.paths)} parameters"
+        if with_truth:
+            footer += " · z = (mean − truth) / std"
+        console.print(Text(footer, style="dim"))
