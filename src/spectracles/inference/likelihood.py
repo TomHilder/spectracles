@@ -6,6 +6,8 @@ equivalent NIFTy.re likelihood, from `to_nifty` (used for MGVI/geoVI).
 
 import math
 import operator
+from abc import abstractmethod
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -16,7 +18,34 @@ from jaxtyping import Array, ArrayLike
 LOG_2PI = math.log(2.0 * math.pi)
 
 
-class GaussianLikelihood(eqx.Module):
+class Likelihood(eqx.Module):
+    """Base class for likelihoods: the observed data and how a prediction is scored.
+
+    A subclass provides `n_used` (the number of data points used), `compress`
+    (a prediction with the data's shape to the used data points, flat),
+    `log_likelihood` (of a prediction, in pure JAX) and `to_nifty` (the
+    equivalent NIFTy.re likelihood, taking the compressed prediction).
+    """
+
+    @property
+    @abstractmethod
+    def n_used(self) -> int:
+        """Number of data points used."""
+
+    @abstractmethod
+    def compress(self, pred: Array) -> Array:
+        """The used data points of a prediction with the data's shape, as a flat array."""
+
+    @abstractmethod
+    def log_likelihood(self, pred: Array) -> Array:
+        """Log-likelihood of a prediction with the data's shape."""
+
+    @abstractmethod
+    def to_nifty(self) -> Any:
+        """The equivalent NIFTy.re likelihood, taking the compressed prediction."""
+
+
+class GaussianLikelihood(Likelihood):
     """Independent Gaussian noise with known inverse variance, and a mask.
 
     Masked data points are removed when the likelihood is built, so their values

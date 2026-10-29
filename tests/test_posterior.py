@@ -99,6 +99,27 @@ def test_value_and_gradient_finite_with_nan_at_masked_data_points(line_posterior
 # ---- E4: the forward model is used as given ----
 
 
+def test_likelihood_must_be_a_likelihood(line_posterior):
+    from spectracles.inference import GaussianLikelihood, Likelihood, Posterior
+
+    assert isinstance(line_posterior.likelihood, Likelihood)
+    assert issubclass(GaussianLikelihood, Likelihood)
+    data = line_posterior.likelihood.data
+    with pytest.raises(TypeError, match="likelihood must be a Likelihood"):
+        Posterior(line_posterior.latent, line_posterior.forward, data)  # type: ignore[arg-type]
+
+
+def test_likelihood_subclass_must_implement_the_interface():
+    from spectracles.inference import Likelihood
+
+    class Partial(Likelihood):
+        def compress(self, pred):
+            return pred
+
+    with pytest.raises(TypeError):
+        Partial()  # type: ignore[abstract]
+
+
 def test_forward_must_be_a_function_not_the_model(line_posterior):
     from spectracles.inference import Posterior
 

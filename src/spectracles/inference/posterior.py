@@ -14,7 +14,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
 from spectracles.inference.latent import Latent, LatentSpace, as_latent_dict
-from spectracles.inference.likelihood import GaussianLikelihood
+from spectracles.inference.likelihood import Likelihood
 from spectracles.model.share_module import ShareModule
 
 
@@ -34,7 +34,7 @@ class Posterior:
         self,
         latent: LatentSpace,
         forward: Callable[[ShareModule], Array],
-        likelihood: GaussianLikelihood,
+        likelihood: Likelihood,
     ):
         if not isinstance(latent, LatentSpace):
             raise TypeError(f"latent must be a LatentSpace, got {type(latent).__name__}.")
@@ -47,6 +47,11 @@ class Posterior:
             raise TypeError(
                 f"forward must be a function from a model to a prediction, got "
                 f"{type(forward).__name__}."
+            )
+        if not isinstance(likelihood, Likelihood):
+            raise TypeError(
+                f"likelihood must be a Likelihood, e.g. GaussianLikelihood(data, ivar, mask); "
+                f"got {type(likelihood).__name__}."
             )
         self.latent = latent
         self.forward = forward
