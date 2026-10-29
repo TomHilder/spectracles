@@ -152,7 +152,7 @@ class ModelDraws:
             )
 
         def evaluate(model: Any) -> Any:
-            return self._resolve(model.for_evaluation().model)(*args, **kwargs)
+            return self._resolve(model.model)(*args, **kwargs)
 
         return self._latent.map_samples(evaluate, self._params, samples_type="params")
 

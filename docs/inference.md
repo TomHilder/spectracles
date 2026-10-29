@@ -421,7 +421,7 @@ flux = models.log_flux(spaxels).mean()  # any component, the same way
 Components are evaluated with shared values filled in, so parts that hold
 shared parameters can be called directly. For a quantity that isn't a single
 call, e.g. a ratio of two fields, use `map_samples` with a function of the
-model:
+model (which gets the model with shared values filled in, too):
 
 ```python
 ratio = posterior.map_samples(lambda m: m.log_flux(spaxels) - m.offset(spaxels), samples)

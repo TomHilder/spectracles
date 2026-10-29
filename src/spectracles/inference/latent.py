@@ -279,7 +279,9 @@ class LatentSpace:
 
         Args:
             fn: Takes a model and returns an array (or a pytree of arrays).
-                Must be JAX-traceable: it runs under `jax.vmap`.
+                Must be JAX-traceable: it runs under `jax.vmap`. The model it
+                gets has shared values filled in (as by `for_evaluation`), so
+                any part of it can be called.
             samples: Stacked samples, as for `posterior_summary`.
             samples_type: "latent" (default) or "params", as for `posterior_summary`.
 
@@ -290,7 +292,7 @@ class LatentSpace:
         values = self._sample_values(samples, samples_type, "map_samples")
         batch = self._sample_shape(values)
         flat = {p: jnp.reshape(v, (-1, *self.shapes[p].shape)) for p, v in values.items()}
-        out = jax.vmap(lambda θ: fn(self.model.set(θ)))(flat)
+        out = jax.vmap(lambda θ: fn(self.model.set(θ).for_evaluation()))(flat)
         stacked = jax.tree.map(lambda x: jnp.reshape(x, (*batch, *jnp.shape(x)[1:])), out)
         return Draws(stacked, n_sample_axes=len(batch))
 

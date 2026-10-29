@@ -310,6 +310,15 @@ def test_map_samples_matches_a_loop_over_to_model(tiny_line_model):
         latent.map_samples(fn, {p: v[0] for p, v in stacked.items()})
 
 
+def test_map_samples_can_call_parts_holding_shared_parameters(tiny_line_model):
+    from .priors_models import line_data
+
+    latent = LatentSpace(tiny_line_model)  # line_2.v's kernel is shared with line_1.v
+    stacked = latent.sample_prior_latent(random.PRNGKey(19), n=3)
+    out = latent.map_samples(lambda m: m.line_2.v(line_data()), stacked)
+    assert out.values.shape[0] == 3
+
+
 def test_draws_of_params_and_latents(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     stacked = latent.sample_prior_latent(random.PRNGKey(15), n=8)
