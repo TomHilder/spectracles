@@ -77,6 +77,11 @@ def _check_prior(prior: Prior | None) -> Prior | None:
 class Parameter(Module):
     """A parameter in a statistical model, which may be fixed or free, and may have a prior.
 
+    A free parameter is inferred (and needs a prior for that). A fixed one
+    (`fixed=True`) keeps its value, but can be freed again, e.g. by
+    `set_fixed_status` or a schedule. For constants that should never be
+    freed, use `Known`.
+
     The prior is a static field: it is part of the model's structure, not an
     array leaf, so it is never optimised and never mistaken for a shared array.
     """
@@ -266,7 +271,12 @@ AnyParameter = Parameter | ConstrainedParameter
 
 
 class Known(Parameter):
-    """A known value that will never be optimised."""
+    """A constant of the problem, such as a rest wavelength: never inferred or optimised.
+
+    Unlike a fixed `Parameter`, it can never be freed, it is left out of
+    parameter summaries and path listings by default (`show_knowns=True`), and
+    `set` refuses to change it unless given `allow_set_knowns=True`.
+    """
 
     def __init__(
         self,

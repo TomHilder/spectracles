@@ -134,13 +134,35 @@ model = model.with_priors({"offset.spaxel_values": Laplace(0.02)})
 
 `with_priors` also takes `"fixed"` to fix a parameter, and returns a new model.
 
-## What gets inferred
+## Free, fixed and Known
 
-| Parameter | Inferred? |
+Every number in a model that isn't data is one of three kinds:
+
+- **A free `Parameter`**, e.g. `Parameter(prior=LogNormal(0.5, 0.2))`: something
+  you want to learn from the data. It needs a prior, and inference infers it.
+- **A fixed `Parameter`**, e.g. `Parameter(0.5, fixed=True)`: a quantity of the
+  model that you've chosen not to infer, for now. It keeps its value and
+  inference doesn't touch it, but it's still a parameter: it is listed in
+  parameter summaries (as "fixed"), `model.set` can change it, and it can be
+  freed again. `with_priors({...: "fixed"})` and `posterior.fix` fix
+  parameters, and [schedules](schedule_builder.md) and
+  [staged fits](#staged-fits) fix and free them between phases.
+- **`Known(value)`**: a constant of the problem, such as a rest wavelength or
+  the instrument's line-spread width. It is never inferred and can never be
+  freed. It is left out of parameter summaries and path listings
+  (`show_knowns=True` includes it), and `model.set` refuses to change it
+  unless you pass `allow_set_knowns=True`.
+
+If you might ever want to infer it, make it a `Parameter`; if it's a fact about
+the world or the instrument, make it `Known`. For inference, fixed parameters
+and `Known` values behave the same: neither has a latent, and every model the
+latent space makes holds their current values.
+
+| Declared as | Inferred? |
 |---|---|
+| `Parameter(prior=P)` or `Parameter(value, prior=P)`, free | **yes** |
+| `Parameter(value, fixed=True)` | no; it keeps its value (a prior, if given, is unused) |
 | `Known(value)` | no; it's a constant |
-| `Parameter(value, fixed=True)` | no; it keeps its value |
-| `Parameter(value, prior=P)`, free | **yes** |
 | `Parameter(value)`, free, no prior | **error**: say what you believe about it, or fix it |
 | `ConstrainedParameter(...)`, free | **error**: use a `Parameter` with a prior; the prior sets the bounds (e.g. `LogNormal` for positive values) |
 
