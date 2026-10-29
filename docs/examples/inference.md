@@ -96,7 +96,7 @@ gx, gy = jnp.meshgrid(g, g, indexing="ij")
 grid = SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(n * n))
 
 f_true = latent.to_model(truth)(grid).reshape(n, n)
-f_mgvi = jnp.stack([latent.to_model(s)(grid) for s in samples]).reshape(-1, n, n)
+f_mgvi = posterior.map_samples(lambda m: m(grid), samples).reshape(-1, n, n)  # per sample
 
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.4), layout="constrained")
 lim = float(jnp.abs(f_true).max())
@@ -170,19 +170,12 @@ All three results are latents of one posterior, so the same `latent` turns each
 into a model. Here is the field at the data points:
 
 ```python
-def mean_field(xi_stacked, every=1):
-    """Mean of the field at the data points over a stack of latent samples."""
-    n_samples = jax.tree.leaves(xi_stacked)[0].shape[0]
-    return jnp.stack(
-        [
-            latent.to_model(jax.tree.map(lambda x, i=i: x[i], xi_stacked))(points)
-            for i in range(0, n_samples, every)
-        ]
-    ).mean(0)
+def field_at_points(m):
+    return m(points)
 
 
-f_nuts = mean_field(nuts_samples, every=10)
-f_mgvi_pts = mean_field(samples.samples.tree)
+f_nuts = posterior.map_samples(field_at_points, nuts_samples).mean(axis=0)
+f_mgvi_pts = posterior.map_samples(field_at_points, samples).mean(axis=0)
 f_true_pts = latent.to_model(truth)(points)
 
 fig, ax = plt.subplots(figsize=(4.5, 4), layout="constrained")

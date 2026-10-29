@@ -282,6 +282,31 @@ def test_posterior_summary_with_truth(tiny_line_model):
         latent.posterior_summary(stacked, true_latents=stacked, print_table=False)
 
 
+def test_map_samples_matches_a_loop_over_to_model(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    stacked = latent.sample_prior_latent(random.PRNGKey(13), n=6)
+
+    def fn(m):
+        return {
+            "ls": leaf(m, "line_1.log_A.kernel.length_scale").val,
+            "two": 2.0 * leaf(m, "offset.tile_values").val,
+        }
+
+    out = latent.map_samples(fn, stacked)
+    for i in range(6):
+        one = fn(latent.to_model({p: v[i] for p, v in stacked.items()}))
+        np.testing.assert_allclose(out["ls"][i], one["ls"])
+        np.testing.assert_allclose(out["two"][i], one["two"])
+    # Parameter values give the same result
+    by_params = latent.map_samples(fn, latent.to_params(stacked), samples_type="params")
+    np.testing.assert_allclose(by_params["ls"], out["ls"])
+    # (chain, draw) axes are kept
+    chains = {p: v.reshape(2, 3, *v.shape[1:]) for p, v in stacked.items()}
+    np.testing.assert_allclose(latent.map_samples(fn, chains)["ls"], out["ls"].reshape(2, 3, 1))
+    with pytest.raises(ValueError, match="leading axis"):
+        latent.map_samples(fn, {p: v[0] for p, v in stacked.items()})
+
+
 def test_to_model_is_set_of_to_params(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     ξ = latent.sample_prior_latent(random.PRNGKey(5))

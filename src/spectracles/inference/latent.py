@@ -7,6 +7,7 @@ Shared parameters are one parameter, so they have one entry, at the parent path.
 
 import math
 import warnings
+from collections.abc import Callable
 from typing import Any, Literal
 
 import equinox as eqx
@@ -247,6 +248,50 @@ class LatentSpace:
         """Latents at zero (every parameter at its prior median)."""
         return {p: jnp.zeros(s.shape, s.dtype) for p, s in self.shapes.items()}
 
+    def _sample_values(self, samples: Any, samples_type: str, caller: str) -> dict[str, Array]:
+        """Parameter values of stacked samples, given as latents or as values."""
+        if samples_type == "latent":
+            values = self.to_params(samples)
+        elif samples_type == "params":
+            values = self._checked(as_latent_samples(samples), what="parameter values")
+        else:
+            raise ValueError(f'samples_type must be "latent" or "params", got {samples_type!r}.')
+        if any(jnp.ndim(values[p]) <= len(self.shapes[p].shape) for p in self.paths):
+            raise ValueError(
+                f"{caller} needs samples stacked along a leading axis; got a single "
+                "draw (use to_params or to_model for one draw)."
+            )
+        return values
+
+    def map_samples(
+        self,
+        fn: Callable[[ShareModule], Any],
+        samples: Any,
+        samples_type: Literal["latent", "params"] = "latent",
+    ) -> Any:
+        """Evaluate `fn(model)` at every sample, stacked along the samples' leading axes.
+
+        For any quantity derived from the model (a field on a grid, the
+        predictions, a line ratio), this gives its value at each posterior
+        sample; its posterior mean and spread are then the mean and std over
+        the leading axis. Several leading axes, e.g. (chain, draw), are kept.
+
+        Args:
+            fn: Takes a model and returns an array (or a pytree of arrays).
+                Must be JAX-traceable: it runs under `jax.vmap`.
+            samples: Stacked samples, as for `posterior_summary`.
+            samples_type: "latent" (default) or "params", as for `posterior_summary`.
+
+        Returns:
+            `fn`'s output with the samples' leading axes in front.
+        """
+        values = self._sample_values(samples, samples_type, "map_samples")
+        p0 = self.paths[0]
+        batch = jnp.shape(values[p0])[: jnp.ndim(values[p0]) - len(self.shapes[p0].shape)]
+        flat = {p: jnp.reshape(v, (-1, *self.shapes[p].shape)) for p, v in values.items()}
+        out = jax.vmap(lambda θ: fn(self.model.set(θ)))(flat)
+        return jax.tree.map(lambda x: jnp.reshape(x, (*batch, *jnp.shape(x)[1:])), out)
+
     def posterior_summary(
         self,
         samples: Any,
@@ -275,17 +320,7 @@ class LatentSpace:
             Dict from path to {"mean": array, "std": array} of the parameter
             values, with "truth" and "z" added when a truth is given.
         """
-        if samples_type == "latent":
-            values = self.to_params(samples)
-        elif samples_type == "params":
-            values = self._checked(as_latent_samples(samples), what="parameter values")
-        else:
-            raise ValueError(f'samples_type must be "latent" or "params", got {samples_type!r}.')
-        if any(jnp.ndim(values[p]) <= len(self.shapes[p].shape) for p in self.paths):
-            raise ValueError(
-                "posterior_summary needs samples stacked along a leading axis; got a single "
-                "draw (use to_params for one draw)."
-            )
+        values = self._sample_values(samples, samples_type, "posterior_summary")
         summary = {
             p: {"mean": jnp.mean(v, axis=0), "std": jnp.std(v, axis=0)} for p, v in values.items()
         }

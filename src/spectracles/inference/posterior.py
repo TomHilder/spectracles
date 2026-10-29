@@ -87,6 +87,15 @@ class Posterior:
     def to_params(self, ξ: Any) -> dict[str, Array]:
         return self.latent.to_params(ξ)
 
+    def map_samples(
+        self,
+        fn: Callable[[ShareModule], Any],
+        samples: Any,
+        samples_type: Literal["latent", "params"] = "latent",
+    ) -> Any:
+        """Evaluate `fn(model)` at every sample: `LatentSpace.map_samples`."""
+        return self.latent.map_samples(fn, samples, samples_type=samples_type)
+
     def summary(
         self,
         samples: Any,

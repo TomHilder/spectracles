@@ -129,6 +129,14 @@ def test_posterior_summary_calls_through(line_posterior):
         np.testing.assert_array_equal(a[p]["mean"], b[p]["mean"])
 
 
+def test_map_samples_of_forward_gives_predictions(line_posterior):
+    post = line_posterior
+    stacked = post.sample_prior_latent(random.PRNGKey(14), n=3)
+    preds = post.map_samples(post.forward, stacked)
+    for i in range(3):
+        np.testing.assert_allclose(preds[i], post.predict({p: v[i] for p, v in stacked.items()}))
+
+
 def test_forward_must_be_a_function_not_the_model(line_posterior):
     from spectracles.inference import Posterior
 

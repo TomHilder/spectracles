@@ -366,28 +366,10 @@ map_model = latent.to_model(ξ)
 
 ## Getting results back
 
-Samples come back as latents. Turn them into parameter values with the same
-latent space:
+Samples come back as latents. The posterior turns them into parameter values:
 
 ```python
-summary = latent.posterior_summary(samples)  # also returns {path: {"mean", "std"}}
-summary = posterior.summary(samples)  # the same, from the posterior
-fitted = latent.to_model(samples.pos)  # the latent mean, as an ordinary model
-maps = jnp.stack([latent.to_model(s)(spaxels) for s in samples])  # one map per sample
-values = latent.to_params(samples)  # {path: stacked values}, e.g. for corner plots
-```
-
-For simulated data, give the truth with `true_latents=` (or `true_params=`): the
-table then adds the true values and z = (mean − truth) / std.
-
-`posterior_summary` takes latent samples, as inference returns them. For
-samples that are already parameter values (from `to_params` or
-`sample_prior_params`), say so with `samples_type="params"`; otherwise they
-would be transformed a second time:
-
-```python
-prior_values = latent.sample_prior_params(random.PRNGKey(4), n=500)
-prior_summary = latent.posterior_summary(prior_values, samples_type="params", print_table=False)
+summary = posterior.summary(samples)  # prints a table; also returns {path: {"mean", "std"}}
 ```
 
 ```text
@@ -404,8 +386,48 @@ prior_summary = latent.posterior_summary(prior_values, samples_type="params", pr
 4 samples · 4 parameters
 ```
 
-Uncertainties on any derived quantity come from evaluating it once per sample,
-as with `maps` above: take the mean and spread across samples.
+(`posterior.summary` is `latent.posterior_summary`.) For simulated data, give
+the truth with `true_latents=` (or `true_params=`): the table then adds the true
+values and z = (mean − truth) / std.
+
+The summary takes latent samples, as inference returns them. For samples that
+are already parameter values (from `to_params` or `sample_prior_params`), say so
+with `samples_type="params"`; otherwise they would be transformed a second time:
+
+```python
+prior_values = latent.sample_prior_params(random.PRNGKey(4), n=500)
+prior_summary = latent.posterior_summary(prior_values, samples_type="params", print_table=False)
+```
+
+### Anything derived from the model
+
+`map_samples(fn, samples)` evaluates `fn(model)` at every sample and stacks the
+results, so any derived quantity (a map, the predictions, a ratio of two
+fields) gets a value per sample. Its posterior mean and uncertainty are then
+the mean and spread over the first axis:
+
+```python
+maps = posterior.map_samples(lambda m: m(spaxels), samples)  # (n_samples, n_spaxels)
+mean_map, std_map = maps.mean(axis=0), maps.std(axis=0)
+predictions = posterior.map_samples(posterior.forward, samples)  # the data's shape, per sample
+values = latent.to_params(samples)  # {path: stacked values}, e.g. for corner plots
+```
+
+`fn` runs under `jax.vmap`, so it must be JAX code. Samples from several chains,
+stacked as `(chain, draw, ...)`, keep both axes. A single draw goes through
+`latent.to_model(ξ)` instead.
+
+!!! note "Which posterior mean?"
+    For a nonlinear model these differ:
+
+    - the **mean of each parameter**, `summary[path]["mean"]`;
+    - the **model at the mean latent**, e.g. `latent.to_model(samples.pos)` for
+      NIFTy samples;
+    - the **posterior mean of a derived quantity**, e.g. `maps.mean(axis=0)`.
+
+    The model evaluated at mean parameters is not the mean map, and averaging
+    the GP coefficients gives a field smoother than any sample. For maps and
+    their uncertainties, use the third.
 
 ### With ArviZ
 
