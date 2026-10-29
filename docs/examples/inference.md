@@ -96,7 +96,7 @@ gx, gy = jnp.meshgrid(g, g, indexing="ij")
 grid = SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(n * n))
 
 f_true = latent.to_model(truth)(grid).reshape(n, n)
-f_mgvi = posterior.map_samples(lambda m: m(grid), samples).reshape(-1, n, n)  # per sample
+f_mgvi = posterior.map_samples(lambda m: m(grid), samples).values.reshape(-1, n, n)  # per sample
 
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.4), layout="constrained")
 lim = float(jnp.abs(f_true).max())
@@ -174,8 +174,8 @@ def field_at_points(m):
     return m(points)
 
 
-f_nuts = posterior.map_samples(field_at_points, nuts_samples).mean(axis=0)
-f_mgvi_pts = posterior.map_samples(field_at_points, samples).mean(axis=0)
+f_nuts = posterior.map_samples(field_at_points, nuts_samples).mean()
+f_mgvi_pts = posterior.map_samples(field_at_points, samples).mean()
 f_true_pts = latent.to_model(truth)(points)
 
 fig, ax = plt.subplots(figsize=(4.5, 4), layout="constrained")

@@ -292,19 +292,55 @@ def test_map_samples_matches_a_loop_over_to_model(tiny_line_model):
             "two": 2.0 * leaf(m, "offset.tile_values").val,
         }
 
-    out = latent.map_samples(fn, stacked)
+    out = latent.map_samples(fn, stacked).values
     for i in range(6):
         one = fn(latent.to_model({p: v[i] for p, v in stacked.items()}))
         np.testing.assert_allclose(out["ls"][i], one["ls"])
         np.testing.assert_allclose(out["two"][i], one["two"])
     # Parameter values give the same result
-    by_params = latent.map_samples(fn, latent.to_params(stacked), samples_type="params")
+    by_params = latent.map_samples(fn, latent.to_params(stacked), samples_type="params").values
     np.testing.assert_allclose(by_params["ls"], out["ls"])
     # (chain, draw) axes are kept
     chains = {p: v.reshape(2, 3, *v.shape[1:]) for p, v in stacked.items()}
-    np.testing.assert_allclose(latent.map_samples(fn, chains)["ls"], out["ls"].reshape(2, 3, 1))
+    by_chain = latent.map_samples(fn, chains)
+    np.testing.assert_allclose(by_chain.values["ls"], out["ls"].reshape(2, 3, 1))
+    assert by_chain.sample_shape == (2, 3) and by_chain.n_draws == 6
+    np.testing.assert_allclose(by_chain.mean()["ls"], out["ls"].mean(axis=0))
     with pytest.raises(ValueError, match="leading axis"):
         latent.map_samples(fn, {p: v[0] for p, v in stacked.items()})
+
+
+def test_draws_of_params_and_latents(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    stacked = latent.sample_prior_latent(random.PRNGKey(15), n=8)
+    params = latent.draws(stacked)
+    values = latent.to_params(stacked)
+    for p in latent.paths:
+        np.testing.assert_allclose(params.mean()[p], values[p].mean(axis=0))
+        np.testing.assert_allclose(params[p].std(), values[p].std(axis=0))
+        np.testing.assert_allclose(params[p].median(), np.median(values[p], axis=0))
+    q = params["offset.tile_values"].quantile(jnp.array([0.16, 0.84]))
+    assert q.shape == (2, 2)
+    np.testing.assert_allclose(
+        latent.draws(stacked, of="latent").mean()["offset.tile_values"],
+        stacked["offset.tile_values"].mean(axis=0),
+    )
+    assert latent.draws(values, samples_type="params").keys() == latent.paths
+    with pytest.raises(KeyError, match="nope"):
+        params["nope"]
+    with pytest.raises(ValueError, match="of must be"):
+        latent.draws(stacked, of="model")  # type: ignore[arg-type]
+
+
+def test_posterior_summary_reduces_over_chain_axes(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    flat = latent.sample_prior_latent(random.PRNGKey(16), n=6)
+    chains = {p: v.reshape(2, 3, *v.shape[1:]) for p, v in flat.items()}
+    a = latent.posterior_summary(flat, print_table=False)
+    b = latent.posterior_summary(chains, print_table=False)
+    for p in latent.paths:
+        np.testing.assert_allclose(b[p]["mean"], a[p]["mean"])
+        np.testing.assert_allclose(b[p]["std"], a[p]["std"])
 
 
 def test_to_model_is_set_of_to_params(tiny_line_model):

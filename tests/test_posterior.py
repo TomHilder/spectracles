@@ -132,7 +132,7 @@ def test_posterior_summary_calls_through(line_posterior):
 def test_map_samples_of_forward_gives_predictions(line_posterior):
     post = line_posterior
     stacked = post.sample_prior_latent(random.PRNGKey(14), n=3)
-    preds = post.map_samples(post.forward, stacked)
+    preds = post.map_samples(post.forward, stacked).values
     for i in range(3):
         np.testing.assert_allclose(preds[i], post.predict({p: v[i] for p, v in stacked.items()}))
 

@@ -13,6 +13,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
+from spectracles.inference.draws import Draws
 from spectracles.inference.latent import Latent, LatentSpace, as_latent_dict
 from spectracles.inference.likelihood import Likelihood
 from spectracles.model.share_module import ShareModule
@@ -92,9 +93,18 @@ class Posterior:
         fn: Callable[[ShareModule], Any],
         samples: Any,
         samples_type: Literal["latent", "params"] = "latent",
-    ) -> Any:
+    ) -> Draws:
         """Evaluate `fn(model)` at every sample: `LatentSpace.map_samples`."""
         return self.latent.map_samples(fn, samples, samples_type=samples_type)
+
+    def draws(
+        self,
+        samples: Any,
+        of: Literal["params", "latent"] = "params",
+        samples_type: Literal["latent", "params"] = "latent",
+    ) -> Draws:
+        """Samples as `Draws` of the parameter values or latents: `LatentSpace.draws`."""
+        return self.latent.draws(samples, of=of, samples_type=samples_type)
 
     def summary(
         self,

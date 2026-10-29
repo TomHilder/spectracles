@@ -401,21 +401,30 @@ prior_summary = latent.posterior_summary(prior_values, samples_type="params", pr
 
 ### Anything derived from the model
 
-`map_samples(fn, samples)` evaluates `fn(model)` at every sample and stacks the
-results, so any derived quantity (a map, the predictions, a ratio of two
-fields) gets a value per sample. Its posterior mean and uncertainty are then
-the mean and spread over the first axis:
+`map_samples(fn, samples)` evaluates `fn(model)` at every sample, so any part
+of the model or quantity derived from it (a map, the predictions, a ratio of
+two fields) gets a value per sample. It returns `Draws`, whose summaries are
+over the samples:
 
 ```python
-maps = posterior.map_samples(lambda m: m(spaxels), samples)  # (n_samples, n_spaxels)
-mean_map, std_map = maps.mean(axis=0), maps.std(axis=0)
-predictions = posterior.map_samples(posterior.forward, samples)  # the data's shape, per sample
-values = latent.to_params(samples)  # {path: stacked values}, e.g. for corner plots
+maps = posterior.map_samples(lambda m: m(spaxels), samples)
+mean_map, std_map = maps.mean(), maps.std()  # each (n_spaxels,)
+lower, upper = maps.quantile(0.16), maps.quantile(0.84)
+predictions = posterior.map_samples(posterior.forward, samples).mean()
 ```
 
-`fn` runs under `jax.vmap`, so it must be JAX code. Samples from several chains,
-stacked as `(chain, draw, ...)`, keep both axes. A single draw goes through
-`latent.to_model(ξ)` instead.
+Parameter values (and latents) come as `Draws` too:
+
+```python
+params = posterior.draws(samples)  # parameter values; of="latent" for the latents
+params.mean()  # {path: mean}
+params["log_flux.kernel.length_scale"].std()
+```
+
+`fn` runs under `jax.vmap`, so it must be JAX code. `.values` holds the stacked
+draws themselves, e.g. for corner plots. Samples from several chains, stacked
+as `(chain, draw, ...)`, are summarised over both axes. A single draw goes
+through `latent.to_model(ξ)` instead.
 
 !!! note "Which posterior mean?"
     For a nonlinear model these differ:
@@ -423,7 +432,7 @@ stacked as `(chain, draw, ...)`, keep both axes. A single draw goes through
     - the **mean of each parameter**, `summary[path]["mean"]`;
     - the **model at the mean latent**, e.g. `latent.to_model(samples.pos)` for
       NIFTy samples;
-    - the **posterior mean of a derived quantity**, e.g. `maps.mean(axis=0)`.
+    - the **posterior mean of a derived quantity**, e.g. `maps.mean()`.
 
     The model evaluated at mean parameters is not the mean map, and averaging
     the GP coefficients gives a field smoother than any sample. For maps and

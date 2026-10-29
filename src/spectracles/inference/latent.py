@@ -16,6 +16,7 @@ import jax.numpy as jnp
 from jax import random
 from jaxtyping import Array, PRNGKeyArray
 
+from spectracles.inference.draws import Draws
 from spectracles.model.parameter import Known, Parameter
 from spectracles.model.share_module import ShareModule
 from spectracles.priors import Prior
@@ -268,7 +269,7 @@ class LatentSpace:
         fn: Callable[[ShareModule], Any],
         samples: Any,
         samples_type: Literal["latent", "params"] = "latent",
-    ) -> Any:
+    ) -> Draws:
         """Evaluate `fn(model)` at every sample, stacked along the samples' leading axes.
 
         For any quantity derived from the model (a field on a grid, the
@@ -283,14 +284,48 @@ class LatentSpace:
             samples_type: "latent" (default) or "params", as for `posterior_summary`.
 
         Returns:
-            `fn`'s output with the samples' leading axes in front.
+            `Draws` of `fn`'s output: `.mean()`, `.std()`, `.quantile(q)` etc.
+            summarise over the samples; `.values` holds the stacked outputs.
         """
         values = self._sample_values(samples, samples_type, "map_samples")
-        p0 = self.paths[0]
-        batch = jnp.shape(values[p0])[: jnp.ndim(values[p0]) - len(self.shapes[p0].shape)]
+        batch = self._sample_shape(values)
         flat = {p: jnp.reshape(v, (-1, *self.shapes[p].shape)) for p, v in values.items()}
         out = jax.vmap(lambda θ: fn(self.model.set(θ)))(flat)
-        return jax.tree.map(lambda x: jnp.reshape(x, (*batch, *jnp.shape(x)[1:])), out)
+        stacked = jax.tree.map(lambda x: jnp.reshape(x, (*batch, *jnp.shape(x)[1:])), out)
+        return Draws(stacked, n_sample_axes=len(batch))
+
+    def draws(
+        self,
+        samples: Any,
+        of: Literal["params", "latent"] = "params",
+        samples_type: Literal["latent", "params"] = "latent",
+    ) -> Draws:
+        """Samples as `Draws` of the parameter values (default) or of the latents.
+
+        `.mean()`, `.std()`, `.quantile(q)` etc. then give {path: summary};
+        `draws[path]` is one parameter's draws.
+
+        Args:
+            samples: Stacked samples, as for `posterior_summary`.
+            of: "params" (default) for parameter values, or "latent" for the latents.
+            samples_type: What `samples` are: "latent" (default) or "params".
+        """
+        if of == "params":
+            values = self._sample_values(samples, samples_type, "draws")
+        elif of == "latent":
+            if samples_type != "latent":
+                raise ValueError(
+                    "Draws of the latents need latent samples (samples_type='latent')."
+                )
+            values = self._checked(as_latent_samples(samples))
+            self._sample_values(values, "latent", "draws")  # checks the sample axis
+        else:
+            raise ValueError(f'of must be "params" or "latent", got {of!r}.')
+        return Draws(values, n_sample_axes=len(self._sample_shape(values)))
+
+    def _sample_shape(self, values: dict[str, Array]) -> tuple[int, ...]:
+        p0 = self.paths[0]
+        return tuple(jnp.shape(values[p0])[: jnp.ndim(values[p0]) - len(self.shapes[p0].shape)])
 
     def posterior_summary(
         self,
@@ -321,16 +356,16 @@ class LatentSpace:
             values, with "truth" and "z" added when a truth is given.
         """
         values = self._sample_values(samples, samples_type, "posterior_summary")
-        summary = {
-            p: {"mean": jnp.mean(v, axis=0), "std": jnp.std(v, axis=0)} for p, v in values.items()
-        }
+        draws = Draws(values, n_sample_axes=len(self._sample_shape(values)))
+        means, stds = draws.mean(), draws.std()
+        summary = {p: {"mean": means[p], "std": stds[p]} for p in values}
         truth = self._truth(true_latents, true_params)
         if truth is not None:
             for p, s in summary.items():
                 s["truth"] = truth[p]
                 s["z"] = jnp.where(s["std"] > 0, (s["mean"] - truth[p]) / s["std"], jnp.nan)
         if print_table:
-            self._print_summary(summary, n=int(jnp.shape(values[self.paths[0]])[0]))
+            self._print_summary(summary, n=draws.n_draws)
         return summary
 
     def _truth(self, true_latents: Any, true_params: Any) -> dict[str, Array] | None:

@@ -10,3 +10,5 @@ The latent space, likelihoods and the posterior shared by every backend. See
 ::: spectracles.inference.GaussianLikelihood
 
 ::: spectracles.inference.Posterior
+
+::: spectracles.inference.Draws
