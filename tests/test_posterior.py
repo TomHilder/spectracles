@@ -205,3 +205,44 @@ def test_posterior_jit_and_vmap(linear_gaussian):
     )
     assert isinstance(post.latent, LatentSpace)
     assert "Posterior(" in repr(post)
+
+
+# ---- ModelDraws ----
+
+
+def test_model_draws_call_any_part(line_posterior):
+    from spectracles.inference import Draws, ModelDraws
+
+    from .priors_models import LAM, line_data
+
+    post, data = line_posterior, line_data()
+    stacked = post.sample_prior_latent(random.PRNGKey(17), n=4)
+    models = post.draws(stacked, of="model")
+    assert isinstance(models, ModelDraws) and isinstance(models.line_2.v, ModelDraws)
+
+    def one(i):
+        return post.latent.to_model({p: v[i] for p, v in stacked.items()}).for_evaluation()
+
+    # The whole model, a component, and a component holding a shared kernel
+    whole = models(LAM[0], data)
+    v2 = models.line_2.v(data)  # line_2.v's kernel is shared with line_1.v
+    assert isinstance(whole, Draws) and whole.sample_shape == (4,)
+    for i in range(4):
+        np.testing.assert_allclose(whole.values[i], one(i)(LAM[0], data))
+        np.testing.assert_allclose(v2.values[i], one(i).line_2.v(data))
+    np.testing.assert_allclose(v2.mean(), v2.values.mean(axis=0))
+    # Methods work too
+    lp = models.line_1.log_A.prior_logpdf()
+    np.testing.assert_allclose(lp.values[0], one(0).line_1.log_A.prior_logpdf())
+
+
+def test_model_draws_errors(line_posterior):
+    post = line_posterior
+    stacked = post.sample_prior_latent(random.PRNGKey(18), n=2)
+    models = post.draws(stacked, of="model")
+    with pytest.raises(AttributeError, match="line_1 has no attribute 'nope'"):
+        _ = models.line_1.nope
+    with pytest.raises(TypeError, match="not callable"):
+        models.line_1.σ()
+    with pytest.raises(AttributeError, match="read-only"):
+        models.line_1 = None

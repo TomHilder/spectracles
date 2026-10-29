@@ -77,6 +77,12 @@ pip install -e .
   schedules and VI stages will share one vocabulary, and the `prior_logpdf`
   losses will be deprecated.
 
+- **Planned (1.2): lazy draws for large fields.** `posterior.draws(samples,
+  of="model")` evaluates and holds every draw in memory. For many samples of a
+  field on many points, summaries will be computed in chunks of samples
+  (streaming mean and variance; quantiles in chunks of points), with the full
+  draws built only on request.
+
 ## Documentation
 
 Full documentation: [tomhilder.github.io/spectracles](https://tomhilder.github.io/spectracles/)

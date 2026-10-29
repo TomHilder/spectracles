@@ -329,7 +329,7 @@ def test_draws_of_params_and_latents(tiny_line_model):
     with pytest.raises(KeyError, match="nope"):
         params["nope"]
     with pytest.raises(ValueError, match="of must be"):
-        latent.draws(stacked, of="model")  # type: ignore[arg-type]
+        latent.draws(stacked, of="values")  # type: ignore[arg-type]
 
 
 def test_posterior_summary_reduces_over_chain_axes(tiny_line_model):

@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
-from spectracles.inference.draws import Draws
+from spectracles.inference.draws import Draws, ModelDraws
 from spectracles.inference.latent import Latent, LatentSpace, as_latent_dict
 from spectracles.inference.likelihood import Likelihood
 from spectracles.model.share_module import ShareModule
@@ -100,10 +100,10 @@ class Posterior:
     def draws(
         self,
         samples: Any,
-        of: Literal["params", "latent"] = "params",
+        of: Literal["params", "latent", "model"] = "params",
         samples_type: Literal["latent", "params"] = "latent",
-    ) -> Draws:
-        """Samples as `Draws` of the parameter values or latents: `LatentSpace.draws`."""
+    ) -> Draws | ModelDraws:
+        """Samples as draws of the parameter values, latents or model: `LatentSpace.draws`."""
         return self.latent.draws(samples, of=of, samples_type=samples_type)
 
     def summary(

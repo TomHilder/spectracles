@@ -96,7 +96,7 @@ gx, gy = jnp.meshgrid(g, g, indexing="ij")
 grid = SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(n * n))
 
 f_true = latent.to_model(truth)(grid).reshape(n, n)
-f_mgvi = posterior.map_samples(lambda m: m(grid), samples).values.reshape(-1, n, n)  # per sample
+f_mgvi = posterior.draws(samples, of="model")(grid).values.reshape(-1, n, n)  # per sample
 
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.4), layout="constrained")
 lim = float(jnp.abs(f_true).max())
@@ -170,12 +170,8 @@ All three results are latents of one posterior, so the same `latent` turns each
 into a model. Here is the field at the data points:
 
 ```python
-def field_at_points(m):
-    return m(points)
-
-
-f_nuts = posterior.map_samples(field_at_points, nuts_samples).mean()
-f_mgvi_pts = posterior.map_samples(field_at_points, samples).mean()
+f_nuts = posterior.draws(nuts_samples, of="model")(points).mean()
+f_mgvi_pts = posterior.draws(samples, of="model")(points).mean()
 f_true_pts = latent.to_model(truth)(points)
 
 fig, ax = plt.subplots(figsize=(4.5, 4), layout="constrained")

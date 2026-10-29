@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from jax import random
 from jaxtyping import Array, PRNGKeyArray
 
-from spectracles.inference.draws import Draws
+from spectracles.inference.draws import Draws, ModelDraws
 from spectracles.model.parameter import Known, Parameter
 from spectracles.model.share_module import ShareModule
 from spectracles.priors import Prior
@@ -297,19 +297,24 @@ class LatentSpace:
     def draws(
         self,
         samples: Any,
-        of: Literal["params", "latent"] = "params",
+        of: Literal["params", "latent", "model"] = "params",
         samples_type: Literal["latent", "params"] = "latent",
-    ) -> Draws:
-        """Samples as `Draws` of the parameter values (default) or of the latents.
+    ) -> "Draws | ModelDraws":
+        """Samples as draws of the parameter values (default), the latents, or the model.
 
-        `.mean()`, `.std()`, `.quantile(q)` etc. then give {path: summary};
-        `draws[path]` is one parameter's draws.
+        For "params" and "latent", returns `Draws`: `.mean()`, `.std()`,
+        `.quantile(q)` etc. give {path: summary}, and `draws[path]` is one
+        parameter's draws. For "model", returns `ModelDraws`: call it, or any
+        part of it, to get `Draws` of that part's output, e.g.
+        `draws(samples, of="model").field(grid).mean()`.
 
         Args:
             samples: Stacked samples, as for `posterior_summary`.
-            of: "params" (default) for parameter values, or "latent" for the latents.
+            of: "params" (default), "latent" or "model".
             samples_type: What `samples` are: "latent" (default) or "params".
         """
+        if of == "model":
+            return ModelDraws(self, self._sample_values(samples, samples_type, "draws"))
         if of == "params":
             values = self._sample_values(samples, samples_type, "draws")
         elif of == "latent":
@@ -320,7 +325,7 @@ class LatentSpace:
             values = self._checked(as_latent_samples(samples))
             self._sample_values(values, "latent", "draws")  # checks the sample axis
         else:
-            raise ValueError(f'of must be "params" or "latent", got {of!r}.')
+            raise ValueError(f'of must be "params", "latent" or "model", got {of!r}.')
         return Draws(values, n_sample_axes=len(self._sample_shape(values)))
 
     def _sample_shape(self, values: dict[str, Array]) -> tuple[int, ...]:

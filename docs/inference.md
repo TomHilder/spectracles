@@ -401,30 +401,38 @@ prior_summary = latent.posterior_summary(prior_values, samples_type="params", pr
 
 ### Anything derived from the model
 
-`map_samples(fn, samples)` evaluates `fn(model)` at every sample, so any part
-of the model or quantity derived from it (a map, the predictions, a ratio of
-two fields) gets a value per sample. It returns `Draws`, whose summaries are
-over the samples:
+`posterior.draws(samples)` gives the samples as draws of the parameter values,
+`of="latent"` as draws of the latents, and `of="model"` as draws of the model
+itself: call it, or any part of it, and you get that part's output at every
+sample. All of these are `Draws`, whose summaries are over the samples:
 
 ```python
-maps = posterior.map_samples(lambda m: m(spaxels), samples)
+params = posterior.draws(samples)  # parameter values
+params.mean()  # {path: mean}
+params["log_flux.kernel.length_scale"].std()
+
+models = posterior.draws(samples, of="model")
+maps = models(spaxels)  # the whole model, at every sample
 mean_map, std_map = maps.mean(), maps.std()  # each (n_spaxels,)
 lower, upper = maps.quantile(0.16), maps.quantile(0.84)
+flux = models.log_flux(spaxels).mean()  # any component, the same way
+```
+
+Components are evaluated with shared values filled in, so parts that hold
+shared parameters can be called directly. For a quantity that isn't a single
+call, e.g. a ratio of two fields, use `map_samples` with a function of the
+model:
+
+```python
+ratio = posterior.map_samples(lambda m: m.log_flux(spaxels) - m.offset(spaxels), samples)
 predictions = posterior.map_samples(posterior.forward, samples).mean()
 ```
 
-Parameter values (and latents) come as `Draws` too:
-
-```python
-params = posterior.draws(samples)  # parameter values; of="latent" for the latents
-params.mean()  # {path: mean}
-params["log_flux.kernel.length_scale"].std()
-```
-
-`fn` runs under `jax.vmap`, so it must be JAX code. `.values` holds the stacked
-draws themselves, e.g. for corner plots. Samples from several chains, stacked
-as `(chain, draw, ...)`, are summarised over both axes. A single draw goes
-through `latent.to_model(ξ)` instead.
+`.values` holds the stacked draws themselves, e.g. for corner plots. Samples
+from several chains, stacked as `(chain, draw, ...)`, are summarised over both
+axes. A single draw goes through `latent.to_model(ξ)` instead. Everything is
+computed when you ask for it and held in memory, so for very large fields
+evaluate on fewer points or fewer samples at a time.
 
 !!! note "Which posterior mean?"
     For a nonlinear model these differ:
