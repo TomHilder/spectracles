@@ -76,6 +76,10 @@ class GaussianLikelihood(Likelihood):
         with np.errstate(invalid="ignore"):
             use = use & np.isfinite(data) & np.isfinite(ivar) & (ivar > 0)
         index = np.flatnonzero(use)
+        if index.size == 0:
+            raise ValueError(
+                "No data points left: every one is masked, non-finite, or has inverse variance <= 0."
+            )
         self.shape = data.shape
         self.index = jnp.asarray(index)
         self.data = jnp.asarray(data.ravel()[index])

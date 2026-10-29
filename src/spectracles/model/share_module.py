@@ -226,6 +226,10 @@ class ShareModule(Module):
     )
 
     def __init__(self, model: Module, locked: bool = False):
+        if isinstance(model, ShareModule):
+            raise TypeError("This model is already built (a ShareModule).")
+        if not isinstance(model, Module):
+            raise TypeError(f"A model must be an equinox Module, got {type(model).__name__}.")
         # Detect module-level sharing BEFORE any tree manipulation
         # (tree_at operations can break object identity)
         self._shared_components = _detect_shared_modules(model)
@@ -755,6 +759,14 @@ class ShareModule(Module):
 
         if self._locked:
             raise ValueError("Cannot set parameters on a locked model.")
+
+        for param_str in params:
+            try:
+                use_path_get_leaf(self, str_to_leafpath(param_str))
+            except (AttributeError, KeyError, IndexError, TypeError):
+                raise ValueError(
+                    f"No parameter at path '{param_str}'. get_parameter_paths() lists them."
+                ) from None
 
         # Check for Known parameters if not allowed
         if not allow_set_knowns:
@@ -1335,8 +1347,28 @@ def parent_model(model) -> ShareModule:
     return ShareModule(model)
 
 
-def build_model(cls: Callable[..., Module], *args, **kwargs) -> ShareModule:
-    return parent_model(cls(*args, **kwargs))
+def build_model(cls: Callable[..., Module] | Module, *args, **kwargs) -> ShareModule:
+    """Build a model from its class and arguments, or from an instance.
+
+    `build_model(MyModel, a=..., b=...)` and `build_model(MyModel(a=..., b=...))`
+    are equivalent. Sharing between parts of the model is detected here.
+    """
+    if isinstance(cls, ShareModule):
+        raise TypeError("This model is already built (build_model returned it).")
+    if isinstance(cls, Module):
+        if args or kwargs:
+            raise TypeError(
+                "build_model takes a model class and its arguments, or a model instance "
+                "on its own; got an instance and further arguments."
+            )
+        return ShareModule(cls)
+    model = cls(*args, **kwargs)
+    if not isinstance(model, Module):
+        raise TypeError(
+            f"build_model needs an equinox Module; {getattr(cls, '__name__', cls)!s} "
+            f"returned {type(model).__name__}."
+        )
+    return parent_model(model)
 
 
 def get_digraph(module: ShareModule, sharing_level: str = "component") -> tuple[DiGraph, int]:

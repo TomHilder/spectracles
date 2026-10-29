@@ -9,6 +9,7 @@ import math
 import warnings
 from typing import Any, Literal
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jax import random
@@ -116,8 +117,33 @@ class LatentSpace:
         `Samples` object. Keys are the latent paths; fixed parameters and Known
         values are not included. Works under jit/grad/vmap.
         """
-        ξ = as_latent_samples(ξ)
+        ξ = self._checked(as_latent_samples(ξ))
         return {p: self.priors[p].transform(ξ[p]) for p in self.paths}
+
+    def _checked(self, ξ: Any) -> Latent:
+        """ξ after checking it is a dict with exactly this latent space's keys."""
+        if isinstance(ξ, ShareModule | eqx.Module):
+            raise TypeError(
+                "Expected latents ξ (a dict keyed by parameter path), got a model. "
+                "latent.from_model(model) gives a model's latents."
+            )
+        if not isinstance(ξ, dict):
+            raise TypeError(
+                f"Expected latents ξ (a dict keyed by parameter path), got {type(ξ).__name__}."
+            )
+        missing = [p for p in self.paths if p not in ξ]
+        unknown = [p for p in ξ if p not in self.priors]
+        if missing or unknown:
+            parts = [
+                f"missing {missing}" if missing else "",
+                f"unknown {unknown}" if unknown else "",
+            ]
+            raise ValueError(
+                "These latents don't match the latent space: "
+                + "; ".join(p for p in parts if p)
+                + ". Latents from a different model?"
+            )
+        return ξ
 
     def to_model(self, ξ: Latent) -> ShareModule:
         """The model with every free parameter set to its value at ξ (one draw).
@@ -139,7 +165,21 @@ class LatentSpace:
         """
         if fallback not in ("zero", "raise"):
             raise ValueError(f"fallback must be 'zero' or 'raise', got {fallback!r}.")
+        if not isinstance(model, ShareModule):
+            raise TypeError(f"from_model needs a built model, got {type(model).__name__}.")
         locked = model.for_evaluation() if not model._locked else model
+        for p in self.paths:
+            try:
+                shape = use_path_get_leaf(locked.model, str_to_leafpath(p)).val.shape
+            except (AttributeError, KeyError, IndexError, TypeError):
+                raise ValueError(
+                    f"The model has no parameter '{p}': it doesn't have this latent space's structure."
+                ) from None
+            if shape != self.shapes[p].shape:
+                raise ValueError(
+                    f"The model's '{p}' has shape {shape}, but the latent space expects "
+                    f"{self.shapes[p].shape}: it doesn't have this latent space's structure."
+                )
         no_inverse = [p for p in self.paths if not self.priors[p].has_inverse]
         if no_inverse and fallback == "raise":
             raise ValueError(f"These parameters' priors have no inverse transform: {no_inverse}")
@@ -216,6 +256,11 @@ class LatentSpace:
             Dict from path to {"mean": array, "std": array} of the parameter values.
         """
         values = self.to_params(samples)
+        if any(jnp.ndim(values[p]) <= len(self.shapes[p].shape) for p in self.paths):
+            raise ValueError(
+                "posterior_summary needs samples stacked along a leading axis; got a single "
+                "draw (use to_params for one draw)."
+            )
         summary = {
             p: {"mean": jnp.mean(v, axis=0), "std": jnp.std(v, axis=0)} for p, v in values.items()
         }

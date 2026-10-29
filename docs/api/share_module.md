@@ -4,15 +4,20 @@
 
 ## Building Models
 
-Use `build_model()` to construct your Equinox model and wrap it in a ShareModule.
-Pass the model class followed by its constructor arguments:
+Use `build_model()` to turn your Equinox model into a spectracles model (a
+`ShareModule`). It accepts either a model instance, or the model class followed
+by its constructor arguments; the two are equivalent:
 
 ```python
 import spectracles as sp
 
-# Equivalent to wrapping MyModel(shared_component=inner, ...)
-model = sp.build_model(MyModel, shared_component=inner, ...)
+model = sp.build_model(MyModel(shared_component=inner, ...))
+model = sp.build_model(MyModel, shared_component=inner, ...)  # the same
 ```
+
+`build_model` is also where sharing is detected: a component or parameter used
+in several places becomes one shared component or parameter. Don't construct a
+`ShareModule` directly.
 
 ## Inspecting the Model
 
@@ -106,7 +111,6 @@ model = model.free_all()
 Calling the whole model always works, with or without sharing:
 
 ```python
-# sketch
 prediction = model(data)
 ```
 
@@ -118,7 +122,6 @@ the same value. But a submodule that holds such a reference can't be called on
 its own, because the reference is not a value:
 
 ```python
-# sketch
 model = build_model(TwoLines, line_1=Line(v=shared_gp), line_2=Line(v=shared_gp))
 model.line_1(data)  # fine: line_1 holds the shared GP itself
 model.line_2(data)  # RuntimeError: line_2 holds a reference to line_1.v
@@ -128,7 +131,6 @@ model.line_2(data)  # RuntimeError: line_2 holds a reference to line_1.v
 any part can be called or inspected:
 
 ```python
-# sketch
 evaluable = model.for_evaluation()
 flux_2 = evaluable.line_2(data)
 velocity = evaluable.line_2.v(grid)
@@ -142,7 +144,6 @@ with the original model for those. (`get_locked_model()` is the old name of
 ## Priors
 
 ```python
-# sketch
 from spectracles.priors import Laplace, LogNormal
 
 model = model.with_priors(

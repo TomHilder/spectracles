@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 import jax.numpy as jnp
+import numpy as np
 from equinox import Module, field
 from jaxtyping import Array, ArrayLike
 
@@ -19,22 +20,48 @@ def _to_float_array(x) -> Array:
     return jnp.asarray(x, dtype=float)
 
 
+def _is_int(x) -> bool:
+    return isinstance(x, int | np.integer) and not isinstance(x, bool | np.bool_)
+
+
+def _shape_from_dims(dims) -> tuple[int, ...]:
+    """The shape `dims` asks for: an int n means (n,)."""
+    if isinstance(dims, Prior):
+        raise TypeError("dims got a Prior. Pass priors by keyword: Parameter(value, prior=...).")
+    if _is_int(dims):
+        shape = (int(dims),)
+    elif isinstance(dims, tuple) and all(_is_int(d) for d in dims):
+        shape = tuple(int(d) for d in dims)
+    else:
+        raise TypeError(f"dims must be an int or a tuple of ints, got {dims!r}.")
+    if any(d < 1 for d in shape):
+        raise ValueError(f"dims must be positive, got {dims!r}.")
+    return shape
+
+
+def _check_fixed(fixed) -> bool:
+    if not isinstance(fixed, bool | np.bool_):
+        raise TypeError(f"fixed must be True or False, got {fixed!r}.")
+    return bool(fixed)
+
+
 def _array_from_user(
     dims: int | tuple | None = None,
     initial: ArrayLike | None = None,
 ) -> Array:
+    if isinstance(initial, Prior):
+        raise TypeError(
+            "The initial value got a Prior. Pass priors by keyword: Parameter(prior=...)."
+        )
+    shape = None if dims is None else _shape_from_dims(dims)
     if initial is not None:
         param_vals = _to_float_array(initial).copy()
-        if dims is not None:
-            expected_shape = (dims,) if isinstance(dims, int) else dims
-            if param_vals.shape != expected_shape:
-                raise ValueError("The shape of initial must match dims.")
+        if shape is not None and param_vals.shape != shape:
+            raise ValueError(
+                f"The initial value's shape {param_vals.shape} doesn't match dims {shape}."
+            )
     else:
-        if dims is None:
-            shape = (1,)
-        else:
-            shape = (dims,) if isinstance(dims, int) else dims
-        param_vals = jnp.zeros(shape)
+        param_vals = jnp.zeros((1,) if shape is None else shape)
 
     return param_vals
 
@@ -65,7 +92,7 @@ class Parameter(Module):
         fixed: bool = False,
         prior: Prior | None = None,
     ):
-        self.fix = fixed
+        self.fix = _check_fixed(fixed)
         self.prior = _check_prior(prior)
         val = _array_from_user(dims, initial)
         if initial is None and self.prior is not None:
@@ -127,7 +154,7 @@ class ConstrainedParameter(Module):
                 "sets the support. Use a Parameter with a prior instead (e.g. LogNormal "
                 "for a positive parameter)."
             )
-        self.fix = fixed
+        self.fix = _check_fixed(fixed)
         # Store bounds for repr
         self._lower = lower
         self._upper = upper
@@ -273,8 +300,22 @@ class Known(Parameter):
         return render_to_string(text)
 
 
-def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:
-    return Parameter(**kwargs) if parameter is None else parameter
+def init_parameter(parameter: Parameter | None, name: str = "parameter", **kwargs) -> Parameter:
+    """A new Parameter from `kwargs`, or the given one after checking its type and shape."""
+    if parameter is None:
+        return Parameter(**kwargs)
+    if not isinstance(parameter, AnyParameter):
+        raise TypeError(
+            f"{name} must be a Parameter, e.g. Parameter(value) or "
+            f"Parameter(dims=..., prior=...); got {type(parameter).__name__}."
+        )
+    if kwargs.get("dims") is not None:
+        expected = _shape_from_dims(kwargs["dims"])
+        if tuple(parameter.val.shape) != expected:
+            raise ValueError(
+                f"{name} must have shape {expected}, got {tuple(parameter.val.shape)}."
+            )
+    return parameter
 
 
 def is_parameter(x):

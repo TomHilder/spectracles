@@ -72,7 +72,7 @@ class Posterior:
 
     def log_prior(self, ξ: Latent) -> Array:
         """The prior in latent space: -½|ξ|² (without the normalisation constant)."""
-        ξ = as_latent_dict(ξ)
+        ξ = self.latent._checked(as_latent_dict(ξ))
         return -0.5 * sum(jnp.sum(ξ[p] ** 2) for p in self.latent.paths)
 
     def log_density(self, ξ: Latent) -> Array:

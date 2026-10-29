@@ -28,6 +28,11 @@ class SpatialData(Module):
     y: AbstractVar[Array]
     idx: AbstractVar[Array]
 
+    def __check_init__(self):
+        shapes = {name: jnp.shape(getattr(self, name)) for name in ("x", "y", "idx")}
+        if len(set(shapes.values())) > 1:
+            raise ValueError(f"x, y and idx must have the same length, got shapes {shapes}.")
+
 
 class SpatialDataGeneric(SpatialData):
     x: Array = field(converter=convert_to_flat_array)
