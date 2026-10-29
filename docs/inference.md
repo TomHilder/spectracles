@@ -258,15 +258,15 @@ print(posterior)
 ```
 
 ```text
-Posterior(LatentSpace(4 parameters, 743 latent dimensions), GaussianLikelihood on 290 pixels)
+Posterior(LatentSpace(4 parameters, 743 latent dimensions), GaussianLikelihood on 290 data points)
 ```
 
 For spectra, the forward model is usually the model evaluated over wavelength,
 `lambda m: jax.vmap(m, in_axes=(0, None))(wavelengths, spatial_data)`.
 
-`GaussianLikelihood(data, ivar, mask)` drops masked pixels, and pixels with
-non-finite data or non-positive inverse variance, so NaNs in real data are
-safe.
+`GaussianLikelihood(data, ivar, mask)` drops masked data points, and those
+with a non-finite value or a non-positive inverse variance, so NaNs in real
+data are safe.
 
 `posterior.log_density(ξ)` is the function every backend works with. It is
 pure JAX, so it works under `jit`, `grad` and `vmap`.

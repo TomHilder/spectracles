@@ -19,19 +19,20 @@ LOG_2PI = math.log(2.0 * math.pi)
 class GaussianLikelihood(eqx.Module):
     """Independent Gaussian noise with known inverse variance, and a mask.
 
-    Masked pixels are removed when the likelihood is built, so their data and
-    inverse variance (often NaN) never enter a value or a gradient. Pixels with
-    non-finite data or inverse variance, or inverse variance <= 0, are masked too.
+    Masked data points are removed when the likelihood is built, so their values
+    and inverse variances (often NaN) never enter a value or a gradient. Data
+    points with a non-finite value or inverse variance, or an inverse variance
+    <= 0, are masked too.
 
     Args:
         data: Observed data, any shape.
         ivar: Inverse variance, same shape as `data`.
-        mask: Boolean, True where a pixel is used. Defaults to all pixels.
+        mask: Boolean, True where a data point is used. Defaults to all data points.
     """
 
-    data: Array  # (n_used,) the used pixels only
+    data: Array  # (n_used,) the used data points only
     std_inv: Array  # (n_used,)
-    index: Array  # (n_used,) flat indices of the used pixels
+    index: Array  # (n_used,) flat indices of the used data points
     log_norm: Array  # the constant part of the log-likelihood
     shape: tuple[int, ...] = eqx.field(static=True)
 
@@ -54,11 +55,11 @@ class GaussianLikelihood(eqx.Module):
 
     @property
     def n_used(self) -> int:
-        """Number of pixels used."""
+        """Number of data points used."""
         return int(self.index.shape[0])
 
     def compress(self, pred: Array) -> Array:
-        """The used pixels of a prediction with the data's shape, as a flat array."""
+        """The used data points of a prediction with the data's shape, as a flat array."""
         if pred.shape != self.shape:
             raise ValueError(f"prediction {pred.shape} must have the data's shape {self.shape}.")
         return pred.reshape(-1)[self.index]
@@ -69,11 +70,11 @@ class GaussianLikelihood(eqx.Module):
         return -0.5 * jnp.sum(r**2) + self.log_norm
 
     def normalised_residual(self, pred: Array) -> Array:
-        """(data - pred) / σ on the used pixels."""
+        """(data - pred) / σ on the used data points."""
         return (self.data - self.compress(pred)) * self.std_inv
 
     def to_nifty(self):
-        """The equivalent NIFTy.re likelihood: `jft.Gaussian` on the used pixels.
+        """The equivalent NIFTy.re likelihood: `jft.Gaussian` on the used data points.
 
         Its input is the compressed prediction (see `compress`).
         """

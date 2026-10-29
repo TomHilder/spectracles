@@ -136,7 +136,7 @@ def line_forward(spatial_data):
 
 
 def noisy_data(pred: Array, noise_std: float, mask_frac: float, seed: int):
-    """Data = pred + noise, with a random fraction of pixels masked and set to NaN."""
+    """Data = pred + noise, with a random fraction of data points masked and set to NaN."""
     rng = np.random.default_rng(seed)
     pred = np.asarray(pred)
     data = pred + noise_std * rng.standard_normal(pred.shape)

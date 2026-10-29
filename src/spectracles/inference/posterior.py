@@ -45,7 +45,7 @@ class Posterior:
     def __repr__(self) -> str:
         return (
             f"Posterior({self.latent!r}, {type(self.likelihood).__name__} on "
-            f"{self.likelihood.n_used} pixels)"
+            f"{self.likelihood.n_used} data points)"
         )
 
     def predict(self, ξ: Latent) -> Array:

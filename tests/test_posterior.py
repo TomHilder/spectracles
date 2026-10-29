@@ -63,7 +63,7 @@ def test_mismatched_inputs_raise():
 # ---- E3: the mask is honoured ----
 
 
-def test_masked_pixels_do_not_change_the_likelihood():
+def test_masked_data_points_do_not_change_the_likelihood():
     rng = np.random.default_rng(1)
     data = rng.normal(size=(6, 7))
     ivar = rng.uniform(0.5, 2.0, size=(6, 7))
@@ -75,20 +75,20 @@ def test_masked_pixels_do_not_change_the_likelihood():
         d[~mask] = fill
         iv[~mask] = fill
         assert float(GaussianLikelihood(d, iv, mask).log_likelihood(pred)) == float(ref)
-    # Also equal to the likelihood of only the unmasked pixels
+    # Also equal to the likelihood of only the unmasked data points
     only = stats.norm.logpdf(data[mask], loc=np.asarray(pred)[mask], scale=1 / np.sqrt(ivar[mask]))
     assert float(ref) == pytest.approx(only.sum(), rel=1e-12)
 
 
-def test_non_finite_or_nonpositive_ivar_pixels_are_masked():
+def test_non_finite_or_nonpositive_ivar_data_points_are_masked():
     data = np.array([1.0, np.nan, 3.0, 4.0, 5.0])
     ivar = np.array([1.0, 1.0, np.inf, 0.0, 2.0])
     lh = GaussianLikelihood(data, ivar)
     np.testing.assert_array_equal(lh.index, [0, 4])
 
 
-def test_value_and_gradient_finite_with_nan_at_masked_pixels(line_posterior):
-    # The fixture really has masked (NaN) pixels
+def test_value_and_gradient_finite_with_nan_at_masked_data_points(line_posterior):
+    # The fixture really has masked (NaN) data points
     assert line_posterior.likelihood.n_used < 12 * 30
     for ξ in make_xi_points(line_posterior.latent):
         value, grad = line_posterior.value_and_grad(ξ)

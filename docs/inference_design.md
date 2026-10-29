@@ -128,12 +128,13 @@ All of this agrees to rtol 1e-14 on CPU.
 
 ## Masking without NaN gradients
 
-Real data have masked pixels whose values are often NaN. A likelihood written as
+Real data have masked data points, whose values are often NaN. A likelihood written as
 `jnp.where(mask, logpdf(data, pred), 0)` gives the right *value*, but its
 *gradient* is NaN: `where` multiplies the unused branch's derivative by zero, and
-0 × NaN = NaN. `GaussianLikelihood` removes masked pixels when it is built
-(keeping the indices of the used pixels), so masked values never enter a
-computation. It also drops pixels with non-finite data or inverse variance ≤ 0.
+0 × NaN = NaN. `GaussianLikelihood` removes masked data points when it is built
+(keeping the indices of the used data points), so masked values never enter a
+computation. It also drops data points with a non-finite value or an inverse
+variance ≤ 0.
 
 ## Staging
 

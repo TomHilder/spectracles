@@ -36,7 +36,7 @@ def tiny_line_model():
 
 @pytest.fixture
 def line_posterior():
-    """tiny_line_model + masked data (NaN at ~10% of pixels) as a Posterior."""
+    """tiny_line_model + masked data (NaN at ~10% of data points) as a Posterior."""
     from jax import random
 
     from spectracles.inference import GaussianLikelihood, LatentSpace, Posterior
