@@ -354,6 +354,23 @@ def test_draws_of_params_and_latents(tiny_line_model):
         latent.draws(stacked, to="values")  # type: ignore[arg-type]
 
 
+def test_draws_axis_and_custom_statistic():
+    from spectracles.inference import Draws
+
+    x = random.normal(random.PRNGKey(0), (2, 5, 3))  # (chain, draw, quantity)
+    draws = Draws({"a": x}, n_sample_axes=2)
+    np.testing.assert_allclose(draws.mean()["a"], x.mean(axis=(0, 1)), rtol=1e-6)
+    np.testing.assert_allclose(draws.mean(axis=1)["a"], x.mean(axis=1), rtol=1e-6)
+    np.testing.assert_allclose(draws.std(axis=-1)["a"], x.std(axis=1), rtol=1e-6)
+    np.testing.assert_allclose(draws.median(axis=(0,))["a"], np.median(x, axis=0), rtol=1e-6)
+    assert draws.quantile(jnp.array([0.1, 0.9]), axis=1)["a"].shape == (2, 2, 3)
+    np.testing.assert_allclose(draws.reduce(jnp.var)["a"], x.var(axis=(0, 1)), rtol=1e-6)
+    frac = draws["a"].reduce(lambda v, axis: jnp.mean(v > 0, axis=axis), axis=1)
+    np.testing.assert_allclose(frac, (x > 0).mean(axis=1))
+    with pytest.raises(ValueError, match="sample axes"):
+        draws.mean(axis=2)  # a quantity axis, not a sample axis
+
+
 def test_posterior_summary_reduces_over_chain_axes(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     flat = latent.sample_prior_latent(random.PRNGKey(16), n=6)

@@ -18,7 +18,8 @@ class Draws:
     (e.g. parameter values keyed by path). The summaries reduce over the sample
     axes only, so `draws.mean()` has the quantity's own shape (or is a dict of
     them). Draws from several chains, stacked as (chain, draw, ...), reduce
-    over both axes.
+    over both axes; `axis=` picks a subset, e.g. `draws.mean(axis=1)` for the
+    mean of each chain. `reduce(fn)` applies any other statistic.
 
     Args:
         values: The stacked draws: an array, or a dict of arrays.
@@ -54,25 +55,49 @@ class Draws:
             n *= size
         return n
 
-    def _reduce(self, fn: Any) -> Any:
-        axes = tuple(range(self.n_sample_axes))
-        return jax.tree.map(lambda x: fn(x, axes), self.values)
+    def _axes(self, axis: int | tuple[int, ...] | None) -> tuple[int, ...]:
+        """The sample axes to reduce over: all of them by default."""
+        n = self.n_sample_axes
+        if axis is None:
+            return tuple(range(n))
+        axes = (axis,) if isinstance(axis, int) else tuple(axis)
+        if any(not isinstance(a, int) or not -n <= a < n for a in axes):
+            raise ValueError(
+                f"axis must index the {n} sample axes (shape {self.sample_shape}), got {axis!r}."
+            )
+        return tuple(sorted(a % n for a in axes))
 
-    def mean(self) -> Any:
-        """The mean over the draws."""
-        return self._reduce(lambda x, axes: jnp.mean(x, axis=axes))
+    def reduce(self, fn: Any, axis: int | tuple[int, ...] | None = None) -> Any:
+        """Any statistic over the draws: `fn(x, axis=axes)` for each array.
 
-    def std(self) -> Any:
-        """The standard deviation over the draws."""
-        return self._reduce(lambda x, axes: jnp.std(x, axis=axes))
+        `fn` reduces over the given axes, as numpy-style reductions do, e.g.
+        `draws.reduce(jnp.var)` or
+        `draws.reduce(lambda x, axis: jnp.mean(x > 0, axis=axis))`.
 
-    def median(self) -> Any:
-        """The median over the draws."""
-        return self._reduce(lambda x, axes: jnp.median(x, axis=axes))
+        Args:
+            fn: Called as `fn(x, axis=axes)`, with `axes` a tuple of sample axes.
+            axis: The sample axes to reduce over: all of them (default), or an
+                index or tuple of indices into `sample_shape`, e.g. `axis=1` on
+                (chain, draw) draws gives one value per chain.
+        """
+        axes = self._axes(axis)
+        return jax.tree.map(lambda x: fn(x, axis=axes), self.values)
 
-    def quantile(self, q: float | Array) -> Any:
+    def mean(self, axis: int | tuple[int, ...] | None = None) -> Any:
+        """The mean over the draws (over `axis` of the sample axes, if given)."""
+        return self.reduce(jnp.mean, axis)
+
+    def std(self, axis: int | tuple[int, ...] | None = None) -> Any:
+        """The standard deviation over the draws (over `axis`, if given)."""
+        return self.reduce(jnp.std, axis)
+
+    def median(self, axis: int | tuple[int, ...] | None = None) -> Any:
+        """The median over the draws (over `axis`, if given)."""
+        return self.reduce(jnp.median, axis)
+
+    def quantile(self, q: float | Array, axis: int | tuple[int, ...] | None = None) -> Any:
         """Quantile(s) `q` (in [0, 1]) over the draws; several q add a leading axis."""
-        return self._reduce(lambda x, axes: jnp.quantile(x, jnp.asarray(q), axis=axes))
+        return self.reduce(lambda x, axis: jnp.quantile(x, jnp.asarray(q), axis=axis), axis)
 
     def __getitem__(self, key: str) -> "Draws":
         """The draws of one entry, when the quantity is a dict (e.g. one parameter)."""

@@ -416,6 +416,7 @@ models = posterior.draws(samples, to="model")
 maps = models(spaxels)  # the whole model, at every sample
 mean_map, std_map = maps.mean(), maps.std()  # each (n_spaxels,)
 lower, upper = maps.quantile(0.16), maps.quantile(0.84)
+maps.reduce(jnp.var)  # any statistic fn(x, axis=...)
 flux = models.log_flux(spaxels).mean()  # any component, the same way
 ```
 
@@ -431,7 +432,8 @@ predictions = posterior.map_samples(posterior.forward, samples).mean()
 
 `.values` holds the stacked draws themselves, e.g. for corner plots. Samples
 from several chains, stacked as `(chain, draw, ...)`, are summarised over both
-axes. A single draw goes through `latent.to_model(ξ)` instead. Everything is
+axes; give `axis=` to reduce over some of them, e.g. `maps.mean(axis=1)` for the
+mean of each chain. A single draw goes through `latent.to_model(ξ)` instead. Everything is
 computed when you ask for it and held in memory, so for very large fields
 evaluate on fewer points or fewer samples at a time.
 
