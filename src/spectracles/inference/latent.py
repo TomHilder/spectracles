@@ -150,13 +150,25 @@ class LatentSpace:
             )
         return ξ
 
-    def to_model(self, ξ: Latent) -> ShareModule:
-        """The model with every free parameter set to its value at ξ (one draw).
+    def to_model(self, x: Any, space: Literal["latent", "params"] = "latent") -> ShareModule:
+        """The model with every free parameter set from one draw.
 
         Shared parameters are written once, at their parent path. Fixed
         parameters and Known values keep their values. Works under jit/grad/vmap.
+
+        Args:
+            x: One draw, as a dict keyed by parameter path: latents ξ by
+                default, or parameter values with `space="params"` (e.g. the
+                output of `to_params`, or `draws(samples).mean()`).
+            space: "latent" (default) or "params": the space `x` is in.
         """
-        return self.model.set(self.to_params(as_latent_dict(ξ)))  # type: ignore[no-any-return]
+        if space == "latent":
+            values = self.to_params(as_latent_dict(x))
+        elif space == "params":
+            values = self._checked(as_latent_dict(x), what="parameter values")
+        else:
+            raise ValueError(f'space must be "latent" or "params", got {space!r}.')
+        return self.model.set(values)  # type: ignore[no-any-return]
 
     def from_model(
         self, model: ShareModule, fallback: Literal["zero", "raise"] = "zero"
@@ -249,14 +261,14 @@ class LatentSpace:
         """Latents at zero (every parameter at its prior median)."""
         return {p: jnp.zeros(s.shape, s.dtype) for p, s in self.shapes.items()}
 
-    def _sample_values(self, samples: Any, samples_type: str, caller: str) -> dict[str, Array]:
+    def _sample_values(self, samples: Any, space: str, caller: str) -> dict[str, Array]:
         """Parameter values of stacked samples, given as latents or as values."""
-        if samples_type == "latent":
+        if space == "latent":
             values = self.to_params(samples)
-        elif samples_type == "params":
+        elif space == "params":
             values = self._checked(as_latent_samples(samples), what="parameter values")
         else:
-            raise ValueError(f'samples_type must be "latent" or "params", got {samples_type!r}.')
+            raise ValueError(f'space must be "latent" or "params", got {space!r}.')
         if any(jnp.ndim(values[p]) <= len(self.shapes[p].shape) for p in self.paths):
             raise ValueError(
                 f"{caller} needs samples stacked along a leading axis; got a single "
@@ -268,7 +280,7 @@ class LatentSpace:
         self,
         fn: Callable[[ShareModule], Any],
         samples: Any,
-        samples_type: Literal["latent", "params"] = "latent",
+        space: Literal["latent", "params"] = "latent",
     ) -> Draws:
         """Evaluate `fn(model)` at every sample, stacked along the samples' leading axes.
 
@@ -283,13 +295,13 @@ class LatentSpace:
                 gets has shared values filled in (as by `for_evaluation`), so
                 any part of it can be called.
             samples: Stacked samples, as for `posterior_summary`.
-            samples_type: "latent" (default) or "params", as for `posterior_summary`.
+            space: "latent" (default) or "params", as for `posterior_summary`.
 
         Returns:
             `Draws` of `fn`'s output: `.mean()`, `.std()`, `.quantile(q)` etc.
             summarise over the samples; `.values` holds the stacked outputs.
         """
-        values = self._sample_values(samples, samples_type, "map_samples")
+        values = self._sample_values(samples, space, "map_samples")
         batch = self._sample_shape(values)
         flat = {p: jnp.reshape(v, (-1, *self.shapes[p].shape)) for p, v in values.items()}
         out = jax.vmap(lambda θ: fn(self.model.set(θ).for_evaluation()))(flat)
@@ -299,35 +311,34 @@ class LatentSpace:
     def draws(
         self,
         samples: Any,
-        of: Literal["params", "latent", "model"] = "params",
-        samples_type: Literal["latent", "params"] = "latent",
+        to: Literal["params", "latent", "model"] = "params",
+        space: Literal["latent", "params"] = "latent",
     ) -> "Draws | ModelDraws":
         """Samples as draws of the parameter values (default), the latents, or the model.
 
+        `space` says what the samples are; `to` says what you get out.
         For "params" and "latent", returns `Draws`: `.mean()`, `.std()`,
         `.quantile(q)` etc. give {path: summary}, and `draws[path]` is one
         parameter's draws. For "model", returns `ModelDraws`: call it, or any
         part of it, to get `Draws` of that part's output, e.g.
-        `draws(samples, of="model").field(grid).mean()`.
+        `draws(samples, to="model").field(grid).mean()`.
 
         Args:
             samples: Stacked samples, as for `posterior_summary`.
-            of: "params" (default), "latent" or "model".
-            samples_type: What `samples` are: "latent" (default) or "params".
+            to: What to return draws of: "params" (default), "latent" or "model".
+            space: The space `samples` are in: "latent" (default) or "params".
         """
-        if of == "model":
-            return ModelDraws(self, self._sample_values(samples, samples_type, "draws"))
-        if of == "params":
-            values = self._sample_values(samples, samples_type, "draws")
-        elif of == "latent":
-            if samples_type != "latent":
-                raise ValueError(
-                    "Draws of the latents need latent samples (samples_type='latent')."
-                )
+        if to == "model":
+            return ModelDraws(self, self._sample_values(samples, space, "draws"))
+        if to == "params":
+            values = self._sample_values(samples, space, "draws")
+        elif to == "latent":
+            if space != "latent":
+                raise ValueError("Draws of the latents need latent samples (space='latent').")
             values = self._checked(as_latent_samples(samples))
             self._sample_values(values, "latent", "draws")  # checks the sample axis
         else:
-            raise ValueError(f'of must be "params", "latent" or "model", got {of!r}.')
+            raise ValueError(f'to must be "params", "latent" or "model", got {to!r}.')
         return Draws(values, n_sample_axes=len(self._sample_shape(values)))
 
     def _sample_shape(self, values: dict[str, Array]) -> tuple[int, ...]:
@@ -337,7 +348,7 @@ class LatentSpace:
     def posterior_summary(
         self,
         samples: Any,
-        samples_type: Literal["latent", "params"] = "latent",
+        space: Literal["latent", "params"] = "latent",
         print_table: bool = True,
         true_latents: Any = None,
         true_params: Any = None,
@@ -348,7 +359,7 @@ class LatentSpace:
             samples: Samples with a leading sample axis: by default latents (a
                 NIFTy `Samples` object, or a dict from path to stacked latents,
                 as inference returns them).
-            samples_type: "latent" (default) or "params". Use "params" for
+            space: "latent" (default) or "params". Use "params" for
                 samples that are already parameter values, e.g. from `to_params`
                 or `sample_prior_params`; with the default they would be
                 transformed a second time.
@@ -362,7 +373,7 @@ class LatentSpace:
             Dict from path to {"mean": array, "std": array} of the parameter
             values, with "truth" and "z" added when a truth is given.
         """
-        values = self._sample_values(samples, samples_type, "posterior_summary")
+        values = self._sample_values(samples, space, "posterior_summary")
         draws = Draws(values, n_sample_axes=len(self._sample_shape(values)))
         means, stds = draws.mean(), draws.std()
         summary = {p: {"mean": means[p], "std": stds[p]} for p in values}

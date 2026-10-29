@@ -78,7 +78,7 @@ pip install -e .
   losses will be deprecated.
 
 - **Planned (1.2): lazy draws for large fields.** `posterior.draws(samples,
-  of="model")` evaluates and holds every draw in memory. For many samples of a
+  to="model")` evaluates and holds every draw in memory. For many samples of a
   field on many points, summaries will be computed in chunks of samples
   (streaming mean and variance; quantiles in chunks of points), with the full
   draws built only on request.

@@ -217,7 +217,7 @@ def test_model_draws_call_any_part(line_posterior):
 
     post, data = line_posterior, line_data()
     stacked = post.sample_prior_latent(random.PRNGKey(17), n=4)
-    models = post.draws(stacked, of="model")
+    models = post.draws(stacked, to="model")
     assert isinstance(models, ModelDraws) and isinstance(models.line_2.v, ModelDraws)
 
     def one(i):
@@ -239,7 +239,7 @@ def test_model_draws_call_any_part(line_posterior):
 def test_model_draws_errors(line_posterior):
     post = line_posterior
     stacked = post.sample_prior_latent(random.PRNGKey(18), n=2)
-    models = post.draws(stacked, of="model")
+    models = post.draws(stacked, to="model")
     with pytest.raises(AttributeError, match="line_1 has no attribute 'nope'"):
         _ = models.line_1.nope
     with pytest.raises(TypeError, match="not callable"):

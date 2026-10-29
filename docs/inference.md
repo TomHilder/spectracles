@@ -210,7 +210,8 @@ forms of the same draw: the latents ξ, the parameter values, and a model.
 - `latent.to_params(ξ)` gives the free parameters' values, a dict keyed by the
   same paths;
 - `latent.to_model(ξ)` gives an ordinary model with those values (the same as
-  `model.set(latent.to_params(ξ))`);
+  `model.set(latent.to_params(ξ))`). For a draw that is already parameter
+  values, use `latent.to_model(values, space="params")`;
 - `latent.from_model(model)` goes the other way, e.g. to start inference from
   an earlier fit.
 
@@ -392,17 +393,17 @@ values and z = (mean − truth) / std.
 
 The summary takes latent samples, as inference returns them. For samples that
 are already parameter values (from `to_params` or `sample_prior_params`), say so
-with `samples_type="params"`; otherwise they would be transformed a second time:
+with `space="params"`; otherwise they would be transformed a second time:
 
 ```python
 prior_values = latent.sample_prior_params(random.PRNGKey(4), n=500)
-prior_summary = latent.posterior_summary(prior_values, samples_type="params", print_table=False)
+prior_summary = latent.posterior_summary(prior_values, space="params", print_table=False)
 ```
 
 ### Anything derived from the model
 
 `posterior.draws(samples)` gives the samples as draws of the parameter values,
-`of="latent"` as draws of the latents, and `of="model"` as draws of the model
+`to="latent"` as draws of the latents, and `to="model"` as draws of the model
 itself: call it, or any part of it, and you get that part's output at every
 sample. All of these are `Draws`, whose summaries are over the samples:
 
@@ -411,7 +412,7 @@ params = posterior.draws(samples)  # parameter values
 params.mean()  # {path: mean}
 params["log_flux.kernel.length_scale"].std()
 
-models = posterior.draws(samples, of="model")
+models = posterior.draws(samples, to="model")
 maps = models(spaxels)  # the whole model, at every sample
 mean_map, std_map = maps.mean(), maps.std()  # each (n_spaxels,)
 lower, upper = maps.quantile(0.16), maps.quantile(0.84)
@@ -440,11 +441,13 @@ evaluate on fewer points or fewer samples at a time.
     - the **mean of each parameter**, `summary[path]["mean"]`;
     - the **model at the mean latent**, e.g. `latent.to_model(samples.pos)` for
       NIFTy samples;
+    - the **model at the mean parameters**,
+      `latent.to_model(posterior.draws(samples).mean(), space="params")`;
     - the **posterior mean of a derived quantity**, e.g. `maps.mean()`.
 
-    The model evaluated at mean parameters is not the mean map, and averaging
-    the GP coefficients gives a field smoother than any sample. For maps and
-    their uncertainties, use the third.
+    Neither model is the mean map, and averaging the GP coefficients gives a
+    field smoother than any sample. For maps and their uncertainties, use the
+    last.
 
 ### With ArviZ
 

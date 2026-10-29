@@ -123,6 +123,19 @@ def test_to_model_sets_transformed_values(tiny_line_model):
         np.testing.assert_allclose(leaf(m, p).val, latent.priors[p].transform(ξ[p]), rtol=RTOL)
 
 
+def test_to_model_from_params(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    ξ = latent.sample_prior_latent(random.PRNGKey(0))
+    from_latents = latent.to_model(ξ)
+    from_params = latent.to_model(latent.to_params(ξ), space="params")
+    for p in latent.paths:
+        np.testing.assert_allclose(leaf(from_params, p).val, leaf(from_latents, p).val)
+    with pytest.raises(ValueError, match="unknown"):
+        latent.to_model({**latent.to_params(ξ), "nope": jnp.zeros(1)}, space="params")
+    with pytest.raises(ValueError, match="space"):
+        latent.to_model(ξ, space="values")  # type: ignore[arg-type]
+
+
 def test_to_model_leaves_fixed_and_known_untouched(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     m = latent.to_model(latent.sample_prior_latent(random.PRNGKey(0)))
@@ -254,13 +267,13 @@ def test_posterior_summary_of_latents_or_params(tiny_line_model):
     stacked = latent.sample_prior_latent(random.PRNGKey(9), n=20)
     from_latents = latent.posterior_summary(stacked, print_table=False)
     from_params = latent.posterior_summary(
-        latent.to_params(stacked), samples_type="params", print_table=False
+        latent.to_params(stacked), space="params", print_table=False
     )
     for p in latent.paths:
         np.testing.assert_allclose(from_params[p]["mean"], from_latents[p]["mean"])
         np.testing.assert_allclose(from_params[p]["std"], from_latents[p]["std"])
-    with pytest.raises(ValueError, match="samples_type"):
-        latent.posterior_summary(stacked, samples_type="values", print_table=False)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="space"):
+        latent.posterior_summary(stacked, space="values", print_table=False)  # type: ignore[arg-type]
 
 
 def test_posterior_summary_with_truth(tiny_line_model):
@@ -298,7 +311,7 @@ def test_map_samples_matches_a_loop_over_to_model(tiny_line_model):
         np.testing.assert_allclose(out["ls"][i], one["ls"])
         np.testing.assert_allclose(out["two"][i], one["two"])
     # Parameter values give the same result
-    by_params = latent.map_samples(fn, latent.to_params(stacked), samples_type="params").values
+    by_params = latent.map_samples(fn, latent.to_params(stacked), space="params").values
     np.testing.assert_allclose(by_params["ls"], out["ls"])
     # (chain, draw) axes are kept
     chains = {p: v.reshape(2, 3, *v.shape[1:]) for p, v in stacked.items()}
@@ -331,14 +344,14 @@ def test_draws_of_params_and_latents(tiny_line_model):
     q = params["offset.tile_values"].quantile(jnp.array([0.16, 0.84]))
     assert q.shape == (2, 2)
     np.testing.assert_allclose(
-        latent.draws(stacked, of="latent").mean()["offset.tile_values"],
+        latent.draws(stacked, to="latent").mean()["offset.tile_values"],
         stacked["offset.tile_values"].mean(axis=0),
     )
-    assert latent.draws(values, samples_type="params").keys() == latent.paths
+    assert latent.draws(values, space="params").keys() == latent.paths
     with pytest.raises(KeyError, match="nope"):
         params["nope"]
-    with pytest.raises(ValueError, match="of must be"):
-        latent.draws(stacked, of="values")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="to must be"):
+        latent.draws(stacked, to="values")  # type: ignore[arg-type]
 
 
 def test_posterior_summary_reduces_over_chain_axes(tiny_line_model):

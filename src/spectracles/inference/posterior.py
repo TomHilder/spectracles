@@ -82,8 +82,9 @@ class Posterior:
 
     # Conveniences forwarded to the latent space
 
-    def to_model(self, ξ: Latent) -> ShareModule:
-        return self.latent.to_model(ξ)
+    def to_model(self, x: Any, space: Literal["latent", "params"] = "latent") -> ShareModule:
+        """The model at one draw, given as latents or parameter values: `LatentSpace.to_model`."""
+        return self.latent.to_model(x, space=space)
 
     def to_params(self, ξ: Any) -> dict[str, Array]:
         return self.latent.to_params(ξ)
@@ -92,24 +93,24 @@ class Posterior:
         self,
         fn: Callable[[ShareModule], Any],
         samples: Any,
-        samples_type: Literal["latent", "params"] = "latent",
+        space: Literal["latent", "params"] = "latent",
     ) -> Draws:
         """Evaluate `fn(model)` at every sample: `LatentSpace.map_samples`."""
-        return self.latent.map_samples(fn, samples, samples_type=samples_type)
+        return self.latent.map_samples(fn, samples, space=space)
 
     def draws(
         self,
         samples: Any,
-        of: Literal["params", "latent", "model"] = "params",
-        samples_type: Literal["latent", "params"] = "latent",
+        to: Literal["params", "latent", "model"] = "params",
+        space: Literal["latent", "params"] = "latent",
     ) -> Draws | ModelDraws:
         """Samples as draws of the parameter values, latents or model: `LatentSpace.draws`."""
-        return self.latent.draws(samples, of=of, samples_type=samples_type)
+        return self.latent.draws(samples, to=to, space=space)
 
     def summary(
         self,
         samples: Any,
-        samples_type: Literal["latent", "params"] = "latent",
+        space: Literal["latent", "params"] = "latent",
         print_table: bool = True,
         true_latents: Any = None,
         true_params: Any = None,
@@ -117,7 +118,7 @@ class Posterior:
         """Summarise samples as parameter values: `LatentSpace.posterior_summary`."""
         return self.latent.posterior_summary(
             samples,
-            samples_type=samples_type,
+            space=space,
             print_table=print_table,
             true_latents=true_latents,
             true_params=true_params,

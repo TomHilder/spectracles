@@ -106,7 +106,7 @@ class ModelDraws:
     parts that hold shared parameters can be called. For parameter values, use
     `posterior.draws(samples)` instead.
 
-    Obtained with `LatentSpace.draws(samples, of="model")` (or the same on a
+    Obtained with `LatentSpace.draws(samples, to="model")` (or the same on a
     `Posterior`); not constructed directly.
     """
 
@@ -154,7 +154,7 @@ class ModelDraws:
         def evaluate(model: Any) -> Any:
             return self._resolve(model.model)(*args, **kwargs)
 
-        return self._latent.map_samples(evaluate, self._params, samples_type="params")
+        return self._latent.map_samples(evaluate, self._params, space="params")
 
     def __repr__(self) -> str:
         name = ".".join(self._path) or "model"
