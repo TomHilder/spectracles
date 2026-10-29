@@ -332,6 +332,39 @@ def test_map_samples_can_call_parts_holding_shared_parameters(tiny_line_model):
     assert out.values.shape[0] == 3
 
 
+def test_fix_holds_parameters_at_values(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    fixed = latent.fix({"line_2.v.kernel.length_scale": 0.3, "offset.tile_values": [1.0, 2.0]})
+    assert "line_1.v.kernel.length_scale" not in fixed.paths  # named by its shared path
+    assert "offset.tile_values" not in fixed.paths
+    assert len(fixed.paths) == len(latent.paths) - 2
+    assert len(latent.paths) == 12  # the original is unchanged
+    m = fixed.to_model(fixed.sample_prior_latent(random.PRNGKey(0))).for_evaluation()
+    for path in ("line_1.v.kernel.length_scale", "line_2.v.kernel.length_scale"):
+        np.testing.assert_allclose(leaf(m, path).val, [0.3])  # scalar broadcast to (1,)
+    np.testing.assert_allclose(leaf(m, "offset.tile_values").val, [1.0, 2.0])
+    by_latent = latent.fix({"line_1.v.kernel.length_scale": 0.0}, space="latent")
+    np.testing.assert_allclose(
+        leaf(by_latent.model, "line_1.v.kernel.length_scale").val,
+        latent.priors["line_1.v.kernel.length_scale"].transform(jnp.zeros(1)),
+    )
+
+
+def test_fix_errors_and_truth(tiny_line_model):
+    latent = LatentSpace(tiny_line_model)
+    with pytest.raises(ValueError, match="not a free parameter"):
+        latent.fix({"line_1.σ": 1.0})
+    with pytest.raises(ValueError, match="expected \\(2,\\)"):
+        latent.fix({"offset.tile_values": [1.0, 2.0, 3.0]})
+    with pytest.raises(ValueError, match="space"):
+        latent.fix({"offset.tile_values": 1.0}, space="values")  # type: ignore[arg-type]
+    θ = latent.sample_prior_params(random.PRNGKey(1))
+    fixed = latent.fix({"offset.tile_values": θ["offset.tile_values"]})
+    stacked = fixed.sample_prior_latent(random.PRNGKey(2), n=4)
+    summary = fixed.posterior_summary(stacked, print_table=False, true_params=θ)
+    assert "offset.tile_values" not in summary and "truth" in summary["scatter.spaxel_values"]
+
+
 def test_draws_of_params_and_latents(tiny_line_model):
     latent = LatentSpace(tiny_line_model)
     stacked = latent.sample_prior_latent(random.PRNGKey(15), n=8)

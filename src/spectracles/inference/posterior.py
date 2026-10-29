@@ -80,6 +80,16 @@ class Posterior:
         """The unnormalised log-posterior: log-likelihood - ½|ξ|²."""
         return self.log_likelihood(ξ) + self.log_prior(ξ)
 
+    def fix(
+        self, values: dict[str, Any], space: Literal["latent", "params"] = "params"
+    ) -> "Posterior":
+        """A new posterior with these parameters fixed: `LatentSpace.fix`.
+
+        It has the same forward model and likelihood; this posterior is
+        unchanged.
+        """
+        return Posterior(self.latent.fix(values, space=space), self.forward, self.likelihood)
+
     # Conveniences forwarded to the latent space
 
     def to_model(self, x: Any, space: Literal["latent", "params"] = "latent") -> ShareModule:

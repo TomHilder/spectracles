@@ -257,6 +257,55 @@ class LatentSpace:
             return self.to_model(ξ)
         return [self.to_model({p: v[i] for p, v in ξ.items()}) for i in range(n)]
 
+    def fix(
+        self, values: dict[str, Any], space: Literal["latent", "params"] = "params"
+    ) -> "LatentSpace":
+        """A new latent space with these parameters fixed at the given values.
+
+        The fixed parameters are no longer inferred: they drop out of `paths`,
+        and every model this latent space makes holds them at these values.
+        This latent space is unchanged, so the original free parameters stay
+        available. A shared parameter can be named by any of its paths.
+
+        Args:
+            values: Dict from parameter path to its value; a single number is
+                broadcast to the parameter's shape.
+            space: "params" (default) for parameter values, or "latent" for
+                latents ξ (transformed by each parameter's prior).
+        """
+        if space not in ("latent", "params"):
+            raise ValueError(f'space must be "latent" or "params", got {space!r}.')
+        if not isinstance(values, dict):
+            raise TypeError(f"fix needs a dict from path to value, got {type(values).__name__}.")
+        child_to_parent = self.model._child_to_parent()
+        fixed: dict[str, Array] = {}
+        for path, value in values.items():
+            p = child_to_parent.get(path, path)
+            if p not in self.priors:
+                raise ValueError(
+                    f"'{path}' is not a free parameter here; these are: {self.paths}."
+                )
+            shape = self.shapes[p]
+            v = jnp.asarray(value, shape.dtype)
+            if v.shape != shape.shape:
+                if v.size != 1:
+                    raise ValueError(
+                        f"The value for '{path}' has shape {v.shape}, expected {shape.shape}."
+                    )
+                v = jnp.broadcast_to(v.reshape(()), shape.shape)
+            fixed[p] = self.priors[p].transform(v) if space == "latent" else v
+        model = self.model.set(fixed).set_fixed_status(list(fixed), [True] * len(fixed))
+        return LatentSpace(model)
+
+    def _fixed_paths(self) -> set[str]:
+        """Paths (shared ones included) of parameters that are fixed, not Known."""
+        paths = set()
+        for path in self.model.get_parameter_paths(show_shared=True, show_knowns=False):
+            param = use_path_get_leaf(self.model.model, str_to_leafpath(path))
+            if not isinstance(param, Known) and param.fix:
+                paths.add(path)
+        return paths
+
     def zeros(self) -> Latent:
         """Latents at zero (every parameter at its prior median)."""
         return {p: jnp.zeros(s.shape, s.dtype) for p, s in self.shapes.items()}
@@ -367,7 +416,8 @@ class LatentSpace:
             true_latents: Optionally, the true latents (one draw), e.g. for
                 simulated data. Adds the truth and z = (mean - truth) / std.
             true_params: The same, given as parameter values. Give at most one
-                of `true_latents` and `true_params`.
+                of `true_latents` and `true_params`. Entries for fixed
+                parameters (e.g. ones fixed with `fix`) are ignored.
 
         Returns:
             Dict from path to {"mean": array, "std": array} of the parameter
@@ -390,10 +440,15 @@ class LatentSpace:
         """The true parameter values (one draw) from either form, or None."""
         if true_latents is not None and true_params is not None:
             raise ValueError("Give true_latents or true_params, not both.")
+        given = true_latents if true_latents is not None else true_params
+        if isinstance(given, dict) or hasattr(given, "tree"):
+            # A truth for the full model also covers parameters fixed since: drop them
+            fixed = self._fixed_paths()
+            given = {p: v for p, v in as_latent_dict(given).items() if p not in fixed}
         if true_latents is not None:
-            truth = self.to_params(as_latent_dict(true_latents))
+            truth = self.to_params(given)
         elif true_params is not None:
-            truth = self._checked(as_latent_dict(true_params), what="parameter values")
+            truth = self._checked(given, what="parameter values")
         else:
             return None
         for p in self.paths:

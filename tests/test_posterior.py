@@ -246,3 +246,16 @@ def test_model_draws_errors(line_posterior):
         models.line_1.σ()
     with pytest.raises(AttributeError, match="read-only"):
         models.line_1 = None
+
+
+def test_posterior_fix(line_posterior):
+    path = "line_1.log_A.kernel.variance"
+    fixed = line_posterior.fix({path: 0.7})
+    assert path not in fixed.latent.paths and path in line_posterior.latent.paths
+    assert fixed.likelihood is line_posterior.likelihood
+    ξ = fixed.latent.sample_prior_latent(random.PRNGKey(3))
+    assert jnp.isfinite(fixed.log_density(ξ))
+    full = {**ξ, path: line_posterior.latent.priors[path].inverse(jnp.array([0.7]))}
+    np.testing.assert_allclose(
+        fixed.log_likelihood(ξ), line_posterior.log_likelihood(full), rtol=1e-5
+    )

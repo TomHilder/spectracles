@@ -325,6 +325,26 @@ samples are drawn along it.
 [How it works](inference_design.md#staging) explains why that needs two of
 NIFTy's settings.
 
+### Fixing parameters for a whole fit
+
+To hold some parameters at chosen values for a whole fit, with any backend,
+`fix` gives a new posterior without them. The original keeps them free, so you
+can switch between the two:
+
+```python
+fixed = posterior.fix({"log_flux.kernel.length_scale": 0.5})
+print(len(posterior.latent.paths), len(fixed.latent.paths))
+```
+
+```text
+4 3
+```
+
+Values are parameter values by default (`space="latent"` takes latents), and a
+single number fills a parameter of any shape. A summary's `true_params=`
+ignores entries for parameters fixed this way, so the truth for the full model
+still works.
+
 ### NUTS (BlackJAX)
 
 The posterior's `log_density` is a valid BlackJAX target. NIFTy isn't needed.
