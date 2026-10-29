@@ -101,6 +101,44 @@ model = model.fix_all()
 model = model.free_all()
 ```
 
+## Evaluating Parts of a Model
+
+Calling the whole model always works, with or without sharing:
+
+```python
+# sketch
+prediction = model(data)
+```
+
+Calling a *part* of it needs care when that part contains sharing. A shared
+parameter is stored once, at its parent location; its other locations hold a
+`Shared` reference to it. That is what makes it one parameter: it is updated in
+one place (by `set`, an optimiser or the latent space) and every location sees
+the same value. But a submodule that holds such a reference can't be called on
+its own, because the reference is not a value:
+
+```python
+# sketch
+model = build_model(TwoLines, line_1=Line(v=shared_gp), line_2=Line(v=shared_gp))
+model.line_1(data)  # fine: line_1 holds the shared GP itself
+model.line_2(data)  # RuntimeError: line_2 holds a reference to line_1.v
+```
+
+`for_evaluation()` returns a copy with every reference replaced by its value, so
+any part can be called or inspected:
+
+```python
+# sketch
+evaluable = model.for_evaluation()
+flux_2 = evaluable.line_2(data)
+velocity = evaluable.line_2.v(grid)
+```
+
+The copy no longer tracks sharing, so use it for evaluation only (predictions,
+plots, checks), not for optimisation or to build a `LatentSpace`. Keep working
+with the original model for those. (`get_locked_model()` is the old name of
+`for_evaluation()` and is deprecated.)
+
 ## Priors
 
 ```python
@@ -144,7 +182,7 @@ info = model.validate_sharing()
         - free_all
         - validate_sharing
         - copy
-        - get_locked_model
+        - for_evaluation
         - debug_repr
 
 ::: spectracles.build_model

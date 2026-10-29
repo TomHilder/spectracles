@@ -271,7 +271,7 @@ class TestOptimiserSchedule:
 
         # Final model should be close to optimal
         final_model = schedule.model_history[-1]
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         assert jnp.allclose(locked.a.val, 0.5, rtol=1e-1)
 
 
@@ -592,18 +592,18 @@ class TestManagedOptimiserSchedule:
         ]
 
         schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
-        initial_loss = self.loss_fn(self.model.get_locked_model(), self.x, self.y)
+        initial_loss = self.loss_fn(self.model.for_evaluation(), self.x, self.y)
 
         schedule.run_all(x=self.x, y=self.y)
 
         final_model = schedule.model_history[-1]
-        final_loss = self.loss_fn(final_model.get_locked_model(), self.x, self.y)
+        final_loss = self.loss_fn(final_model.for_evaluation(), self.x, self.y)
 
         # Loss should decrease significantly
         assert final_loss < initial_loss * 0.1
 
         # Parameter should be close to optimal (2.0)
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         assert jnp.allclose(locked.param.val, 2.0, rtol=0.1)
 
     def test_reset_and_rerun(self):

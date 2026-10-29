@@ -217,7 +217,7 @@ def test_with_priors_globs():
 def test_with_priors_fixed():
     model = make_outer()
     new = model.with_priors({"a": "fixed", "inner.p": Normal(0.0, 1.0)})
-    locked = new.get_locked_model()
+    locked = new.for_evaluation()
     assert locked.model.a.fix
     assert not locked.model.inner.p.fix and not locked.model.b.fix
     assert new.get_priors() == {"inner.p": Normal(0.0, 1.0)}
@@ -240,12 +240,12 @@ def test_with_priors_child_path_sets_the_one_parameter():
     model = make_outer()
     new = model.with_priors({"b": Uniform(0.0, 5.0)})  # b is shared from inner.p
     assert new.get_priors() == {"inner.p": Uniform(0.0, 5.0)}
-    locked = new.get_locked_model()
+    locked = new.for_evaluation()
     assert locked.model.b.prior == locked.model.inner.p.prior == Uniform(0.0, 5.0)
     # Still one parameter
     assert new.get_sharing_summary(level="parameter") == {"inner.p": ["b"]}
     new = new.set(["inner.p"], [jnp.array([4.0])])
-    locked = new.get_locked_model()
+    locked = new.for_evaluation()
     assert locked.model.b.val == locked.model.inner.p.val == 4.0
 
 
@@ -260,7 +260,7 @@ def test_with_priors_conflict_raises():
 def test_with_priors_keeps_values_and_status():
     model = make_outer().set_fixed_status(["a"], [True])
     new = model.with_priors({"a": Normal(0.0, 1.0)})
-    old_l, new_l = model.get_locked_model(), new.get_locked_model()
+    old_l, new_l = model.for_evaluation(), new.for_evaluation()
     np.testing.assert_array_equal(new_l.model.a.val, old_l.model.a.val)
     np.testing.assert_array_equal(new_l.model.inner.p.val, old_l.model.inner.p.val)
     assert new_l.model.a.fix  # fixed status kept
@@ -271,12 +271,12 @@ def test_with_priors_rejects_constrained_parameter():
     with pytest.raises(ValueError, match="ConstrainedParameter"):
         model.with_priors({"a": LogNormal(1.0, 0.5)})
     # Fixing it is fine
-    assert model.with_priors({"a": "fixed"}).get_locked_model().model.a.fix
+    assert model.with_priors({"a": "fixed"}).for_evaluation().model.a.fix
 
 
 def test_with_priors_on_locked_model_raises():
     with pytest.raises(ValueError, match="locked"):
-        make_outer().get_locked_model().with_priors({"a": Normal(0.0, 1.0)})
+        make_outer().for_evaluation().with_priors({"a": Normal(0.0, 1.0)})
 
 
 # ---- B7: FourierGP defaults ----
@@ -351,7 +351,7 @@ def test_optimiser_frame_same_with_and_without_priors():
     # operations differently (seen on Linux CI: 1-ULP differences)
     np.testing.assert_allclose(loss_a, loss_b, rtol=1e-13)
     # Compare parameter values (ShareModule's own leaves include id-keyed metadata)
-    la, lb = out_a.get_locked_model().model, out_b.get_locked_model().model
+    la, lb = out_a.for_evaluation().model, out_b.for_evaluation().model
     for path in out_a.get_parameter_paths(show_knowns=True):
         leaf_path = str_to_leafpath(path)
         np.testing.assert_allclose(
@@ -375,7 +375,7 @@ def test_schedule_builder_and_fix_all_with_priors():
         params={"gp.coefficients": free_in(0, 1), "gp.kernel.*": free_after(1)},
     )
     assert schedule is not None
-    assert all(p.fix for p in [model.fix_all().get_locked_model().model.gp.coefficients])
+    assert all(p.fix for p in [model.fix_all().for_evaluation().model.gp.coefficients])
     assert model.fix_all().free_all().get_priors() == model.get_priors()
 
 

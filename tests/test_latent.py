@@ -40,7 +40,7 @@ LINE_PATHS = [
 
 
 def leaf(model, path):
-    return use_path_get_leaf(model.get_locked_model().model, str_to_leafpath(path))
+    return use_path_get_leaf(model.for_evaluation().model, str_to_leafpath(path))
 
 
 # ---- D1: keys ----
@@ -107,7 +107,7 @@ def test_free_constrained_parameter_rejected():
 
 def test_requires_unlocked_share_module(tiny_gp_model):
     with pytest.raises(ValueError):
-        LatentSpace(tiny_gp_model.get_locked_model())
+        LatentSpace(tiny_gp_model.for_evaluation())
     with pytest.raises(TypeError):
         LatentSpace(tiny_gp_model.model)
 

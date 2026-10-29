@@ -282,7 +282,7 @@ class TestBuildSchedule:
         schedule.run_all(x=self.x, y=self.y)
 
         final_model = schedule.model_history[-1]
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         # Should converge to ~2.0
         assert jnp.allclose(locked.param.val, 2.0, rtol=0.1)
 
@@ -453,7 +453,7 @@ class TestBuildScheduleWithSharing:
 
         schedule.run_all(x=x, y=y)
         final_model = schedule.model_history[-1]
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         assert jnp.allclose(locked.a.val, 0.5, rtol=0.1)
 
     def test_shared_model_child_path_raises(self):

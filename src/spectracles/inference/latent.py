@@ -139,7 +139,7 @@ class LatentSpace:
         """
         if fallback not in ("zero", "raise"):
             raise ValueError(f"fallback must be 'zero' or 'raise', got {fallback!r}.")
-        locked = model.get_locked_model() if not model._locked else model
+        locked = model.for_evaluation() if not model._locked else model
         no_inverse = [p for p in self.paths if not self.priors[p].has_inverse]
         if no_inverse and fallback == "raise":
             raise ValueError(f"These parameters' priors have no inverse transform: {no_inverse}")

@@ -151,9 +151,7 @@ def contains_shared(obj: Any) -> bool:
     Examples:
         >>> model = build_model(MyModel, ...)
         >>> if contains_shared(model.line_1):
-        ...     # Use locked model for this sub-component
-        ...     locked = model.get_locked_model()
-        ...     result = locked.line_1(data)
+        ...     result = model.for_evaluation().line_1(data)
         ... else:
         ...     result = model.line_1(data)
     """
@@ -184,11 +182,11 @@ class _SharedSubcomponentProxy:
         raise RuntimeError(
             f"Cannot call '{self._attr_name}' directly - it contains shared parameters "
             f"that have been replaced with Shared sentinel objects.\n\n"
-            f"To call sub-components of the model, use get_locked_model() first:\n"
-            f"    locked_model = model.get_locked_model()\n"
-            f"    result = locked_model.{self._attr_name}(...)\n\n"
-            f"Note: Locked models cannot be optimised, so get_locked_model() is "
-            f"intended for inference/prediction only."
+            f"To call sub-components of the model, evaluate a copy with the shared "
+            f"values filled in:\n"
+            f"    result = model.for_evaluation().{self._attr_name}(...)\n\n"
+            f"Note: that copy no longer tracks sharing, so it is for evaluation "
+            f"only and can't be optimised."
         )
 
     def __repr__(self):
@@ -327,7 +325,7 @@ class ShareModule(Module):
             header.append("locked", style="dim")
         else:
             # Count free vs fixed parameters (unique only, excluding Known)
-            locked = self.get_locked_model()
+            locked = self.for_evaluation()
             unique_paths = self.get_parameter_paths(show_shared=False, show_knowns=False)
             n_free = 0
             n_fixed = 0
@@ -399,7 +397,7 @@ class ShareModule(Module):
 
         # Use locked model to get actual values (not Shared sentinels)
         # and format just the model, not the ShareModule wrapper metadata
-        return eqx.tree_pformat(self.get_locked_model().model)
+        return eqx.tree_pformat(self.for_evaluation().model)
 
     def __call__(self, *args, **kwargs) -> Any:
         # Replace nodes specified by `where` with the nodes specified by `get`
@@ -463,12 +461,33 @@ class ShareModule(Module):
     def _prepare_new_vals(self, val_paths: list[LeafPath], new_vals: list[Array]) -> list[Array]:
         return [self._prepare_new_val(p, v) for p, v in zip(val_paths, new_vals)]
 
-    def get_locked_model(self) -> Self:
-        """
-        Get a locked model. Locked models do not properly track shared parameters and so can no longer be optimised. Since all model parameters contained their actual values instead of some containing Shared objects, any subcomponent of the model may be called to make predictions, which is the primary use case for a locked model. You can't convert a locked model back, but this function returns a copy anyway so it doesn't matter.
+    def for_evaluation(self) -> Self:
+        """A copy of the model for evaluating any part of it.
+
+        In a model with sharing, each shared value is stored once, at its parent
+        location; its other locations hold `Shared` references to it. That is
+        what keeps a shared parameter one parameter, but it means a submodule
+        containing such a reference can't be called on its own. In the copy
+        returned here every reference is replaced by its value, so any
+        submodule can be called, e.g. `model.for_evaluation().line_2.v(data)`.
+
+        The copy no longer tracks sharing, so it is for evaluation only: it
+        can't be optimised or used to build a `LatentSpace`. The model itself is
+        unchanged; calling it (`model(data)`) never needs this.
         """
         cls = type(self)
         return cls(tree_at(self._where, self.model, self._get(self.model)), locked=True)
+
+    def get_locked_model(self) -> Self:
+        """Deprecated alias of `for_evaluation`."""
+        import warnings
+
+        warnings.warn(
+            "get_locked_model() is deprecated; use for_evaluation() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.for_evaluation()
 
     def copy(self) -> Self:
         """
@@ -998,7 +1017,7 @@ class ShareModule(Module):
         console = get_console()
 
         # Get the locked model for traversal
-        locked = self.get_locked_model()
+        locked = self.for_evaluation()
 
         # Build list of parameter info
         params_info = []
