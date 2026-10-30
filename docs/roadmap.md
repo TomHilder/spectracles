@@ -11,6 +11,16 @@ Models can currently be fitted two ways: with `OptimiserFrame` and schedules
 unified: optimisation will move to the latent space, schedules and VI stages
 will share one vocabulary, and the `prior_logpdf` losses will be deprecated.
 
+## Parameters in lists, tuples and dicts (1.1)
+
+Parameters, and modules holding them, must currently be named attributes of a
+module; `build_model` raises a clear error otherwise. 1.1 will support lists,
+tuples and dicts, with paths such as `lines[0].flux` or `lines['Ha'].flux`, so
+models with a variable number of components (e.g. emission lines) can be built
+in a loop. This also makes `MultiFourierGP`, which holds its kernels in a
+list, usable in a built model. Existing paths are unchanged.
+([#4](https://github.com/TomHilder/spectracles/issues/4))
+
 ## Lazy draws for large fields (1.2)
 
 `posterior.draws(samples, to="model")` evaluates and holds every draw in

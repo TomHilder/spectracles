@@ -112,6 +112,16 @@ def test_build_model_takes_a_class_or_an_instance():
         build_model(lambda: 3)
 
 
+def test_parameters_in_containers_not_supported_yet():
+    class Lines(eqx.Module):
+        items: list
+
+    with pytest.raises(TypeError, match=r"inside a list, tuple or dict \(at model\.items\[1\]"):
+        build_model(Lines, [3.0, Parameter(2.0)])
+    with pytest.raises(TypeError, match="planned for 1.1"):
+        build_model(Lines, {"a": FourierGP((5, 5), kernel())})
+
+
 def test_set_unknown_path():
     model = build_model(Field, FourierGP((5, 5), kernel()))
     with pytest.raises(ValueError, match="No parameter at path 'gp.nope'"):

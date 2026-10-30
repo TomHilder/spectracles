@@ -201,6 +201,20 @@ class _SharedSubcomponentProxy:
         setattr(self._obj, name, value)
 
 
+def _check_no_parameters_in_containers(model: Module) -> None:
+    """Raise if a Parameter sits inside a list, tuple or dict (not yet supported)."""
+    from jax.tree_util import GetAttrKey, keystr
+
+    for path, leaf in leaves_with_path(model, is_leaf=is_parameter):
+        if is_parameter(leaf) and not all(isinstance(k, GetAttrKey) for k in path):
+            raise TypeError(
+                f"A Parameter is inside a list, tuple or dict (at model{keystr(path)}). "
+                "Parameters (and modules holding them) must be named attributes of a "
+                "module for now, e.g. one field per emission line instead of a list of "
+                "lines. Support for lists, tuples and dicts is planned for 1.1."
+            )
+
+
 class ShareModule(Module):
     model: Module
 
@@ -230,6 +244,7 @@ class ShareModule(Module):
             raise TypeError("This model is already built (a ShareModule).")
         if not isinstance(model, Module):
             raise TypeError(f"A model must be an equinox Module, got {type(model).__name__}.")
+        _check_no_parameters_in_containers(model)
         # Detect module-level sharing BEFORE any tree manipulation
         # (tree_at operations can break object identity)
         self._shared_components = _detect_shared_modules(model)
