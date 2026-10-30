@@ -9,17 +9,25 @@ pip install spectracles
 pip install "spectracles[nifty]"   # optional: MGVI / geoVI through NIFTy.re
 ```
 
+NUTS needs [BlackJAX](https://github.com/blackjax-devs/blackjax)
+(`pip install blackjax`); MAP uses optax, which is included.
+
 ## Status
+
+From 1.0.0, spectracles follows semantic versioning: the public API (the
+`spectracles`, `spectracles.priors`, `spectracles.inference` and
+`spectracles.nifty` namespaces) only changes incompatibly in a major release,
+after a deprecation warning. Two parts are outside this promise:
 
 !!! warning "Experimental: `spectracles.lvm_models`"
     The LVM-specific models are not covered by the stability promise. They are
     being ported to priors and the latent space one at a time.
 
-!!! note "Planned: one way to fit"
+!!! note "Changing: `OptimiserFrame` and schedules"
     Models can currently be fitted two ways: with `OptimiserFrame` and
     schedules (using `prior_logpdf` losses), or through the latent space
     ([`Posterior`](inference.md) with NIFTy.re, BlackJAX or optax). These
-    will be unified later.
+    will be unified, as the [roadmap](roadmap.md) describes.
 
 ## Quick Start
 

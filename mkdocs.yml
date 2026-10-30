@@ -48,6 +48,7 @@ nav:
     - Priors and inference: inference.md
     - How it works: inference_design.md
     - Schedule Builder: schedule_builder.md
+    - Roadmap: roadmap.md
   - Examples:
     - examples/inference.md
     - examples/schedule_builder.md
