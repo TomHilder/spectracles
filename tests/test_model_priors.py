@@ -25,7 +25,6 @@ from spectracles import (
     save_model,
 )
 from spectracles.model.formatting import get_console
-from spectracles.model.spatial import MultiFourierGP
 from spectracles.priors import Laplace, LogNormal, Normal, Prior, StdNormal, Uniform
 from spectracles.tree.path_utils import str_to_leafpath, use_path_get_leaf
 
@@ -285,8 +284,6 @@ def test_with_priors_on_locked_model_raises():
 def test_fourier_gp_coefficients_default_to_std_normal():
     kernel = Matern32(length_scale=Parameter(1.0), variance=Parameter(1.0))
     assert FourierGP(n_modes=(5, 5), kernel=kernel).coefficients.prior == StdNormal()
-    multi = MultiFourierGP(n_components=2, n_modes=(5, 5), kernels=[kernel, kernel])
-    assert multi.coefficients.prior == StdNormal()
 
 
 def test_fourier_gp_user_coefficients_keep_their_prior():

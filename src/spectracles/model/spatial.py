@@ -198,7 +198,10 @@ class MultiFourierGP(SpatialModel):
     """A collection of independent FourierGPs grouped to better batch through fiNUFFT calls.
     Requires that all component GPs use the same number of modes, but can use different kernels.
 
-    Very much a work in progress.
+    Not available yet: instantiating it raises NotImplementedError. It holds its
+    kernels in a list, which built models will support from 1.1. The aim is
+    faster models with several fields on GPU, since such fields usually share
+    one frequency grid and can go through one batched NUFFT.
     """
 
     coefficients: Parameter
@@ -215,6 +218,10 @@ class MultiFourierGP(SpatialModel):
         kernels: list[Kernel],
         coefficients: Parameter | None = None,
     ):
+        raise NotImplementedError(
+            "MultiFourierGP is not available yet: it holds its kernels in a list, which "
+            "built models will support from spectracles 1.1. Use one FourierGP per field."
+        )
         # Model specfication
         self.n_modes = n_modes = _check_n_modes(n_modes)
         fx, fy = get_freqs(n_modes)

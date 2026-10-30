@@ -78,9 +78,9 @@ def test_fourier_gp_arguments():
     assert FourierGP([5, 5], kernel()).n_modes == (5, 5)  # type: ignore[arg-type]
 
 
-def test_multi_fourier_gp_kernel_count():
-    with pytest.raises(ValueError, match="2 kernels for 3 components"):
-        MultiFourierGP(n_components=3, n_modes=(5, 5), kernels=[kernel(), kernel()])
+def test_multi_fourier_gp_not_available_yet():
+    with pytest.raises(NotImplementedError, match="from spectracles 1.1"):
+        MultiFourierGP(n_components=2, n_modes=(5, 5), kernels=[kernel(), kernel()])
 
 
 def test_per_spaxel_and_tile_values():

@@ -17,8 +17,12 @@ Parameters, and modules holding them, must currently be named attributes of a
 module; `build_model` raises a clear error otherwise. 1.1 will support lists,
 tuples and dicts, with paths such as `lines[0].flux` or `lines['Ha'].flux`, so
 models with a variable number of components (e.g. emission lines) can be built
-in a loop. This also makes `MultiFourierGP`, which holds its kernels in a
-list, usable in a built model. Existing paths are unchanged.
+in a loop. Existing paths are unchanged.
+
+It also brings back `MultiFourierGP`, which holds its kernels in a list and
+raises `NotImplementedError` until then. It batches several fields through one
+NUFFT, since fields in one model usually share a frequency grid, to make
+multi-field models faster on GPU.
 ([#4](https://github.com/TomHilder/spectracles/issues/4))
 
 ## Lazy draws for large fields (1.2)
