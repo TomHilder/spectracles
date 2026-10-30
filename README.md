@@ -83,6 +83,13 @@ pip install -e .
   (streaming mean and variance; quantiles in chunks of points), with the full
   draws built only on request.
 
+- **Planned: corner plots from draws.** `Draws.corner(...)`, a small wrapper
+  around [`corner`](https://corner.readthedocs.io) (an optional extra):
+  hyperparameters only by default (`exclude_fourier_coeffs=True`), labels
+  from the parameter paths, vector parameters split into columns, ringed
+  scatter points with step histograms, and every `corner` keyword (including
+  `fig`, to overlay several methods) passed through.
+
 ## Documentation
 
 Full documentation: [tomhilder.github.io/spectracles](https://tomhilder.github.io/spectracles/)
