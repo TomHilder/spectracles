@@ -3,6 +3,7 @@
 import jax.numpy as jnp
 import numpy as np
 import pytest
+
 from spectracles.model.parameter import (
     BoundsError,
     ConstrainedParameter,

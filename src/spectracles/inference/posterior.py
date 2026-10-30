@@ -1,0 +1,153 @@
+"""posterior.py - The unnormalised posterior in latent space, shared by every backend.
+
+    log p(ξ | d) = log L(d | forward(model(ξ))) - ½ |ξ|²  (+ const)
+
+NIFTy.re (MGVI/geoVI), BlackJAX (NUTS) and optax (MAP) all work on this one
+function, in the same coordinates.
+"""
+
+from collections.abc import Callable
+from typing import Any, Literal
+
+import jax
+import jax.numpy as jnp
+from jaxtyping import Array, PRNGKeyArray
+
+from spectracles.inference.draws import Draws, ModelDraws
+from spectracles.inference.latent import Latent, LatentSpace, as_latent_dict
+from spectracles.inference.likelihood import Likelihood
+from spectracles.model.share_module import ShareModule
+
+
+class Posterior:
+    """A latent space, a forward model and a likelihood.
+
+    Args:
+        latent: The model's latent space.
+        forward: Maps a model to a prediction with the data's shape, e.g.
+            `lambda m: jax.vmap(m, in_axes=(0, None))(λ, spatial_data)`.
+        likelihood: The likelihood of the data given the prediction.
+
+    All methods taking ξ are pure JAX (jit, grad, vmap).
+    """
+
+    def __init__(
+        self,
+        latent: LatentSpace,
+        forward: Callable[[ShareModule], Array],
+        likelihood: Likelihood,
+    ):
+        if not isinstance(latent, LatentSpace):
+            raise TypeError(f"latent must be a LatentSpace, got {type(latent).__name__}.")
+        if isinstance(forward, ShareModule):
+            raise TypeError(
+                "forward must be a function from a model to a prediction, not the model "
+                "itself, e.g. forward=lambda m: m(spatial_data)."
+            )
+        if not callable(forward):
+            raise TypeError(
+                f"forward must be a function from a model to a prediction, got "
+                f"{type(forward).__name__}."
+            )
+        if not isinstance(likelihood, Likelihood):
+            raise TypeError(
+                f"likelihood must be a Likelihood, e.g. GaussianLikelihood(data, ivar, mask); "
+                f"got {type(likelihood).__name__}."
+            )
+        self.latent = latent
+        self.forward = forward
+        self.likelihood = likelihood
+
+    def __repr__(self) -> str:
+        return (
+            f"Posterior({self.latent!r}, {type(self.likelihood).__name__} on "
+            f"{self.likelihood.n_used} data points)"
+        )
+
+    def predict(self, ξ: Latent) -> Array:
+        """The forward model's prediction at ξ, with the data's shape."""
+        return self.forward(self.latent.to_model(ξ))
+
+    def log_likelihood(self, ξ: Latent) -> Array:
+        return self.likelihood.log_likelihood(self.predict(ξ))
+
+    def log_prior(self, ξ: Latent) -> Array:
+        """The prior in latent space: -½|ξ|² (without the normalisation constant)."""
+        ξ = self.latent._checked(as_latent_dict(ξ))
+        return -0.5 * sum(jnp.sum(ξ[p] ** 2) for p in self.latent.paths)
+
+    def log_density(self, ξ: Latent) -> Array:
+        """The unnormalised log-posterior: log-likelihood - ½|ξ|²."""
+        return self.log_likelihood(ξ) + self.log_prior(ξ)
+
+    def fix(
+        self, values: dict[str, Any], space: Literal["latent", "params"] = "params"
+    ) -> "Posterior":
+        """A new posterior with these parameters fixed: `LatentSpace.fix`.
+
+        It has the same forward model and likelihood; this posterior is
+        unchanged.
+        """
+        return Posterior(self.latent.fix(values, space=space), self.forward, self.likelihood)
+
+    # Conveniences forwarded to the latent space
+
+    def to_model(self, x: Any, space: Literal["latent", "params"] = "latent") -> ShareModule:
+        """The model at one draw, given as latents or parameter values: `LatentSpace.to_model`."""
+        return self.latent.to_model(x, space=space)
+
+    def to_params(self, ξ: Any) -> dict[str, Array]:
+        return self.latent.to_params(ξ)
+
+    def map_samples(
+        self,
+        fn: Callable[[ShareModule], Any],
+        samples: Any,
+        space: Literal["latent", "params"] = "latent",
+    ) -> Draws:
+        """Evaluate `fn(model)` at every sample: `LatentSpace.map_samples`."""
+        return self.latent.map_samples(fn, samples, space=space)
+
+    def draws(
+        self,
+        samples: Any,
+        to: Literal["params", "latent", "model"] = "params",
+        space: Literal["latent", "params"] = "latent",
+    ) -> Draws | ModelDraws:
+        """Samples as draws of the parameter values, latents or model: `LatentSpace.draws`."""
+        return self.latent.draws(samples, to=to, space=space)
+
+    def summary(
+        self,
+        samples: Any,
+        space: Literal["latent", "params"] = "latent",
+        print_table: bool = True,
+        true_latents: Any = None,
+        true_params: Any = None,
+    ) -> dict[str, Any]:
+        """Summarise samples as parameter values: `LatentSpace.posterior_summary`."""
+        return self.latent.posterior_summary(
+            samples,
+            space=space,
+            print_table=print_table,
+            true_latents=true_latents,
+            true_params=true_params,
+        )
+
+    def sample_prior_latent(self, key: PRNGKeyArray, n: int | None = None) -> Latent:
+        return self.latent.sample_prior_latent(key, n)
+
+    def sample_prior_params(self, key: PRNGKeyArray, n: int | None = None) -> dict[str, Array]:
+        return self.latent.sample_prior_params(key, n)
+
+    def sample_prior_model(
+        self, key: PRNGKeyArray, n: int | None = None
+    ) -> ShareModule | list[ShareModule]:
+        return self.latent.sample_prior_model(key, n)
+
+    def zeros(self) -> Latent:
+        return self.latent.zeros()
+
+    def value_and_grad(self, ξ: Latent) -> tuple[Array, Latent]:
+        """log_density and its gradient with respect to ξ."""
+        return jax.value_and_grad(self.log_density)(as_latent_dict(ξ))

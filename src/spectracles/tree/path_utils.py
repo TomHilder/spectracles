@@ -1,5 +1,6 @@
 """path_utils.py - utilities for handling paths in PyTree structures."""
 
+from fnmatch import fnmatch
 from typing import Any, TypeAlias
 
 from equinox import filter
@@ -70,7 +71,7 @@ def get_duplicated_leaves(
     leaves = leaves_with_path(filtered_tree)
 
     # Create a dictionary to keep track of the parent leaves
-    parent_leaf_paths: dict[int, LeafPath] = dict()
+    parent_leaf_paths: dict[int, LeafPath] = {}
     dupl_leaf_paths = []
     dupl_leaf_ids = []
 
@@ -78,7 +79,7 @@ def get_duplicated_leaves(
     for path, leaf in leaves:
         leaf_id = id(leaf)
         # If id already seen:
-        if leaf_id in parent_leaf_paths.keys():
+        if leaf_id in parent_leaf_paths:
             # Remember path to duplicated leaf
             dupl_leaf_paths.append(path)
             dupl_leaf_ids.append(leaf_id)
@@ -88,3 +89,87 @@ def get_duplicated_leaves(
             parent_leaf_paths[leaf_id] = path
 
     return dupl_leaf_ids, dupl_leaf_paths, parent_leaf_paths
+
+
+# ---- Glob matching of dotted parameter paths ----
+
+
+def _match_parts(pattern_parts: list[str], path_parts: list[str]) -> bool:
+    """Match path components against pattern components ('**' = zero or more)."""
+    if not pattern_parts:
+        return not path_parts
+    head, rest = pattern_parts[0], pattern_parts[1:]
+    if head == "**":
+        # '**' absorbs zero or more components
+        return any(_match_parts(rest, path_parts[i:]) for i in range(len(path_parts) + 1))
+    if not path_parts:
+        return False
+    return fnmatch(path_parts[0], head) and _match_parts(rest, path_parts[1:])
+
+
+def _match_pattern(pattern: str, path: str) -> bool:
+    """Match a glob pattern against a dotted parameter path.
+
+    Supports:
+    - '*' (and other fnmatch wildcards) within a single path component
+    - '**' as a whole component, matching any number of components (including zero)
+    - Exact matches
+
+    Args:
+        pattern: Glob pattern (e.g., "gp.*.coefficients", "**.lengthscale")
+        path: Parameter path to match (e.g., "gp.kernel.lengthscale")
+
+    Returns:
+        True if the pattern matches the path.
+    """
+    return _match_parts(pattern.split("."), path.split("."))
+
+
+def _simple_match(pattern: str, path: str) -> bool:
+    """Simple glob matching where * matches a single component (no '**')."""
+    pattern_parts = pattern.split(".")
+    path_parts = path.split(".")
+    if len(pattern_parts) != len(path_parts):
+        return False
+    return all(fnmatch(p, pat) for pat, p in zip(pattern_parts, path_parts))
+
+
+def resolve_patterns_to_parents(
+    patterns: dict[str, Any],
+    candidates: list[str],
+    child_to_parent: dict[str, str],
+    context: str,
+) -> dict[str, list[tuple[str, Any]]]:
+    """Expand glob patterns to parent parameter paths.
+
+    Patterns are matched against `candidates` (which may include shared, child
+    paths); each match is mapped to its parent path, since a shared parameter
+    is one parameter.
+
+    Args:
+        patterns: Mapping from glob pattern to a value.
+        candidates: Paths to match against.
+        child_to_parent: Mapping from shared (child) paths to their parent path.
+        context: Name used in error messages (e.g. "with_priors").
+
+    Returns:
+        Mapping from parent path to the list of (pattern, value) that matched it,
+        in the order the patterns were given.
+
+    Raises:
+        ValueError: If a pattern matches nothing.
+    """
+    resolved: dict[str, list[tuple[str, Any]]] = {}
+    for pattern, value in patterns.items():
+        matched = [p for p in candidates if _match_pattern(pattern, p)]
+        if not matched:
+            raise ValueError(
+                f"{context}: pattern '{pattern}' did not match any parameters. "
+                f"Available paths: {candidates}"
+            )
+        for path in matched:
+            parent = child_to_parent.get(path, path)
+            entries = resolved.setdefault(parent, [])
+            if (pattern, value) not in entries:
+                entries.append((pattern, value))
+    return resolved

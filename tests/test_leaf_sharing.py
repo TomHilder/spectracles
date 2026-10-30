@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import pytest
 from equinox import is_array
 from jax.tree_util import tree_map
+
 from spectracles.model.parameter import Parameter
 from spectracles.model.share_module import (
     Shared,
@@ -23,7 +24,6 @@ from spectracles.tree.path_utils import (
 from .test_models import (
     ComplexSharedModel,
     NestedModel,
-    SharedBranchModel,
     SharedLeafModel,
     SimpleModel,
 )
@@ -51,7 +51,7 @@ class TestLeafHelperFunctions:
         model = ComplexSharedModel()
 
         # Get duplicated leaves
-        dupl_ids, dupl_paths, parent_paths = get_duplicated_parameters(model)
+        dupl_ids, dupl_paths, _ = get_duplicated_parameters(model)
 
         # There should be 3 duplicates
         assert len(dupl_ids) == 3
@@ -70,7 +70,7 @@ class TestLeafHelperFunctions:
         _, _, parent_paths = get_duplicated_parameters(model)
 
         # Use the path to get the parameter
-        param_path = list(parent_paths.values())[0]
+        param_path = next(iter(parent_paths.values()))
         param = use_path_get_leaf(model, param_path)
 
         # Check it's the right parameter's value
@@ -174,7 +174,7 @@ class TestShareModule:
 
         # Access non-existent attribute
         with pytest.raises(AttributeError):
-            shared_model.nonexistent
+            _ = shared_model.nonexistent
 
     def test_call_with_shared_leaves(self):
         # Test call with shared leaves
@@ -209,11 +209,19 @@ class TestShareModule:
         assert isinstance(shared_model.inner2.param.val, Shared)  # Changed: check .val
         assert isinstance(shared_model.inner3.inner1.param.val, Shared)  # Changed: check .val
 
-    def test_get_locked_model(self):
+    def test_get_locked_model_is_a_deprecated_alias(self):
+        shared_model = ShareModule(SharedLeafModel(value=2.0))
+        with pytest.warns(DeprecationWarning, match="for_evaluation"):
+            old = shared_model.get_locked_model()
+        new = shared_model.for_evaluation()
+        assert old._locked and new._locked
+        assert jnp.array_equal(old.b.val, new.b.val)
+
+    def test_for_evaluation(self):
         # Test locking an unlocked model
         model = SharedLeafModel(value=2.0)
         shared_model = ShareModule(model)
-        locked_model = shared_model.get_locked_model()
+        locked_model = shared_model.for_evaluation()
 
         # Check that the model is locked
         assert locked_model._locked is True
@@ -264,7 +272,6 @@ def assert_array_equal_but_different(x, y):
     #
     # Since we can't directly modify JAX arrays, this test is disabled
     # and we only check for equality
-    pass
 
 
 class TestContainsShared:
@@ -290,7 +297,7 @@ class TestContainsShared:
         # Locked models should not contain Shared values
         model = SharedLeafModel(value=1.0)
         shared_model = ShareModule(model)
-        locked_model = shared_model.get_locked_model()
+        locked_model = shared_model.for_evaluation()
 
         assert contains_shared(locked_model.a) is False
         assert contains_shared(locked_model.b) is False
@@ -321,7 +328,7 @@ class TestSubcomponentAccessError:
         # Check the error message is helpful
         error_msg = str(exc_info.value)
         assert "inner2" in error_msg
-        assert "get_locked_model()" in error_msg
+        assert "for_evaluation()" in error_msg
         assert "Shared" in error_msg
 
     def test_callable_subcomponent_without_shared_works(self):
@@ -349,7 +356,7 @@ class TestSubcomponentAccessError:
         # Locked models should have callable sub-components
         model = ComplexSharedModel(value=2.0)
         shared_model = ShareModule(model)
-        locked_model = shared_model.get_locked_model()
+        locked_model = shared_model.for_evaluation()
 
         # inner2 should be callable on the locked model
         x = jnp.array([1.0])
@@ -501,7 +508,7 @@ class TestSharingSummary:
 
         # Should have one parent (inner1.param) with multiple duplicates
         assert len(summary) == 1
-        parent_path = list(summary.keys())[0]
+        parent_path = next(iter(summary))
         assert "inner1.param" == parent_path
 
         # Should have 3 duplicates: param, inner2.param, inner3.inner1.param
@@ -653,7 +660,7 @@ class TestFixAllFreeAll:
         fixed_model = model.fix_all()
 
         # Both shared parameters should be fixed
-        locked = fixed_model.get_locked_model()
+        locked = fixed_model.for_evaluation()
         assert locked.a.fix
         assert locked.b.fix
 
@@ -693,7 +700,7 @@ class TestFixAllFreeAll:
     def test_fix_all_on_locked_model_raises(self):
         # Test that fix_all raises on a locked model
         model = build_model(SimpleModel, value=1.0)
-        locked_model = model.get_locked_model()
+        locked_model = model.for_evaluation()
 
         # Wrap in ShareModule with locked=True
         locked_share = ShareModule(locked_model.model, locked=True)
@@ -714,7 +721,7 @@ class TestFixAllFreeAll:
         model = build_model(NestedModel, value=1.0)
 
         fixed_model = model.fix_all()
-        locked = fixed_model.get_locked_model()
+        locked = fixed_model.for_evaluation()
 
         # All parameters should be fixed
         assert locked.inner1.param.fix
@@ -729,13 +736,13 @@ class TestFixAllFreeAll:
         fixed_model = model.fix_all()
 
         # Verify all are fixed
-        locked = fixed_model.get_locked_model()
+        locked = fixed_model.for_evaluation()
         assert locked.param.fix
         assert locked.inner1.param.fix
 
         # Then free all
         freed_model = fixed_model.free_all()
-        locked_freed = freed_model.get_locked_model()
+        locked_freed = freed_model.for_evaluation()
 
         # All should be free
         assert not locked_freed.param.fix
@@ -762,7 +769,7 @@ class TestKnownParameterHandling:
 
         # Should work with flag
         updated = model.set(["known"], [jnp.array([999.0])], allow_set_knowns=True)
-        locked = updated.get_locked_model()
+        locked = updated.for_evaluation()
         assert jnp.allclose(locked.model.known.val, 999.0)
 
     def test_set_regular_param_still_works(self):
@@ -772,7 +779,7 @@ class TestKnownParameterHandling:
         model = ShareModule(ModelWithKnown(param_value=1.0))
 
         updated = model.set(["param"], [jnp.array([42.0])])
-        locked = updated.get_locked_model()
+        locked = updated.for_evaluation()
         assert jnp.allclose(locked.model.param.val, 42.0)
 
     def test_set_fixed_status_known_unfix_raises(self):

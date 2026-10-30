@@ -1,6 +1,7 @@
 """test.io - tests for the spectracles.model.io module."""
 
 import pytest
+
 from spectracles.model.io import MODELFILE_EXT, load_model, save_model
 from spectracles.model.share_module import ShareModule, build_model
 
@@ -107,7 +108,7 @@ class TestLoadModel:
         loaded_model = load_model(file_path)
 
         # Use the sharing structure to removed Shared sentinels
-        locked_loaded_model = loaded_model.get_locked_model()
+        locked_loaded_model = loaded_model.for_evaluation()
 
         # Check that the model structure is preserved
         # inner1.param, param, inner2.param, and inner3.inner1.param should all be the same

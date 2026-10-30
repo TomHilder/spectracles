@@ -2,6 +2,8 @@
 
 import jax.numpy as jnp
 import numpy as np
+import pytest
+
 from spectracles.model.data import SpatialDataGeneric, convert_to_flat_array
 
 
@@ -85,12 +87,8 @@ class TestSpatialData:
         assert data.y.shape == (0,)
         assert data.idx.shape == (0,)
 
-    def test_dimension_mismatch_handling(self):
-        # The module doesn't explicitly check for dimension matching between x, y, and idx
-        # This is more of a "what happens" test than a correctness test
-        data = SpatialDataGeneric(
-            x=jnp.array([1.0, 2.0]), y=jnp.array([3.0]), idx=jnp.array([0, 1, 2])
-        )
-        assert data.x.shape == (2,)
-        assert data.y.shape == (1,)
-        assert data.idx.shape == (3,)
+    def test_dimension_mismatch_raises(self):
+        with pytest.raises(ValueError, match="same length"):
+            SpatialDataGeneric(
+                x=jnp.array([1.0, 2.0]), y=jnp.array([3.0]), idx=jnp.array([0, 1, 2])
+            )

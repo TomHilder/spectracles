@@ -9,10 +9,11 @@ from spectracles import build_schedule, free_in, free_after, init_normal
 import jax.random as jr
 
 schedule = build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[
-        (100, 0.1),   # 100 steps, lr=0.1
-        (50, 0.01),   # 50 steps, lr=0.01
+        (100, 0.1),  # 100 steps, lr=0.1
+        (50, 0.01),  # 50 steps, lr=0.01
     ],
     params={
         "gp.coefficients": free_in(0, 1),
@@ -106,10 +107,10 @@ Glob-style patterns match parameter paths:
 Phases are tuples of `(n_steps, learning_rate)` or `(n_steps, learning_rate, optimizer)`:
 
 ```python
-phases=[
-    (100, 0.1),                    # Uses default optimizer (adam)
+phases = [
+    (100, 0.1),  # Uses default optimizer (adam)
     (50, 0.01),
-    (50, 0.001, optax.sgd(0.001)), # Custom optimizer
+    (50, 0.001, optax.sgd(0.001)),  # Custom optimizer
 ]
 ```
 
@@ -117,15 +118,15 @@ phases=[
 
 ```python
 schedule = build_schedule(
-    model,                          # ShareModule to optimize
-    loss_fn,                        # Loss function
-    phases,                         # List of phase specs
-    params,                         # Dict of pattern -> ParamSpec
-    default_optimizer="adam",       # "adam" or "sgd"
-    managed=False,                  # Return ManagedOptimiserSchedule if True
+    model,  # ShareModule to optimize
+    loss_fn,  # Loss function
+    phases,  # List of phase specs
+    params,  # Dict of pattern -> ParamSpec
+    default_optimizer="adam",  # "adam" or "sgd"
+    managed=False,  # Return ManagedOptimiserSchedule if True
     get_filter_spec_fn=get_opt_filter_spec,  # Selects which leaves are optimised
-    Δloss_criterion=None,           # Early-stopping threshold (None = off)
-    key=None,                       # PRNG key for random initialization
+    Δloss_criterion=None,  # Early-stopping threshold (None = off)
+    key=None,  # PRNG key for random initialization
 )
 ```
 
@@ -137,7 +138,8 @@ Pass `Δloss_criterion` to let phases exit before their full `n_steps`. From ste
 
 ```python
 schedule = sp.build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[(5000, 0.1), (5000, 0.01)],
     params={"**": sp.free_in(0, 1)},
     Δloss_criterion=1e-2,
@@ -153,7 +155,7 @@ When parameters are shared, only specify the **parent** path (not the shared cop
 
 ```python
 # If 'b' is shared from 'a':
-params={
+params = {
     "a": free_in(0),  # Correct - use parent path
     # "b": free_in(0),  # Error - 'b' is a shared path
 }
@@ -163,19 +165,18 @@ params={
 
 ```python
 schedule = build_schedule(
-    model, loss_fn,
+    model,
+    loss_fn,
     phases=[
-        (200, 0.1),    # Phase 0: Warm up coefficients
-        (100, 0.05),   # Phase 1: Refine with kernel
-        (50, 0.01),    # Phase 2: Fine tune everything
+        (200, 0.1),  # Phase 0: Warm up coefficients
+        (100, 0.05),  # Phase 1: Refine with kernel
+        (50, 0.01),  # Phase 2: Fine tune everything
     ],
     params={
         # Coefficients: always free
         "*.coefficients": free_in(0, 1, 2),
-
         # Kernel params: free after warm-up
         "*.kernel.*": free_after(1),
-
         # Amplitude: reinitialize at phase 1
         "line.amplitude": free_after(1) | init_normal(1, std=0.5),
     },

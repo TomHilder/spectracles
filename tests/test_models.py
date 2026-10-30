@@ -5,6 +5,7 @@ These need to be in a separate file from the tests beacuse the serialisation we 
 import equinox as eqx
 import jax.numpy as jnp
 from equinox import Module
+
 from spectracles.model.data import SpatialData
 from spectracles.model.parameter import Known, Parameter
 

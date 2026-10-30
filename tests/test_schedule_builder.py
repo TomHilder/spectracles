@@ -4,26 +4,27 @@ import jax.numpy as jnp
 import jax.random as jr
 import optax  # type: ignore[import]
 import pytest
+
 from spectracles.model.share_module import build_model
-from spectracles.optimise.opt_schedule import OptimiserSchedule, ManagedOptimiserSchedule
+from spectracles.optimise.opt_schedule import ManagedOptimiserSchedule, OptimiserSchedule
 from spectracles.optimise.schedule_builder import (
-    ParamSpec,
     InitSpec,
-    free_in,
-    free_after,
-    free_until,
-    fixed_in,
-    init_normal,
-    init_value,
-    init_uniform,
-    expand_patterns,
-    build_schedule,
+    ParamSpec,
     _match_pattern,
-    _simple_match,
     _resolve_free_phases,
+    _simple_match,
+    build_schedule,
+    expand_patterns,
+    fixed_in,
+    free_after,
+    free_in,
+    free_until,
+    init_normal,
+    init_uniform,
+    init_value,
 )
 
-from .test_models import SimpleModel, NestedModel, SharedLeafModel, ComplexSharedModel
+from .test_models import ComplexSharedModel, NestedModel, SharedLeafModel, SimpleModel
 
 
 class TestParamSpec:
@@ -281,7 +282,7 @@ class TestBuildSchedule:
         schedule.run_all(x=self.x, y=self.y)
 
         final_model = schedule.model_history[-1]
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         # Should converge to ~2.0
         assert jnp.allclose(locked.param.val, 2.0, rtol=0.1)
 
@@ -452,7 +453,7 @@ class TestBuildScheduleWithSharing:
 
         schedule.run_all(x=x, y=y)
         final_model = schedule.model_history[-1]
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         assert jnp.allclose(locked.a.val, 0.5, rtol=0.1)
 
     def test_shared_model_child_path_raises(self):
@@ -482,9 +483,6 @@ class TestBuildScheduleWithSharing:
             pred = model(x)
             return jnp.mean((pred - y) ** 2)
 
-        x = jnp.array([1.0, 2.0, 3.0])
-        y = x
-
         # Get the parent paths to verify
         parent_paths = model.get_parameter_paths(show_shared=False)
 
@@ -493,9 +491,7 @@ class TestBuildScheduleWithSharing:
             model,
             loss_fn,
             phases=[(10, 0.1)],
-            params={
-                p: free_in(0) for p in parent_paths
-            },
+            params={p: free_in(0) for p in parent_paths},
         )
 
         assert len(schedule.phases) == 1

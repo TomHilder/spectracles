@@ -35,15 +35,29 @@ markdown_extensions:
   - pymdownx.details
   - toc:
       permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
 
 nav:
   - Home: index.md
-  - Schedule Builder: schedule_builder.md
+  - Guides:
+    - Priors and inference: inference.md
+    - How it works: inference_design.md
+    - Schedule Builder: schedule_builder.md
+    - Roadmap: roadmap.md
   - Examples:
+    - examples/inference.md
     - examples/schedule_builder.md
   - API Reference:
     - api/share_module.md
     - api/models.md
+    - api/priors.md
+    - api/inference.md
+    - api/nifty.md
     - api/opt_schedule.md
     - api/schedule_builder.md
 

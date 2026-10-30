@@ -10,14 +10,11 @@ from .. import (
     Kernel,
     Parameter,
     PerSpaxel,
-    SpatialData,
     SpatialDataLVM,
     SpectralSpatialModel,
     WindowConstant,
-    l_bounded,
 )
-from ..model.spatial import PerIFU, PerTile, PerTilePinned, SpatialModel
-from .fields import FieldFromRatio, GPField, PositiveGPField, ScaledField, SumTwoFields
+from .fields import FieldFromRatio, GPField, PositiveGPField, ScaledField
 from .likelihood import ln_likelihood
 from .line_single import EmissionLineVCal, WaveCalVelocity
 from .ratios import FluxCalFactor
@@ -296,7 +293,7 @@ def neg_ln_posterior(
 ):
     vmapped_model = jax.vmap(model, in_axes=(0, None))
     ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
-    locked_model = model.get_locked_model()
+    locked_model = model.for_evaluation()
     # === Get the prior
     ln_prior = 0
     # Strong line contributions

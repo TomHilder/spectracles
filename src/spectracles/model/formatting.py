@@ -2,27 +2,27 @@
 
 from typing import Any
 
-from rich.console import Console
-from rich.text import Text
-from rich.tree import Tree
-from rich.table import Table
-from rich.theme import Theme
-import jax.numpy as jnp
 from jaxtyping import Array
-
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
+from rich.theme import Theme
+from rich.tree import Tree
 
 # Catppuccin Mocha-inspired theme
-THEME = Theme({
-    "type": "#89b4fa",       # Blue - class/type names
-    "value": "#cdd6f4",      # Text - values
-    "free": "#a6e3a1",       # Green - free parameters
-    "fixed": "#f9e2af",      # Yellow - fixed parameters
-    "shared": "#cba6f7",     # Mauve - shared references
-    "tree": "#6c7086",       # Overlay0 - tree branches
-    "dim": "#6c7086",        # Overlay0 - dimmed text
-    "error": "#f38ba8",      # Red - errors/warnings
-    "success": "#a6e3a1",    # Green - success
-})
+THEME = Theme(
+    {
+        "type": "#89b4fa",  # Blue - class/type names
+        "value": "#cdd6f4",  # Text - values
+        "free": "#a6e3a1",  # Green - free parameters
+        "fixed": "#f9e2af",  # Yellow - fixed parameters
+        "shared": "#cba6f7",  # Mauve - shared references
+        "tree": "#6c7086",  # Overlay0 - tree branches
+        "dim": "#6c7086",  # Overlay0 - dimmed text
+        "error": "#f38ba8",  # Red - errors/warnings
+        "success": "#a6e3a1",  # Green - success
+    }
+)
 
 # Console with theme, but force_terminal=False to allow graceful fallback
 # force_jupyter=False prevents Rich from using IPython's display() in interactive environments
@@ -125,6 +125,7 @@ def parameter_repr_parts(
     is_fixed: bool,
     constraint_str: str | None = None,
     shared_path: str | None = None,
+    prior_str: str | None = None,
 ) -> Text:
     """Build a styled parameter repr.
 
@@ -134,6 +135,7 @@ def parameter_repr_parts(
         is_fixed: Whether the parameter is fixed
         constraint_str: Optional constraint description (e.g., "x > 0")
         shared_path: If this value is shared, the parent path
+        prior_str: Optional prior description (e.g., "LogNormal(0.3, 0.15)")
 
     Returns:
         Rich Text object with styled repr
@@ -157,6 +159,11 @@ def parameter_repr_parts(
         text.append_text(styled_fixed())
     else:
         text.append_text(styled_free())
+
+    # Add prior if present
+    if prior_str:
+        text.append(", ", style="dim")
+        text.append(f"~{prior_str}", style="dim")
 
     text.append(")", style="dim")
     return text

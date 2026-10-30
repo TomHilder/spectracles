@@ -10,7 +10,8 @@ from jaxtyping import Array
 
 from spectracles.model.data import SpatialData
 from spectracles.model.kernels import Kernel
-from spectracles.model.parameter import AnyParameter, Parameter, init_parameter
+from spectracles.model.parameter import AnyParameter, Parameter, _is_int, init_parameter
+from spectracles.priors import StdNormal
 
 # NOTE: List of current obvious foot guns:
 # - n_modes must always be two odd integers, but this is not enforced
@@ -19,7 +20,29 @@ from spectracles.model.parameter import AnyParameter, Parameter, init_parameter
 #     repeated in the shape info right now, since I didn't implement n_modes
 #     != n_requested_modes yet.
 
-FINUFFT_KWDS = dict(eps=1e-10)
+FINUFFT_KWDS = {"eps": 1e-10}
+
+
+def _check_n_modes(n_modes) -> tuple[int, int]:
+    """Two positive odd integers, as a tuple."""
+    if isinstance(n_modes, list):
+        n_modes = tuple(n_modes)
+    if not (isinstance(n_modes, tuple) and len(n_modes) == 2 and all(_is_int(m) for m in n_modes)):
+        raise TypeError(f"n_modes must be two integers, e.g. (31, 31); got {n_modes!r}.")
+    if any(m < 1 or m % 2 == 0 for m in n_modes):
+        raise ValueError(
+            f"n_modes must be two positive odd integers, e.g. (31, 31); got {n_modes}."
+        )
+    return (int(n_modes[0]), int(n_modes[1]))
+
+
+def _check_kernel(kernel, name: str = "kernel") -> Kernel:
+    if not isinstance(kernel, Kernel):
+        raise TypeError(
+            f"{name} must be a Kernel, e.g. Matern32(length_scale, variance); "
+            f"got {type(kernel).__name__}."
+        )
+    return kernel
 
 
 def get_freqs_1D(n_modes: int) -> Array:
@@ -90,11 +113,11 @@ class FourierBasis(SpatialModel):
         coefficients: Parameter | None = None,
     ):
         # Model specfication
-        self.n_modes = n_modes
+        self.n_modes = n_modes = _check_n_modes(n_modes)
         fx, fy = get_freqs(n_modes)
         self._freqs = jnp.sqrt(fx**2 + fy**2)
         # Initialise parameters
-        self.coefficients = init_parameter(coefficients, dims=n_modes)
+        self.coefficients = init_parameter(coefficients, name="coefficients", dims=n_modes)
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
@@ -131,17 +154,22 @@ class FourierGP(SpatialModel):
         zeromode: Parameter | None = None,
     ):
         # Model specfication
-        self.n_modes = n_modes
+        self.n_modes = n_modes = _check_n_modes(n_modes)
         fx, fy = get_freqs(n_modes)
         self._freqs = jnp.sqrt(fx**2 + fy**2)
-        self.kernel = kernel
-        # Initialise parameters
-        self.coefficients = init_parameter(coefficients, dims=n_modes)
+        self.kernel = _check_kernel(kernel)
+        # Initialise parameters. The coefficients are whitened (the kernel scales
+        # them), so their prior is a standard normal by construction.
+        # A user-supplied Parameter is kept as is (the same object, so it can be
+        # shared between GPs), with whatever prior it has.
+        self.coefficients = init_parameter(
+            coefficients, name="coefficients", dims=n_modes, prior=StdNormal()
+        )
         # Zero-mode: scalar added to the field after NUFFT. Defaults to a fixed
         # zero so kernels with non-zero DC (e.g. Matern) behave as before. Kernels
         # that zero their DC (e.g. LogLogLinear) require a non-trivial zeromode
         # Parameter to represent the field's spatial mean.
-        self.zeromode = zeromode if zeromode is not None else Parameter(0.0, fixed=True)
+        self.zeromode = init_parameter(zeromode, name="zeromode", initial=0.0, fixed=True)
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
@@ -170,7 +198,10 @@ class MultiFourierGP(SpatialModel):
     """A collection of independent FourierGPs grouped to better batch through fiNUFFT calls.
     Requires that all component GPs use the same number of modes, but can use different kernels.
 
-    Very much a work in progress.
+    Not available yet: instantiating it raises NotImplementedError. It holds its
+    kernels in a list, which built models will support from 1.1. The aim is
+    faster models with several fields on GPU, since such fields usually share
+    one frequency grid and can go through one batched NUFFT.
     """
 
     coefficients: Parameter
@@ -187,13 +218,21 @@ class MultiFourierGP(SpatialModel):
         kernels: list[Kernel],
         coefficients: Parameter | None = None,
     ):
+        raise NotImplementedError(
+            "MultiFourierGP is not available yet: it holds its kernels in a list, which "
+            "built models will support from spectracles 1.1. Use one FourierGP per field."
+        )
         # Model specfication
-        self.n_modes = n_modes
+        self.n_modes = n_modes = _check_n_modes(n_modes)
         fx, fy = get_freqs(n_modes)
         self._freqs = jnp.sqrt(fx**2 + fy**2)
-        self.kernels = kernels
+        if len(kernels) != n_components:
+            raise ValueError(f"Got {len(kernels)} kernels for {n_components} components.")
+        self.kernels = [_check_kernel(k, "each kernel") for k in kernels]
         # Initialise parameters
-        self.coefficients = init_parameter(coefficients, dims=(n_components, *n_modes))
+        self.coefficients = init_parameter(
+            coefficients, name="coefficients", dims=(n_components, *n_modes), prior=StdNormal()
+        )
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
@@ -240,7 +279,7 @@ class PerSpaxel(SpatialModel):
     spaxel_values: Parameter
 
     def __init__(self, n_spaxels: int, spaxel_values: Parameter | None = None):
-        self.spaxel_values = init_parameter(spaxel_values, dims=n_spaxels)
+        self.spaxel_values = init_parameter(spaxel_values, name="spaxel_values", dims=n_spaxels)
 
     def __call__(self, data: SpatialData) -> Array:
         return self.spaxel_values.val[data.idx]
@@ -251,7 +290,7 @@ class PerIFUAndTile(SpatialModel):
     ifu_values: Parameter
 
     def __init__(self, n_tiles: int, n_ifus: int, ifu_values: Parameter | None = None):
-        self.ifu_values = init_parameter(ifu_values, dims=(n_tiles, n_ifus))
+        self.ifu_values = init_parameter(ifu_values, name="ifu_values", dims=(n_tiles, n_ifus))
 
     def __call__(self, data: SpatialData) -> Array:
         return self.ifu_values.val[data.tile_idx, data.ifu_idx]
@@ -262,7 +301,7 @@ class PerIFU(SpatialModel):
     ifu_values: Parameter
 
     def __init__(self, n_ifus: int, ifu_values: Parameter | None = None):
-        self.ifu_values = init_parameter(ifu_values, dims=n_ifus)
+        self.ifu_values = init_parameter(ifu_values, name="ifu_values", dims=n_ifus)
 
     def __call__(self, data: SpatialData) -> Array:
         return self.ifu_values.val[data.ifu_idx]
@@ -273,7 +312,7 @@ class PerTile(SpatialModel):
     tile_values: Parameter
 
     def __init__(self, n_tiles: int, tile_values: Parameter | None = None):
-        self.tile_values = init_parameter(tile_values, dims=n_tiles)
+        self.tile_values = init_parameter(tile_values, name="tile_values", dims=n_tiles)
 
     def __call__(self, data: SpatialData) -> Array:
         return self.tile_values.val[data.tile_idx]
@@ -292,7 +331,7 @@ class PerTilePinned(SpatialModel):
     ):
         if n_tiles < 2:
             raise ValueError("n_tiles must be at least 2 for PerTilePinned")
-        self.tile_values = init_parameter(tile_values, dims=n_tiles - 1)
+        self.tile_values = init_parameter(tile_values, name="tile_values", dims=n_tiles - 1)
         self.pinned_val = pinned_val
 
     def __call__(self, data: SpatialData) -> Array:
