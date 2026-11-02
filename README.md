@@ -25,21 +25,15 @@
 
 ## What it does
 
-Spectracles fits models to IFU data where line properties (flux, velocity,
-width, ...) vary smoothly across the sky. Each one is a Gaussian process, and
-the model is evaluated at the true position of every spaxel, so your data
-never has to be resampled onto a grid.
+Spectracles fits models to IFU data where line or spectrum properties (line flux or velocity, continuum, ...) vary smoothly across the sky. These are modelled as *fields* and so they exist continuous at all sky locations spanned by the data.
 
-Models are ordinary Python classes. You put priors on the parameters you want
-to fit, then fit with whichever method suits the problem: MGVI or geoVI (fast
-and approximate, through NIFTy), NUTS (MCMC, through BlackJAX), or a simple
-best fit. They all use the same model, and you get back samples you can turn
-into maps, error bars or anything else you compute from the model.
+More generically, Spectracles is a Python/[JAX](https://github.com/jax-ml/jax) library for statistical models, and particularly for models containing latent fields. It is designed for large-scale problems.
+
+Spectracles has been designed for ease-of-use, both within and beyond the IFU community. Models are modular, and may be built from scratch or composed of many sub-models, which is particularly useful for hierarchical models (like spectrospatial IFU models). Spectracles is compatible with most JAX-supported inference algorithms out-of-the-box, including large-scale variational algorithms ([MGVI](https://arxiv.org/abs/1901.11033) or [geoVI](https://doi.org/10.3390/e23070853) via [NIFTy.re](https://github.com/NIFTy-PPL/NIFTy)) or [NUTS](https://jmlr.org/papers/v15/hoffman14a.html) (e.g. [BlackJAX](https://github.com/blackjax-devs/blackjax) or [NumPyro](https://github.com/pyro-ppl/numpyro)).
 
 ## Example
 
-A positive map, observed with noise at 300 scattered points and fitted with
-NUTS:
+In this example, we fit a positive-valued field using observations at 300 scattered points. The inference machinery in this case is [BlackJAX](https://github.com/blackjax-devs/blackjax):
 
 ```python
 import blackjax
@@ -106,19 +100,27 @@ pip install "spectracles[nifty]"   # to use MGVI and geoVI
 pip install blackjax               # to use NUTS
 ```
 
-To run on a GPU, build [jax-finufft](https://github.com/flatironinstitute/jax-finufft)
-from source as its README describes (this needs FFTW). To work on spectracles
-itself, clone this repository and run `uv sync` (which also builds jax-finufft
-from source).
+To run on a GPU, build [jax-finufft](https://github.com/flatironinstitute/jax-finufft) from source as its README describes (this needs [FFTW](https://www.fftw.org)). To work on spectracles itself, clone this repository and run `uv sync` with [uv](https://github.com/astral-sh/uv), which also builds jax-finufft from source.
 
 ## Features
 
-- Gaussian-process maps with Matérn and squared-exponential kernels
-- Spectral lines and other components whose parameters are maps
-- Parameters shared between components (e.g. one kernel for two lines)
-- Priors on any parameter, and fixing parameters at chosen values
-- Bad pixels and NaNs masked in the likelihood
-- Saving and loading models, and readable summaries of models and fits
+IFU:
+
+- Models including emission lines whose parameters are fields
+- Models for systematics, for example per-pointing or per-spaxel parameters
+
+Fields:
+
+- Fast stationary Gaussian-process fields on arbitrary points via the equispaced Fourier representation ([EFGP](https://doi.org/10.1137/23M1565310)) and [FINUFFT](https://github.com/flatironinstitute/finufft) (through [jax-finufft](https://github.com/flatironinstitute/jax-finufft))
+- Squared exponential (RBF) and Matern 1/2, 3/2 and 5/2 kernels
+- Easy dense evaluation after fitting (i.e. between the data points)
+
+Generic:
+
+- Easy evaluation of model sub-components and fast mapping over posterior or prior samples
+- PPL-like features including easy prior specification and sampling
+- Saving and loading models
+- Readable summaries of models and fits
 
 ## Stability
 
@@ -135,8 +137,59 @@ warning. `spectracles.lvm_models` and the optimisation schedules
 
 ## Citation
 
-Coming soon.
+If you find this software useful, please cite the paper:
+
+[Hilder et al. (2026)](https://doi.org/10.3847/1538-4357/ae274b):
+
+```bibtex
+@article{Hilder2026,
+    author        = {{Hilder}, Thomas and {Casey}, Andrew R. and {Dalcanton}, Julianne J. and
+                     {Kreckel}, Kathryn and {Stutz}, Amelia M. and {Singh}, Amrita and
+                     {Blanc}, Guillermo A. and {S{\'a}nchez}, Sebasti{\'a}n F. and
+                     {M{\'e}ndez-Delgado}, J. E. and {Saydjari}, Andrew K. and
+                     {Vargas-Herrera}, Luciano and {Drory}, Niv and {Bizyaev}, Dmitry and
+                     {Fern{\'a}ndez-Trincado}, Jos{\'e} G. and {Rom{\'a}n-Z{\'u}{\~n}iga}, Carlos G. and
+                     {Kollmeier}, Juna A. and {Johnston}, Evelyn J.},
+    title         = {{Unified Spectrospatial Forward Models: Spatially Continuous Maps of Weak
+                     Emission Lines in the Rosette Nebula with SDSS-V LVM}},
+    journal       = {The Astrophysical Journal},
+    year          = {2026},
+    volume        = {997},
+    number        = {2},
+    eid           = {339},
+    doi           = {10.3847/1538-4357/ae274b},
+    eprint        = {2510.07395},
+    archivePrefix = {arXiv},
+    primaryClass  = {astro-ph.GA},
+}
+```
+
+You should also cite [JAX](https://github.com/jax-ml/jax#citing-jax) and
+[Equinox](https://github.com/patrick-kidger/equinox#citation).
+
+If you also use [NIFTy.re](https://github.com/NIFTy-PPL/NIFTy), [NumPyro](https://github.com/pyro-ppl/numpyro), [BlackJAX](https://github.com/blackjax-devs/blackjax), or any other inference machinery that is not part of Spectracles, make sure you cite the relevant works!
 
 ## License
 
 MIT
+
+## Other useful software
+
+Spectracles has many possible applications, but there are also many other great libraries out there! Here are just a few that may be useful to users of Spectracles:
+
+- [NIFTy.re](https://github.com/NIFTy-PPL/NIFTy): JAX library for Gaussian-process
+  models and variational inference (MGVI, geoVI), widely used for large imaging
+  problems. Spectracles can hand its posteriors to NIFTy.re.
+- [GraphGP](https://github.com/stanford-ism/graphgp): scalable Gaussian processes in
+  JAX using nearest-neighbour graphs (Vecchia's approximation), in linear time
+  and memory at arbitrary points.
+- [efgp_jax](https://github.com/pgree/efgp_jax): JAX implementation of the
+  equispaced Fourier Gaussian processes that Spectracles' fields are based on.
+- [tinygp](https://github.com/dfm/tinygp) and
+  [GPJax](https://github.com/JaxGaussianProcesses/GPJax): general-purpose
+  Gaussian-process libraries in JAX.
+- [pPXF](https://pypi.org/project/ppxf/): full-spectrum fitting of stellar and gas
+  kinematics and stellar populations, usually spaxel by spaxel or bin by bin.
+- [PowerBin](https://pypi.org/project/powerbin/) (successor to
+  [VorBin](https://pypi.org/project/vorbin/)): adaptive spatial binning of IFU
+  data to a target signal-to-noise.
