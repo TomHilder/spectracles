@@ -61,13 +61,13 @@ The documentation is Markdown in `docs/`, built with [MkDocs Material](https://s
 uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs serve
 ```
 
-and open the address it prints. Before opening a pull request, check that it builds without warnings:
+and open the address it prints. To check that it builds without warnings, as CI does:
 
 ``` bash
 uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs build --strict
 ```
 
-New pages go in the `nav` section of `mkdocs.yml`. The docs are deployed when a version is tagged.
+New pages go in the `nav` section of `mkdocs.yml`. CI builds the docs on every pull request and deploys them when a version is tagged.
 
 ### Code on the docs pages is tested
 
@@ -89,7 +89,7 @@ Docstrings use [Google style](https://google.github.io/styleguide/pyguide.html#3
 3. Add an entry to the [changelog](changelog.md) under **Unreleased**, in the right group (Added, Changed, Deprecated, Removed or Fixed). Say plainly if the change affects results or breaks existing code.
 4. Open a pull request against `main`.
 
-CI must pass: the lint job (`ruff check` and `ruff format --check`) and the tests on Python 3.11, 3.12, 3.13 and 3.14.
+CI must pass: the lint job (`ruff check` and `ruff format --check`), the tests on Python 3.11, 3.12, 3.13 and 3.14, and the strict docs build.
 
 ## Reporting issues
 

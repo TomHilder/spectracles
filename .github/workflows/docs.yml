@@ -2,15 +2,28 @@ name: Docs
 
 on:
   push:
+    branches: [main]
     tags:
       - "v*"  # Same trigger as release.yml, which publishes to PyPI without creating a GitHub release
-  workflow_dispatch:  # Allow manual trigger
+    paths:
+      - "docs/**"
+      - "src/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "src/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:  # Allow manual deploy
 
 permissions:
   contents: write
 
 jobs:
-  deploy:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,5 +37,12 @@ jobs:
           pip install mkdocs-material mkdocstrings[python]
           pip install -e .
 
-      - name: Build and deploy
+      # Pushes and PRs only check that the docs build; pages with broken links
+      # or API references fail here
+      - name: Build
+        run: mkdocs build --strict
+
+      # Deploy to GitHub Pages on version tags and manual runs only
+      - name: Deploy
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: mkdocs gh-deploy --force
