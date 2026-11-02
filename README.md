@@ -19,7 +19,7 @@
   </a>
 
   <p align="center">
-    Unified spectrospatial models for integral field spectroscopy in JAX
+    Continuous field models for integral fields spectroscopy and beyond
   </p>
 </div>
 
