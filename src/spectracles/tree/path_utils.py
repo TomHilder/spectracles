@@ -8,7 +8,7 @@ from jax.tree import leaves_with_path
 from jax.tree_util import GetAttrKey
 from jaxtyping import PyTree
 
-LeafPath: TypeAlias = tuple[GetAttrKey, ...]
+LeafPath: TypeAlias = tuple[Any, ...]  # of GetAttrKey (typed as Any by jax)
 
 
 def str_to_leafpath(str_path: str) -> LeafPath:

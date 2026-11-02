@@ -8,7 +8,7 @@ from jax.scipy.stats import norm
 from jax_finufft import nufft2  # type: ignore
 from jaxtyping import Array
 
-from spectracles.model.data import SpatialData
+from spectracles.model.data import SpatialData, SpatialDataLVM
 from spectracles.model.kernels import Kernel
 from spectracles.model.parameter import AnyParameter, Parameter, _is_int, init_parameter
 from spectracles.priors import StdNormal
@@ -52,7 +52,7 @@ def get_freqs_1D(n_modes: int) -> Array:
         return jnp.arange(-(n_modes - 1) // 2, (n_modes - 1) // 2 + 1, dtype=float)
 
 
-def get_freqs(n_modes: int | tuple[int, ...], n_dim: int = 2) -> Array | list[Array]:
+def get_freqs(n_modes: int | tuple[int, ...], n_dim: int = 2) -> Array | tuple[Array, ...]:
     if n_dim == 1 and isinstance(n_modes, int):
         return get_freqs_1D(n_modes)
     elif isinstance(n_modes, tuple):
@@ -91,7 +91,7 @@ def conjugate_symmetry(
 
 class SpatialModel(Module):
     @abstractmethod
-    def __call__(self, data: SpatialData):
+    def __call__(self, data: SpatialData) -> Array:
         pass
 
 
@@ -292,7 +292,7 @@ class PerIFUAndTile(SpatialModel):
     def __init__(self, n_tiles: int, n_ifus: int, ifu_values: Parameter | None = None):
         self.ifu_values = init_parameter(ifu_values, name="ifu_values", dims=(n_tiles, n_ifus))
 
-    def __call__(self, data: SpatialData) -> Array:
+    def __call__(self, data: SpatialDataLVM) -> Array:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.ifu_values.val[data.tile_idx, data.ifu_idx]
 
 
@@ -303,7 +303,7 @@ class PerIFU(SpatialModel):
     def __init__(self, n_ifus: int, ifu_values: Parameter | None = None):
         self.ifu_values = init_parameter(ifu_values, name="ifu_values", dims=n_ifus)
 
-    def __call__(self, data: SpatialData) -> Array:
+    def __call__(self, data: SpatialDataLVM) -> Array:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.ifu_values.val[data.ifu_idx]
 
 
@@ -314,7 +314,7 @@ class PerTile(SpatialModel):
     def __init__(self, n_tiles: int, tile_values: Parameter | None = None):
         self.tile_values = init_parameter(tile_values, name="tile_values", dims=n_tiles)
 
-    def __call__(self, data: SpatialData) -> Array:
+    def __call__(self, data: SpatialDataLVM) -> Array:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self.tile_values.val[data.tile_idx]
 
 
@@ -334,6 +334,6 @@ class PerTilePinned(SpatialModel):
         self.tile_values = init_parameter(tile_values, name="tile_values", dims=n_tiles - 1)
         self.pinned_val = pinned_val
 
-    def __call__(self, data: SpatialData) -> Array:
+    def __call__(self, data: SpatialDataLVM) -> Array:  # pyright: ignore[reportIncompatibleMethodOverride]
         tile_values_full = jnp.insert(self.tile_values.val, 0, self.pinned_val)
         return tile_values_full[data.tile_idx]

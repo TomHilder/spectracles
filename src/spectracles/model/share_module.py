@@ -1,7 +1,7 @@
 """share_module.py - Models built on equinox and jax that can have parameters that are shared between leaves of the model tree. Module refers to equinox Modules not Python modules."""
 
 from collections.abc import Callable
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import matplotlib.pyplot as plt
 from equinox import Module, filter, is_inexact_array, tree_at
@@ -829,7 +829,9 @@ class ShareModule(Module):
             if is_shared(val):
                 p_id = val.id
             else:
-                p_id = id_from_path(self._parent_leaf_paths, pp + (GetAttrKey(val_attr),))
+                p_id = cast(
+                    int, id_from_path(self._parent_leaf_paths, pp + (GetAttrKey(val_attr),))
+                )
             fix_paths.append(self._parent_leaf_paths[p_id][:-1] + (GetAttrKey("fix"),))
             new_fix.append(ff)
             inds = get_indices(self._dupl_leaf_ids, p_id)
@@ -1328,8 +1330,8 @@ class ShareModule(Module):
                 width=1.5,
                 nodelist=NODES,
                 node_size=NODE_SIZE,
-                min_target_margin=2.0,
-                min_source_margin=2.0,
+                min_target_margin=2,
+                min_source_margin=2,
             )
 
             # curved same-level edges (stagger radii so parallel arcs don’t overlap)
@@ -1348,8 +1350,8 @@ class ShareModule(Module):
                     width=1.5,
                     nodelist=NODES,
                     node_size=NODE_SIZE,
-                    min_target_margin=2.0,
-                    min_source_margin=2.0,
+                    min_target_margin=2,
+                    min_source_margin=2,
                 )
             if show:
                 plt.show()

@@ -135,6 +135,11 @@ class ModelDraws:
     `Posterior`); not constructed directly.
     """
 
+    _latent: "LatentSpace"
+    _params: dict[str, Array]
+    _path: tuple[str, ...]
+    _target: Any
+
     def __init__(
         self, latent: "LatentSpace", params: dict[str, Array], path: tuple[str, ...] = ()
     ):

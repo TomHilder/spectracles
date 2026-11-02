@@ -133,11 +133,15 @@ class OptimiserFrame:
             loss.append(loss_)
 
             # Check for convergence
-            check_now = self.Δloss_criterion is not None and i >= 100 and i % 50 == 0
-            if check_now and self._check_convergence(
-                loss_history=loss,
-                Δloss=self.Δloss_criterion,
-                pbar=pbar,
+            check_now = i >= 100 and i % 50 == 0
+            if (
+                check_now
+                and self.Δloss_criterion is not None
+                and self._check_convergence(
+                    loss_history=loss,
+                    Δloss=self.Δloss_criterion,
+                    pbar=pbar,
+                )
             ):
                 print(
                     f"Early exit based on Δloss_criterion of {self.Δloss_criterion:.2e} at step {i}."
@@ -171,12 +175,12 @@ class OptimiserFrame:
     def _check_convergence(
         loss_history: list[float],
         Δloss: float,
-        pbar: tqdm = None,
+        pbar: tqdm | None = None,
     ) -> bool:
         trend = loss_history[-50] - loss_history[-1]
         if pbar is not None:
             pbar.set_description(f"Optimising (Δloss trend: {trend:.2e})")
-        return jnp.abs(trend) < Δloss
+        return bool(jnp.abs(trend) < Δloss)
 
     def get_gradient_summary(self, *loss_args, **loss_kwargs) -> dict[str, dict[str, Any]]:
         """

@@ -12,7 +12,7 @@ from spectracles.model.spatial import SpatialModel
 
 class SpectralSpatialModel(Module):
     @abstractmethod
-    def __call__(self, λ: Array, data: SpatialData):
+    def __call__(self, λ: Array, data: SpatialData) -> Array:
         pass
 
 

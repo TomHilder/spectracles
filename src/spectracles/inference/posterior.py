@@ -7,7 +7,7 @@ function, in the same coordinates.
 """
 
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import jax
 import jax.numpy as jnp
@@ -74,7 +74,7 @@ class Posterior:
     def log_prior(self, ξ: Latent) -> Array:
         """The prior in latent space: -½|ξ|² (without the normalisation constant)."""
         ξ = self.latent._checked(as_latent_dict(ξ))
-        return -0.5 * sum(jnp.sum(ξ[p] ** 2) for p in self.latent.paths)
+        return cast(Array, -0.5 * sum(jnp.sum(ξ[p] ** 2) for p in self.latent.paths))
 
     def log_density(self, ξ: Latent) -> Array:
         """The unnormalised log-posterior: log-likelihood - ½|ξ|²."""

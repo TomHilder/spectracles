@@ -56,6 +56,8 @@ line-length = 99 # Sorry PEP8 I'm a rebel
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+# lvm_models is outside the stable API and not type-checked
+exclude = ["**/.*", "**/__pycache__", "src/spectracles/lvm_models"]
 
 [tool.uv.sources]
 jax-finufft = { git = "https://github.com/flatironinstitute/jax-finufft.git" }

@@ -43,7 +43,7 @@ def to_nifty(posterior: Posterior) -> Any:
     def forward(ξ):
         return likelihood.compress(posterior.predict(ξ))
 
-    model = jft.Model(forward, domain=domain, white_init=True)
+    model = jft.Model(forward, domain=domain, white_init=True)  # pyright: ignore[reportArgumentType]
     return likelihood.to_nifty().amend(model)
 
 
