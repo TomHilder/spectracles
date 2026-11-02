@@ -170,3 +170,66 @@ class TestKernelClasses:
 
         # Outputs should be different
         assert not jnp.allclose(fw1, fw2)
+
+
+class TestContinuousForm:
+    """spectral_density and covariance: normalised, a Fourier pair, and the same
+    shape as the feature weights the model uses."""
+
+    LENGTH, VAR = 0.7, 1.3
+    KERNELS = (Matern12, Matern32, Matern52, SquaredExponential)
+
+    def kernel(self, cls):
+        return cls(length_scale=Parameter(self.LENGTH), variance=Parameter(self.VAR))
+
+    def test_spectral_density_integrates_to_the_variance(self):
+        from scipy.integrate import quad
+
+        for cls in self.KERNELS:
+            k = self.kernel(cls)
+
+            def integrand(q, k=k):
+                return 2 * jnp.pi * q * float(jnp.squeeze(k.spectral_density(q)))
+
+            total, _ = quad(integrand, 0, jnp.inf)
+            assert jnp.isclose(total, self.VAR, rtol=1e-8), cls.__name__
+
+    def test_covariance_at_zero_is_the_variance(self):
+        for cls in self.KERNELS:
+            assert jnp.isclose(self.kernel(cls).covariance(0.0), self.VAR), cls.__name__
+
+    def test_spectral_density_is_the_hankel_transform_of_the_covariance(self):
+        # S(k) = (1 / 2π) ∫ r k(r) J0(k r) dr in 2D
+        from scipy.integrate import quad
+        from scipy.special import j0
+
+        for cls in self.KERNELS:
+            kern = self.kernel(cls)
+            for q in (0.0, 0.5, 2.0, 6.0):
+
+                def integrand(r, kern=kern, q=q):
+                    return r * float(jnp.squeeze(kern.covariance(r))) * j0(q * r)
+
+                val, _ = quad(integrand, 0, 60 * self.LENGTH, limit=400)
+                assert jnp.isclose(val / (2 * jnp.pi), kern.spectral_density(q), rtol=1e-7), (
+                    cls.__name__,
+                    q,
+                )
+
+    def test_spectral_density_has_the_shape_of_the_feature_weights(self):
+        freqs = jnp.linspace(0.0, 20.0, 41)
+        for cls in self.KERNELS:
+            kern = self.kernel(cls)
+            ratio = kern.spectral_density(freqs) / kern.feature_weights(freqs) ** 2
+            assert jnp.allclose(ratio, ratio[0], rtol=1e-12), cls.__name__
+
+    def test_kernels_without_a_continuous_form_say_so(self):
+        import pytest
+
+        from spectracles.model.kernels import LogLogLinear
+
+        kern = LogLogLinear(m_0=Parameter(0.0), m_s=Parameter(-2.0))
+        with pytest.raises(NotImplementedError):
+            kern.spectral_density(1.0)
+        with pytest.raises(NotImplementedError):
+            kern.covariance(1.0)

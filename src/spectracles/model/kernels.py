@@ -40,14 +40,49 @@ def _hyperparameter(kernel: str, name: str, value) -> Parameter:
     return value  # type: ignore[return-value]
 
 
+def matern_spectral_density(k: ArrayLike, length: ArrayLike, var: ArrayLike, nu: float) -> Array:
+    """The 2D Matern spectral density, normalised so that its integral over k is `var`."""
+    length, var = jnp.asarray(length), jnp.asarray(var)
+    return var * (nu * length**2 / jnp.pi) * (1 + (jnp.asarray(k) * length) ** 2) ** (-(nu + 1))
+
+
+def matern_covariance(r: ArrayLike, length: ArrayLike, var: ArrayLike, nu: float) -> Array:
+    """The Matern covariance for half-integer nu, in spectracles' convention (x = r / length)."""
+    x = jnp.abs(jnp.asarray(r)) / jnp.asarray(length)
+    if nu == 0.5:
+        poly = 1.0
+    elif nu == 1.5:
+        poly = 1 + x
+    elif nu == 2.5:
+        poly = 1 + x + x**2 / 3
+    else:
+        raise ValueError(f"Only nu = 1/2, 3/2 and 5/2 have a closed form here, got {nu}.")
+    return jnp.asarray(var) * poly * jnp.exp(-x)
+
+
 class Kernel(Module):
     """Base class for kernels. Subclasses declare whatever hyperparameter fields
     they need. The only contract is `feature_weights(freqs) -> sqrt(P(k))` on the
-    mode grid."""
+    mode grid.
+
+    Kernels can also give their continuous form, which the discretisation
+    diagnostic compares the field against: `spectral_density(k)`, the 2D
+    spectral density normalised so that its integral over k is the variance,
+    and `covariance(r)`. Both raise `NotImplementedError` unless a kernel
+    defines them.
+    """
 
     @abstractmethod
     def feature_weights(self, freqs: Array) -> Array:
         pass
+
+    def spectral_density(self, k: ArrayLike) -> Array:
+        """The 2D spectral density S(|k|), with integral over k equal to k(0)."""
+        raise NotImplementedError(f"{type(self).__name__} has no spectral_density.")
+
+    def covariance(self, r: ArrayLike) -> Array:
+        """The covariance k(r) at separation r."""
+        raise NotImplementedError(f"{type(self).__name__} has no covariance.")
 
 
 class Matern12(Kernel):
@@ -61,6 +96,12 @@ class Matern12(Kernel):
     def feature_weights(self, freqs: Array) -> Array:
         return matern_kernel_fw_nd(freqs, self.length_scale.val, self.variance.val, nu=0.5, n=2)
 
+    def spectral_density(self, k: ArrayLike) -> Array:
+        return matern_spectral_density(k, self.length_scale.val, self.variance.val, nu=0.5)
+
+    def covariance(self, r: ArrayLike) -> Array:
+        return matern_covariance(r, self.length_scale.val, self.variance.val, nu=0.5)
+
 
 class Matern32(Kernel):
     length_scale: Parameter
@@ -72,6 +113,12 @@ class Matern32(Kernel):
 
     def feature_weights(self, freqs: Array) -> Array:
         return matern_kernel_fw_nd(freqs, self.length_scale.val, self.variance.val, nu=1.5, n=2)
+
+    def spectral_density(self, k: ArrayLike) -> Array:
+        return matern_spectral_density(k, self.length_scale.val, self.variance.val, nu=1.5)
+
+    def covariance(self, r: ArrayLike) -> Array:
+        return matern_covariance(r, self.length_scale.val, self.variance.val, nu=1.5)
 
 
 class Matern52(Kernel):
@@ -85,6 +132,12 @@ class Matern52(Kernel):
     def feature_weights(self, freqs: Array) -> Array:
         return matern_kernel_fw_nd(freqs, self.length_scale.val, self.variance.val, nu=2.5, n=2)
 
+    def spectral_density(self, k: ArrayLike) -> Array:
+        return matern_spectral_density(k, self.length_scale.val, self.variance.val, nu=2.5)
+
+    def covariance(self, r: ArrayLike) -> Array:
+        return matern_covariance(r, self.length_scale.val, self.variance.val, nu=2.5)
+
 
 class SquaredExponential(Kernel):
     length_scale: Parameter
@@ -97,6 +150,13 @@ class SquaredExponential(Kernel):
     def feature_weights(self, freqs: Array) -> Array:
         fw = jnp.exp(-0.25 * freqs**2 * self.length_scale.val**2 + 1e-4)
         return jnp.sqrt(self.variance.val) * normalise_fw(fw)
+
+    def spectral_density(self, k: ArrayLike) -> Array:
+        ℓ = self.length_scale.val
+        return self.variance.val * (ℓ**2 / (2 * jnp.pi)) * jnp.exp(-0.5 * (k * ℓ) ** 2)
+
+    def covariance(self, r: ArrayLike) -> Array:
+        return self.variance.val * jnp.exp(-0.5 * (jnp.asarray(r) / self.length_scale.val) ** 2)
 
 
 class LogLogLinear(Kernel):
