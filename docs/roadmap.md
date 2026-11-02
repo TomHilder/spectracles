@@ -1,7 +1,7 @@
 # Roadmap
 
 Planned work, roughly in order. Nothing here is covered by the
-[stability promise](index.md#status) until it is released.
+[stability promise](index.md#stability) until it is released.
 
 ## One way to fit
 
@@ -31,6 +31,15 @@ multi-field models faster on GPU.
 memory. For many samples of a field on many points, summaries will be computed
 in chunks of samples (streaming mean and variance; quantiles in chunks of
 points), with the full draws built only on request.
+
+## Saving fits rather than models
+
+`save_model` pickles the whole model with dill, including the code of your
+model classes, so a saved file is tied to the Python and package versions that
+wrote it. Since the model's structure comes from your own code and can be
+rebuilt, saving is likely to change to store only what a fit produces: the
+parameter values or latents (and samples), loaded back into a model you build
+the same way. `save_model` and `load_model` would then be deprecated.
 
 ## Corner plots from draws
 

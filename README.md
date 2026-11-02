@@ -25,7 +25,7 @@
 
 ## What it does
 
-Spectracles fits models to IFU data where line or spectrum properties (line flux or velocity, continuum, ...) vary smoothly across the sky. These are modelled as *fields* and so they exist continuous at all sky locations spanned by the data.
+Spectracles fits models to IFU data where line or spectrum properties (line flux or velocity, continuum, ...) vary continuously across the sky. These are modelled as *fields*, so they are defined at every sky position spanned by the data, not just at the spaxels.
 
 More generically, Spectracles is a Python/[JAX](https://github.com/jax-ml/jax) library for statistical models, and particularly for models containing latent fields. It is designed for large-scale problems.
 
@@ -99,6 +99,8 @@ pip install spectracles            # or: uv add spectracles
 pip install "spectracles[nifty]"   # to use MGVI and geoVI
 pip install blackjax               # to use NUTS
 ```
+
+For SDSS-V LVM data, [lvm_tools](https://github.com/TomHilder/lvm_tools) reads the DRP output (lazily, with dask) and gives you the data ready for spectracles: `pip install "lvm-tools[spectracles]"`.
 
 To run on a GPU, build [jax-finufft](https://github.com/flatironinstitute/jax-finufft) from source as its README describes (this needs [FFTW](https://www.fftw.org)). To work on spectracles itself, clone this repository and run `uv sync` with [uv](https://github.com/astral-sh/uv), which also builds jax-finufft from source.
 
@@ -186,6 +188,8 @@ MIT
 
 Spectracles has many possible applications, but there are also many other great libraries out there! Here are just a few that may be useful to users of Spectracles:
 
+- [lvm_tools](https://github.com/TomHilder/lvm_tools): reads and selects SDSS-V
+  LVM data (lazily, with dask) and hands it to spectracles as `SpatialDataLVM`.
 - [NIFTy.re](https://github.com/NIFTy-PPL/NIFTy): JAX library for Gaussian-process
   models and variational inference (MGVI, geoVI), widely used for large imaging
   problems. Spectracles can hand its posteriors to NIFTy.re.

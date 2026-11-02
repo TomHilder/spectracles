@@ -1,14 +1,66 @@
 """io.py - Model object serialisation and deserialisation."""
 
+import sys
 from pathlib import Path
 from pickle import PicklingError
+from types import CodeType
+from typing import Any
 from warnings import catch_warnings, filterwarnings
 
-from dill import PicklingWarning, dump, load  # type: ignore[import]
+from dill import Pickler, PicklingWarning, load  # type: ignore[import]
+from dill import settings as dill_settings  # type: ignore[import]
+from dill._dill import MetaCatchingDict, _create_code  # type: ignore[import]
 
 from spectracles.model.share_module import ShareModule
 
 MODELFILE_EXT = ".model"
+
+
+class _ModelPickler(Pickler):
+    """dill's Pickler, with code objects saved on every supported Python.
+
+    dill (0.4.1) reads `co_lnotab` when saving a code object, and Python 3.15
+    removed it. dill stores it only for Pythons before 3.10 and drops it when
+    loading, so on 3.15 and later an empty one is stored in its place.
+    """
+
+    dispatch = MetaCatchingDict(Pickler.dispatch.copy())
+
+
+def _save_code(pickler: Any, obj: CodeType) -> None:
+    args = (
+        b"",  # co_lnotab
+        obj.co_argcount,
+        obj.co_posonlyargcount,
+        obj.co_kwonlyargcount,
+        obj.co_nlocals,
+        obj.co_stacksize,
+        obj.co_flags,
+        obj.co_code,
+        obj.co_consts,
+        obj.co_names,
+        obj.co_varnames,
+        obj.co_filename,
+        obj.co_name,
+        obj.co_qualname,
+        obj.co_firstlineno,
+        obj.co_linetable,
+        obj.co_exceptiontable,
+        obj.co_freevars,
+        obj.co_cellvars,
+    )
+    pickler.save_reduce(_create_code, args, obj=obj)
+
+
+if sys.version_info >= (3, 15):
+    _ModelPickler.dispatch[CodeType] = _save_code
+
+
+def _dump(obj, file, protocol=None, byref=None, fmode=None, recurse=None, **kwds) -> None:
+    """`dill.dump`, with `_ModelPickler`."""
+    protocol = dill_settings["protocol"] if protocol is None else int(protocol)
+    kwds.update(byref=byref, fmode=fmode, recurse=recurse)
+    _ModelPickler(file, protocol, **kwds).dump(obj)
 
 
 def save_model(model: ShareModule, file: Path, overwrite: bool = False, **dump_kwargs):
@@ -42,7 +94,7 @@ def save_model(model: ShareModule, file: Path, overwrite: bool = False, **dump_k
         # Open file in write and bytes mode
         with open(file, "wb") as f:
             try:
-                dump(model, f, **dump_kwargs)
+                _dump(model, f, **dump_kwargs)
             except PicklingWarning:
                 raise PicklingError(
                     "Above warning raised by dill when saving. Likely, you need to move your model class into it's own file and import it."
