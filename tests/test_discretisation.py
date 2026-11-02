@@ -17,7 +17,7 @@ from spectracles.discretisation import (
 )
 from spectracles.model.kernels import Kernel, LogLogLinear
 
-# The 19-tile Rosette footprint at padding 0.15 (P0.2 and P1.10's reference case)
+# A 19-tile LVM footprint (Rosette) at padding 0.15
 ROSETTE = Domain((0.0, 0.0), 9963.2 / 1.3)
 
 
@@ -50,7 +50,7 @@ class TestRealisedCovariance:
 
 class TestErrors:
     def test_reproduces_the_rosette_mode_counts(self):
-        # tolerance_modes.py (P1.10): ℓ_min = 37″ needs 237 modes at 1%, 439 at 0.1%
+        # Known values for this footprint: ℓ_min = 37″ needs 237 modes at 1%, 439 at 0.1%
         k = matern(37.0)
         assert required_modes(k, ROSETTE, padding=0.15, tol=1e-2) == 237
         assert required_modes(k, ROSETTE, padding=0.15, tol=1e-3) == 439
