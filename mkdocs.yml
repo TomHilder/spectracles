@@ -47,6 +47,7 @@ nav:
   - Guides:
     - Building models: models.md
     - Priors and inference: inference.md
+    - LVM data: lvm.md
     - How it works: inference_design.md
     - Schedule Builder: schedule_builder.md
     - Roadmap: roadmap.md

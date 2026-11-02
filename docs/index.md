@@ -99,6 +99,8 @@ mean_map, std_map = maps.mean(), maps.std()
   evaluating your model.
 - [Priors and inference](inference.md): priors, the posterior, fitting with
   MGVI, geoVI, NUTS or a best fit, and working with the results.
+- [LVM data](lvm.md): fitting SDSS-V LVM data with
+  [lvm_tools](https://tomhilder.github.io/lvm_tools/).
 - [Worked example](examples/inference.md): one field fitted three ways, with
   figures.
 - [How it works](inference_design.md): the design, for when you rely on the

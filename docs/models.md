@@ -48,7 +48,8 @@ roughly ±3 (see the roadmap for physical units).
 
 For LVM data, `SpatialDataLVM` also carries the tile, IFU and fibre of each
 point. [lvm_tools](https://tomhilder.github.io/lvm_tools/) builds it for you
-from the DRP output: its `FitData.αδ_data` is a `SpatialDataLVM`. If your models need something else per point (an exposure number, say),
+from the DRP output: its `FitData.αδ_data` is a `SpatialDataLVM`. See
+[LVM data](lvm.md). If your models need something else per point (an exposure number, say),
 subclass `SpatialData` and add it:
 
 ```python

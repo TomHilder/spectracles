@@ -100,7 +100,7 @@ pip install "spectracles[nifty]"   # to use MGVI and geoVI
 pip install blackjax               # to use NUTS
 ```
 
-For SDSS-V LVM data, [lvm_tools](https://github.com/TomHilder/lvm_tools) reads the DRP output (lazily, with dask) and gives you the data ready for spectracles: `pip install "lvm-tools[spectracles]"`.
+For SDSS-V LVM data, [lvm_tools](https://github.com/TomHilder/lvm_tools) reads the DRP output (lazily, with dask) and gives you the data ready for spectracles: `pip install "lvm-tools[spectracles]"`. The [LVM data guide](https://tomhilder.github.io/spectracles/lvm/) shows a full Hα fit.
 
 To run on a GPU, build [jax-finufft](https://github.com/flatironinstitute/jax-finufft) from source as its README describes (this needs [FFTW](https://www.fftw.org)). To work on spectracles itself, clone this repository and run `uv sync` with [uv](https://github.com/astral-sh/uv), which also builds jax-finufft from source.
 
