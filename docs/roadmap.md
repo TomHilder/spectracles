@@ -49,3 +49,10 @@ only by default (`exclude_fourier_coeffs=True`), labels from the parameter
 paths, vector parameters split into columns, ringed scatter points with step
 histograms, and every `corner` keyword (including `fig`, to overlay several
 methods) passed through.
+
+## Docs on Zensical
+
+The documentation is built with Material for MkDocs, which reaches end of life
+in May 2027. It will move to [Zensical](https://zensical.org), its successor
+from the same team, which reads the existing `mkdocs.yml`. lvm_tools' docs,
+built the same way, will move with it.
