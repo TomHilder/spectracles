@@ -83,7 +83,7 @@ which sets how smooth the field is, and the domain:
 ```python
 field = FourierGP(
     Matern32(
-        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),  # arcsec
+        length_scale=Parameter(prior=LogNormal(40.0, 12.0)),  # arcsec
         variance=Parameter(prior=LogNormal(1.0, 0.5)),
     ),
     domain=domain,
@@ -93,9 +93,7 @@ print(field.n_modes, field.padding)
 
 The field is represented by Fourier modes on a box larger than the domain. The
 number of modes and the size of the margin are chosen for you, so that the
-field is accurate (to 0.1%) for every length scale its prior allows. The
-margin grows with the longest length scale, so fields that can vary on scales
-close to the size of the domain get a much larger box.
+field is accurate (to 0.1%) for every length scale its prior allows.
 [Geometry and discretisation](discretisation.md) explains the choice, how to
 change it, and how to check a fit afterwards.
 
@@ -113,7 +111,7 @@ example, is positive, and often best modelled as the exponential of a GP:
 ```python
 flux = FourierGP(
     Matern32(
-        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),
+        length_scale=Parameter(prior=LogNormal(40.0, 12.0)),
         variance=Parameter(prior=LogNormal(1.0, 0.5)),
     ),
     domain=domain,
@@ -184,7 +182,7 @@ function that makes a new flux field each time it is called:
 ```python
 velocity = FourierGP(
     Matern32(
-        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),
+        length_scale=Parameter(prior=LogNormal(40.0, 12.0)),
         variance=Parameter(prior=LogNormal(400.0, 200.0)),  # (km/s)²
     ),
     domain=domain,
@@ -193,7 +191,7 @@ velocity = FourierGP(
 
 def flux_field():
     kernel = Matern32(
-        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),
+        length_scale=Parameter(prior=LogNormal(40.0, 12.0)),
         variance=Parameter(prior=LogNormal(1.0, 0.5)),
     )
     return FourierGP(kernel, domain=domain, mean=Parameter(prior=Normal(0.0, 1.0)), link="exp")
@@ -236,7 +234,7 @@ from spectracles import FieldFromRatio, FieldPlusScatter
 
 log10_ratio = FourierGP(
     Matern32(
-        length_scale=Parameter(prior=LogNormal(200.0, 80.0)),
+        length_scale=Parameter(prior=LogNormal(60.0, 20.0)),
         variance=Parameter(prior=LogNormal(0.1, 0.05)),
     ),
     domain=domain,

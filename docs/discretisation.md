@@ -64,7 +64,7 @@ its prior's 1% and 99% quantiles:
 
 ```python
 kernel = Matern32(
-    length_scale=Parameter(prior=LogNormal(120.0, 40.0)),
+    length_scale=Parameter(prior=LogNormal(40.0, 12.0)),
     variance=Parameter(prior=LogNormal(1.0, 0.5)),
 )
 field = FourierGP(kernel, domain=domain)
@@ -73,21 +73,18 @@ print(field.design)  # (tol, shortest, longest length scale) it was chosen for
 ```
 
 ```text
-(105, 105) 0.94
-(0.001, 53.50..., 242.23...)
+(163, 163) 0.3
+(0.001, 19.4..., 75.8...)
 ```
 
-The padding is set by the longest length scale and the modes by the shortest.
-Here the padding is large, 0.94 of the extent on each side: the prior allows
-length scales up to 242″, a fifth of the domain, and keeping aliasing below
-0.1% needs a gap of about ten length scales between the data and their copies.
-Fields whose length scales are small compared with the domain need much less.
-A wide prior costs modes, padding or both. You can change what the choice is
-made for:
+The padding is set by the longest length scale: keeping aliasing below 0.1%
+needs a gap of about ten length scales between the data and their periodic
+copies. The modes are set by the shortest. A wide prior costs both. You can
+change what the choice is made for:
 
 ```python
 FourierGP(kernel, domain=domain, tol=1e-2)  # 1% instead of 0.1%
-FourierGP(kernel, domain=domain, length_scale=(60.0, 300.0))  # your own range
+FourierGP(kernel, domain=domain, length_scale=(20.0, 100.0))  # your own range
 FourierGP(kernel, domain=domain, quantiles=(0.05, 0.95))  # a narrower part of the prior
 ```
 
@@ -108,7 +105,7 @@ be with a different length scale, number of modes or padding:
 from spectracles.discretisation import discretisation_error
 
 print(discretisation_error(by_hand))
-print(discretisation_error(by_hand, length_scale=40.0).truncation)  # if ℓ were 40″
+print(discretisation_error(by_hand, length_scale=15.0).truncation)  # if ℓ were 15″
 print(discretisation_error(by_hand, n_modes=51).truncation)  # with fewer modes
 print(discretisation_error(by_hand, padding=0.05).aliasing)  # with less padding
 ```
@@ -116,7 +113,7 @@ print(discretisation_error(by_hand, padding=0.05).aliasing)  # with less padding
 It works for a kernel before you build any field, too:
 
 ```python
-e = discretisation_error(kernel, domain=domain, n_modes=101, padding=0.2, length_scale=80.0)
+e = discretisation_error(kernel, domain=domain, n_modes=101, padding=0.2, length_scale=30.0)
 ```
 
 An array of length scales gives the errors along it, e.g. for a plot:
@@ -124,7 +121,7 @@ An array of length scales gives the errors along it, e.g. for a plot:
 ```python
 import numpy as np
 
-curve = discretisation_error(by_hand, length_scale=np.geomspace(20.0, 1000.0, 30))
+curve = discretisation_error(by_hand, length_scale=np.geomspace(5.0, 300.0, 30))
 curve.truncation, curve.aliasing  # arrays, one value per length scale
 ```
 
@@ -134,8 +131,8 @@ a given accuracy need?
 ```python
 from spectracles.discretisation import required_modes, required_padding
 
-required_modes(kernel, domain, length_scale=40.0, padding=0.2, tol=1e-3)  # modes per side
-required_padding(kernel, domain, length_scale=400.0, tol=1e-3)  # fraction of the extent
+required_modes(kernel, domain, length_scale=20.0, padding=0.2, tol=1e-3)  # modes per side
+required_padding(kernel, domain, length_scale=80.0, tol=1e-3)  # fraction of the extent
 ```
 
 ## Checking a fit
