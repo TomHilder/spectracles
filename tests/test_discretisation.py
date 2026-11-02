@@ -171,3 +171,85 @@ class TestInputs:
     def test_too_short_a_length_scale(self):
         with pytest.raises(ValueError, match="too short"):
             required_modes(matern(1.0), ROSETTE, tol=1e-3)
+
+
+class TestReport:
+    DOMAIN = Domain((0.0, 0.0), 6.0)
+
+    def model(self):
+        from spectracles import build_model
+        from spectracles.priors import LogNormal
+
+        class TwoFields(eqx.Module):
+            good: FourierGP
+            coarse: FourierGP
+
+            def __call__(self, d):
+                return self.good(d) + self.coarse(d)
+
+        def kernel():
+            return Matern32(
+                length_scale=Parameter(prior=LogNormal(0.5, 0.1)),
+                variance=Parameter(prior=LogNormal(1.0, 0.3)),
+            )
+
+        return build_model(
+            TwoFields,
+            good=FourierGP(kernel(), domain=self.DOMAIN),
+            coarse=FourierGP(kernel(), domain=self.DOMAIN, n_modes=(9, 9)),
+        )
+
+    def test_current_values(self):
+        from spectracles.discretisation import report
+
+        model = self.model()
+        with pytest.warns(UserWarning, match="coarse"):
+            rows = report(model, print_table=False)
+        assert set(rows) == {"good", "coarse"}
+        assert rows["good"]["ok"] and not rows["coarse"]["ok"]
+        assert rows["good"]["design"] == model.good.design
+        assert rows["good"]["length_scale"][0] == rows["good"]["length_scale"][1]
+
+    def test_at_samples(self, capsys):
+        from spectracles.discretisation import report
+        from spectracles.inference import LatentSpace
+
+        latent = LatentSpace(self.model())
+        samples = latent.sample_prior_latent(random.PRNGKey(0), n=50)
+        with pytest.warns(UserWarning):
+            rows = report(latent, samples)
+        lo, hi = rows["good"]["length_scale"]
+        values = latent.to_params(samples)["good.kernel.length_scale"]
+        assert np.isclose(lo, values.min()) and np.isclose(hi, values.max())
+        # Checked where each error is worst
+        gp = latent.model.for_evaluation().good
+        assert np.isclose(
+            rows["good"]["truncation"], discretisation_error(gp, length_scale=lo).truncation
+        )
+        assert np.isclose(
+            rows["good"]["aliasing"], discretisation_error(gp, length_scale=hi).aliasing
+        )
+        out = capsys.readouterr().out
+        assert "Discretisation" in out and "good" in out
+
+    def test_tol_override(self):
+        from spectracles.discretisation import report
+
+        rows = report(self.model(), tol=1.0, print_table=False)
+        assert all(r["ok"] for r in rows.values())
+
+    def test_samples_need_a_latent_space(self):
+        from spectracles.discretisation import report
+
+        with pytest.raises(ValueError, match="LatentSpace or Posterior"):
+            report(self.model(), samples={})
+
+    def test_plot(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        from spectracles.discretisation import plot_discretisation
+
+        gp = self.model().for_evaluation().good
+        ax = plot_discretisation(gp, length_scales=[0.4, 0.5, 0.6])
+        assert ax.get_xscale() == "log" and len(ax.get_lines()) >= 3

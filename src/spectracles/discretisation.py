@@ -22,7 +22,10 @@ is the continuous GP it approximates. The aliasing error is the worst case
 over pairs of points in the data region.
 """
 
+import dataclasses
+import warnings
 from dataclasses import dataclass
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -411,3 +414,233 @@ def realised_covariance(gp: FourierGP, dx: ArrayLike, dy: ArrayLike) -> np.ndarr
     dx, dy = np.asarray(dx, dtype=float), np.asarray(dy, dtype=float)
     phase = dk * (dx[..., None, None] * jx[:, None] + dy[..., None, None] * jy[None, :])
     return s2 * np.sum(w * np.cos(phase), axis=(-2, -1)) / w.sum()
+
+
+def _find_gps(obj: Any, path: tuple[str, ...] = ()):
+    """(dotted path, FourierGP) for every FourierGP in a module tree."""
+    if isinstance(obj, FourierGP):
+        yield ".".join(path), obj
+        return
+    if isinstance(obj, eqx.Module) and dataclasses.is_dataclass(obj):
+        for f in dataclasses.fields(obj):
+            yield from _find_gps(getattr(obj, f.name), (*path, f.name))
+
+
+def _resolve_model(model_or_latent: Any):
+    """(evaluable model, latent space or None) from a ShareModule, LatentSpace or Posterior."""
+    from spectracles.inference.latent import LatentSpace
+    from spectracles.inference.posterior import Posterior
+    from spectracles.model.share_module import ShareModule
+
+    if isinstance(model_or_latent, Posterior):
+        model_or_latent = model_or_latent.latent
+    if isinstance(model_or_latent, LatentSpace):
+        return model_or_latent.model.for_evaluation(), model_or_latent
+    if isinstance(model_or_latent, ShareModule):
+        return model_or_latent.for_evaluation(), None
+    raise TypeError(
+        "report takes a built model, a LatentSpace or a Posterior, got "
+        f"{type(model_or_latent).__name__}."
+    )
+
+
+def _get(obj: Any, path: str) -> Any:
+    for name in path.split("."):
+        obj = getattr(obj, name)
+    return obj
+
+
+def report(
+    model_or_latent: Any,
+    samples: Any = None,
+    *,
+    tol: float | None = None,
+    space: str = "latent",
+    print_table: bool = True,
+) -> dict[str, dict[str, Any]]:
+    """Check every FourierGP in a model against its tolerance, at its current
+    hyperparameters or at every sample.
+
+    Truncation is checked at the shortest length scale across the samples and
+    aliasing at the longest, which is where each is worst. A GP whose modes
+    were chosen for you is checked against its own `tol` (and its design
+    range of length scales is shown); others against 1e-3, or `tol`.
+
+    Args:
+        model_or_latent: A built model, a LatentSpace or a Posterior.
+        samples: Samples (as for `posterior.draws`); needs a LatentSpace or
+            Posterior. Without them, the model's current values are checked.
+        tol: The tolerance for every GP, instead of each GP's own.
+        space: Whether `samples` are latents ("latent") or parameter values ("params").
+        print_table: Whether to print the table.
+
+    Returns:
+        {path: {"n_modes", "padding", "length_scale" (shortest, longest),
+        "design" (or None), "truncation", "aliasing", "tol", "ok"}}.
+    """
+    model, latent = _resolve_model(model_or_latent)
+    gps = dict(_find_gps(model.model))
+    if not gps:
+        raise ValueError("The model has no FourierGP.")
+    with_ls = [p for p, g in gps.items() if hasattr(g.kernel, "length_scale")]
+    if samples is not None:
+        if latent is None:
+            raise ValueError("Samples need a LatentSpace or Posterior, not a model.")
+        draws = latent.map_samples(
+            lambda m: {p: jnp.ravel(_get(m.model, p).kernel.length_scale.val) for p in with_ls},
+            samples,
+            space=space,  # type: ignore[arg-type]
+        )
+        ls = {p: np.asarray(draws.values[p]) for p in with_ls}
+    else:
+        ls = {p: np.asarray(jnp.ravel(gps[p].kernel.length_scale.val)) for p in with_ls}  # type: ignore[attr-defined]
+
+    out: dict[str, dict[str, Any]] = {}
+    for path, gp in gps.items():
+        gp_tol = tol if tol is not None else (gp.design[0] if gp.design else DEFAULT_TOL)
+        row: dict[str, Any] = {
+            "n_modes": gp.n_modes,
+            "padding": gp.padding,
+            "design": gp.design,
+            "tol": gp_tol,
+        }
+        try:
+            _check_continuous_form(gp.kernel)
+        except NotImplementedError:
+            row.update(length_scale=None, truncation=None, aliasing=None, ok=None)
+            out[path] = row
+            continue
+        if path in ls:
+            lo, hi = float(ls[path].min()), float(ls[path].max())
+            trunc = discretisation_error(gp, length_scale=lo).truncation
+            alias = discretisation_error(gp, length_scale=hi).aliasing
+        else:
+            lo = hi = None
+            e = discretisation_error(gp)
+            trunc, alias = e.truncation, e.aliasing
+        row.update(
+            length_scale=None if lo is None else (lo, hi),
+            truncation=float(trunc),
+            aliasing=float(alias),
+            ok=bool(max(trunc, alias) <= gp_tol),
+        )
+        out[path] = row
+
+    if print_table:
+        _print_report(out, samples is not None)
+    failed = [p for p, r in out.items() if r["ok"] is False]
+    if failed:
+        warnings.warn(
+            f"Discretisation error above tolerance for {failed}: see the table, and choose "
+            "more modes or padding (or let FourierGP choose them for the length scales found).",
+            stacklevel=2,
+        )
+    return out
+
+
+def _print_report(rows: dict[str, dict[str, Any]], with_samples: bool) -> None:
+    from rich.table import Table
+    from rich.text import Text
+
+    from spectracles.model.formatting import get_console
+
+    def rng(r):
+        return (
+            "-" if r is None else (f"{r[0]:.4g}" if r[0] == r[1] else f"[{r[0]:.4g}, {r[1]:.4g}]")
+        )
+
+    table = Table(
+        title="Discretisation",
+        show_header=True,
+        header_style="bold",
+        border_style="dim",
+        title_style="bold",
+    )
+    table.add_column("Path", style="white", overflow="fold")
+    table.add_column("Modes", style="dim")
+    table.add_column("Padding", style="dim")
+    table.add_column("ℓ (samples)" if with_samples else "ℓ")
+    table.add_column("ℓ designed for", style="dim")
+    table.add_column("Truncation")
+    table.add_column("Aliasing")
+    table.add_column("OK")
+    for path, r in rows.items():
+        design = None if r["design"] is None else r["design"][1:]
+        if r["ok"] is None:
+            cells = ["n/a", "n/a", Text("?", style="yellow")]
+        else:
+            mark = Text("✓", style="green") if r["ok"] else Text("✗", style="bold red")
+            cells = [f"{r['truncation']:.1e}", f"{r['aliasing']:.1e}", mark]
+        pad = "-" if r["padding"] is None else f"{r['padding']:g}"
+        table.add_row(
+            path,
+            f"{r['n_modes'][0]}×{r['n_modes'][1]}",
+            pad,
+            rng(r["length_scale"]),
+            rng(design),
+            *cells,
+        )
+    console = get_console()
+    console.print(table)
+    tols = sorted({r["tol"] for r in rows.values()})
+    console.print(
+        Text(
+            "truncation at the shortest ℓ, aliasing at the longest; relative to s²; tol "
+            + ", ".join(f"{t:g}" for t in tols),
+            style="dim",
+        )
+    )
+
+
+def plot_discretisation(
+    gp: FourierGP,
+    length_scales: ArrayLike | None = None,
+    *,
+    tol: float | None = None,
+    ax: Any = None,
+):
+    """Plot a FourierGP's truncation and aliasing errors against the length scale.
+
+    Shows the tolerance, the range of length scales the GP was designed for
+    (if its modes were chosen for you) and, optionally, the length scales
+    found in a fit (e.g. posterior samples), as ticks along the bottom.
+
+    Returns:
+        The matplotlib Axes.
+    """
+    import matplotlib.pyplot as plt
+
+    if not isinstance(gp, FourierGP):
+        raise TypeError(f"Expected a FourierGP, got {type(gp).__name__}.")
+    tol = tol if tol is not None else (gp.design[0] if gp.design else DEFAULT_TOL)
+    found = None if length_scales is None else np.ravel(np.asarray(length_scales, dtype=float))
+    centre = [_length_scale(gp.kernel) or 1.0]
+    if gp.design:
+        centre += list(gp.design[1:])
+    if found is not None and found.size:
+        centre += [found.min(), found.max()]
+    grid = np.geomspace(min(centre) / 4, max(centre) * 4, 50)
+    e = discretisation_error(gp, length_scale=grid)
+    if ax is None:
+        _, ax = plt.subplots()
+    ax.loglog(grid, e.truncation, label="truncation")
+    ax.loglog(grid, e.aliasing, label="aliasing")
+    ax.axhline(tol, color="0.5", lw=0.8, label=f"tol {tol:g}")
+    if gp.design:
+        ax.axvspan(gp.design[1], gp.design[2], color="0.9", zorder=0, label="designed for")
+    if found is not None and found.size:
+        ax.plot(
+            found,
+            np.full(found.shape, 0.02),
+            "|",
+            color="k",
+            ms=8,
+            transform=ax.get_xaxis_transform(),
+            label="length scales found",
+        )
+    ax.set_ylim(tol * 1e-5, 2.0)  # the errors span hundreds of decades otherwise
+    ax.set_xlabel("length scale")
+    ax.set_ylabel("error / s²")
+    ax.set_title(f"{gp.n_modes[0]}×{gp.n_modes[1]} modes, padding {gp.padding}")
+    ax.legend()
+    return ax
