@@ -114,13 +114,22 @@ Fields:
 - Fast stationary Gaussian-process fields on arbitrary points via the equispaced Fourier representation ([EFGP](https://doi.org/10.1137/23M1565310)) and [FINUFFT](https://github.com/flatironinstitute/finufft) (through [jax-finufft](https://github.com/flatironinstitute/jax-finufft))
 - Squared exponential (RBF) and Matern 1/2, 3/2 and 5/2 kernels
 - Easy dense evaluation after fitting (i.e. between the data points)
+- Runs on GPU through JAX
 
 Generic:
 
-- Easy evaluation of model sub-components and fast mapping over posterior or prior samples
+- Parameter sharing: pass the same `Parameter` (or kernel, or whole field) to several components, e.g. one velocity field for every line, and it is fitted as one parameter
+- Priors and fixed parameters set by path or glob pattern, e.g. `model.with_priors({"**.length_scale": LogNormal(0.5, 0.2), "log_flux.*.variance": "fixed"})`
+- Fix parameters at chosen values for a fit with `posterior.fix({"log_flux.kernel.length_scale": 0.3})`
+- Works with any JAX inference algorithm: `posterior.log_density` is a plain JAX function, and `to_nifty(posterior)` hands the same posterior to NIFTy.re
+- Gaussian likelihoods that drop NaNs, zero inverse variances and masked pixels automatically: `GaussianLikelihood(data, ivar, mask=good)`
+- The model, or any sub-component, at every posterior sample: `posterior.draws(samples, to="model").log_flux(spaxels).mean()`
+- Fast mapping of any function over posterior or prior samples
 - PPL-like features including easy prior specification and sampling
+- Plots of the model structure, showing which parameters are shared where: `model.plot_model_graph()`
 - Saving and loading models
 - Readable summaries of models and fits
+- Optimisation schedules for staged best fits (experimental; see the [docs](https://tomhilder.github.io/spectracles/schedule_builder/))
 
 ## Stability
 
