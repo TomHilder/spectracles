@@ -3,12 +3,15 @@
 from abc import abstractmethod
 
 import jax.numpy as jnp
-from equinox import Module
+import numpy as np
+from equinox import Module, field
+from jax.core import Tracer
 from jax.scipy.stats import norm
 from jax_finufft import nufft2  # type: ignore
 from jaxtyping import Array
 
 from spectracles.model.data import SpatialData, SpatialDataLVM
+from spectracles.model.domain import Domain
 from spectracles.model.kernels import Kernel
 from spectracles.model.parameter import AnyParameter, Parameter, _is_int, init_parameter
 from spectracles.priors import StdNormal
@@ -20,7 +23,56 @@ from spectracles.priors import StdNormal
 #     repeated in the shape info right now, since I didn't implement n_modes
 #     != n_requested_modes yet.
 
-FINUFFT_KWDS = {"eps": 1e-10}
+DEFAULT_PADDING = 0.15
+DEFAULT_NUFFT_TOL = 1e-10
+
+
+def _box(domain: Domain | None, padding: float | None) -> tuple[float, float, float]:
+    """The periodic box (centre x, centre y, side) for a domain and padding.
+
+    Without a domain, coordinates are already in [-π, π]: the box is that square.
+    """
+    if domain is None:
+        if padding is not None:
+            raise ValueError("padding needs a domain: FourierGP(..., domain=Domain(...)).")
+        return 0.0, 0.0, 2 * np.pi
+    if not isinstance(domain, Domain):
+        raise TypeError(f"domain must be a Domain, got {type(domain).__name__}.")
+    padding = DEFAULT_PADDING if padding is None else float(padding)
+    if not (np.isfinite(padding) and padding >= 0):
+        raise ValueError(f"padding must be a non-negative number, got {padding!r}.")
+    return domain.centre[0], domain.centre[1], domain.box_size(padding)
+
+
+def _check_in_box(x, y, box: tuple[float, float, float]) -> None:
+    """Raise if any point is outside the periodic box (it would wrap to the other side).
+
+    Runs on concrete positions only, so it costs nothing inside compiled code;
+    positions that are themselves traced (e.g. jit arguments) aren't checked.
+    """
+    if isinstance(x, Tracer) or isinstance(y, Tracer):
+        return
+    cx, cy, size = box
+    half = 0.5 * size * (1 + 1e-12)
+    x, y = np.asarray(x), np.asarray(y)
+    if x.size == 0:
+        return
+    dx, dy = np.abs(x - cx).max(), np.abs(y - cy).max()
+    if dx > half or dy > half:
+        raise ValueError(
+            f"Points lie outside the GP's periodic box (centre ({cx:.6g}, {cy:.6g}), side "
+            f"{size:.6g}): x spans [{x.min():.6g}, {x.max():.6g}], y spans "
+            f"[{y.min():.6g}, {y.max():.6g}]. They would wrap to the opposite side. Use a "
+            "Domain that covers them, or more padding."
+        )
+
+
+def _to_box(x, y, box: tuple[float, float, float]):
+    """Map coordinates into the box's [-π, π] square."""
+    _check_in_box(x, y, box)
+    cx, cy, size = box
+    scale = 2 * np.pi / size
+    return (x - cx) * scale, (y - cy) * scale
 
 
 def _check_n_modes(n_modes) -> tuple[int, int]:
@@ -104,6 +156,10 @@ class FourierBasis(SpatialModel):
 
     coefficients: Parameter
     n_modes: tuple[int, int]
+    domain: Domain | None = field(static=True)
+    padding: float | None = field(static=True)
+    nufft_tol: float = field(static=True)
+    _box: tuple[float, float, float] = field(static=True)
     _freqs: Array
     _shape_info: tuple[int, int, int]
 
@@ -111,11 +167,21 @@ class FourierBasis(SpatialModel):
         self,
         n_modes: tuple[int, int],
         coefficients: Parameter | None = None,
+        *,
+        domain: Domain | None = None,
+        padding: float | None = None,
+        nufft_tol: float = DEFAULT_NUFFT_TOL,
     ):
         # Model specfication
         self.n_modes = n_modes = _check_n_modes(n_modes)
+        self._box = _box(domain, padding)
+        self.domain = domain
+        self.padding = (
+            None if domain is None else (DEFAULT_PADDING if padding is None else float(padding))
+        )
+        self.nufft_tol = float(nufft_tol)
         fx, fy = get_freqs(n_modes)
-        self._freqs = jnp.sqrt(fx**2 + fy**2)
+        self._freqs = (2 * np.pi / self._box[2]) * jnp.sqrt(fx**2 + fy**2)
         # Initialise parameters
         self.coefficients = init_parameter(coefficients, name="coefficients", dims=n_modes)
         # Initialise the shape info
@@ -123,12 +189,13 @@ class FourierBasis(SpatialModel):
         self._shape_info = (p, p // 2, p)
 
     def __call__(self, data: SpatialData) -> Array:
+        x, y = _to_box(data.x, data.y, self._box)
         # Sum basis functions with nufft
         model_eval: Array = nufft2(
             conjugate_symmetry(self.coefficients.val.flatten(), self.n_modes, self._shape_info),
-            data.x,
-            data.y,
-            **FINUFFT_KWDS,
+            x,
+            y,
+            eps=self.nufft_tol,
         ).real
         return model_eval
 
@@ -139,10 +206,33 @@ class FourierBasis(SpatialModel):
 
 
 class FourierGP(SpatialModel):
+    """A Gaussian-process field, represented by Fourier modes on a periodic box.
+
+    Without a `domain`, coordinates must already lie in [-π, π] and the
+    kernel's length scale is in those units. With a `domain`, coordinates and
+    length scales are in the domain's units (e.g. arcsec), and the field lives
+    on a periodic box of the domain plus `padding` × extent on each side.
+
+    Args:
+        n_modes: Modes in each direction, two positive odd integers.
+        kernel: The kernel, e.g. `Matern32(length_scale, variance)`.
+        coefficients: The (whitened) Fourier coefficients; a standard-normal
+            prior by default.
+        zeromode: A constant added to the field; fixed at 0 by default.
+        domain: The region the data cover, in the data's units.
+        padding: The margin on each side of the domain, as a fraction of its
+            extent (0.15 by default when a domain is given).
+        nufft_tol: The relative accuracy of the non-uniform FFT.
+    """
+
     coefficients: Parameter
     kernel: Kernel
     zeromode: Parameter
     n_modes: tuple[int, int]
+    domain: Domain | None = field(static=True)
+    padding: float | None = field(static=True)
+    nufft_tol: float = field(static=True)
+    _box: tuple[float, float, float] = field(static=True)
     _freqs: Array
     _shape_info: tuple[int, int, int]
 
@@ -152,11 +242,22 @@ class FourierGP(SpatialModel):
         kernel: Kernel,
         coefficients: Parameter | None = None,
         zeromode: Parameter | None = None,
+        *,
+        domain: Domain | None = None,
+        padding: float | None = None,
+        nufft_tol: float = DEFAULT_NUFFT_TOL,
     ):
         # Model specfication
         self.n_modes = n_modes = _check_n_modes(n_modes)
+        self._box = _box(domain, padding)
+        self.domain = domain
+        self.padding = (
+            None if domain is None else (DEFAULT_PADDING if padding is None else float(padding))
+        )
+        self.nufft_tol = float(nufft_tol)
+        # Physical frequencies, so the kernel sees length scales in the coordinates' units
         fx, fy = get_freqs(n_modes)
-        self._freqs = jnp.sqrt(fx**2 + fy**2)
+        self._freqs = (2 * np.pi / self._box[2]) * jnp.sqrt(fx**2 + fy**2)
         self.kernel = _check_kernel(kernel)
         # Initialise parameters. The coefficients are whitened (the kernel scales
         # them), so their prior is a standard normal by construction.
@@ -175,14 +276,15 @@ class FourierGP(SpatialModel):
         self._shape_info = (p, p // 2, p)
 
     def __call__(self, data: SpatialData) -> Array:
+        x, y = _to_box(data.x, data.y, self._box)
         # Feature weighted coefficients
         scaled_coeffs = self.coefficients.val * self.kernel.feature_weights(self._freqs)
         # Sum basis functions with nufft after processing the coefficients to enforce conjugate symmetry
         model_eval: Array = nufft2(
             conjugate_symmetry(scaled_coeffs.flatten(), self.n_modes, self._shape_info),
-            data.x,
-            data.y,
-            **FINUFFT_KWDS,
+            x,
+            y,
+            eps=self.nufft_tol,
         ).real
         return model_eval + self.zeromode.val
 
@@ -255,7 +357,7 @@ class MultiFourierGP(SpatialModel):
             coeffs_for_nufft,  # (n_components, n_data)
             data.x,  # (1, n_data) where 1 is implicit
             data.y,  # (1, n_data) where 1 is implicit
-            **FINUFFT_KWDS,
+            eps=DEFAULT_NUFFT_TOL,
         ).real  # (n_components, n_data)
         return model_eval
 
