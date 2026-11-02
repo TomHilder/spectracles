@@ -23,23 +23,23 @@
   </p>
 </div>
 
-## Glasses for your spectra
+## What it does
 
-Spectracles models IFU spectra as continuous functions of sky position. Line
-fluxes, velocities and widths are Gaussian-process fields, represented by
-their Fourier modes and evaluated exactly at each spaxel's position (with
-non-uniform FFTs), so the data's irregular sampling is never regridded.
+Spectracles fits models to IFU data where line properties (flux, velocity,
+width, ...) vary smoothly across the sky. Each one is a Gaussian process, and
+the model is evaluated at the true position of every spaxel, so your data
+never has to be resampled onto a grid.
 
-You write the model as an [Equinox](https://github.com/patrick-kidger/equinox)
-module, attach priors to its parameters, and get one posterior that every
-backend fits in the same coordinates: MGVI and geoVI (NIFTy.re), NUTS
-(BlackJAX) or MAP (optax). Results come back as draws of anything you can
-compute from the model.
+Models are ordinary Python classes. You put priors on the parameters you want
+to fit, then fit with whichever method suits the problem: MGVI or geoVI (fast
+and approximate, through NIFTy), NUTS (MCMC, through BlackJAX), or a simple
+best fit. They all use the same model, and you get back samples you can turn
+into maps, error bars or anything else you compute from the model.
 
 ## Example
 
-A positive field, observed with noise at 300 scattered points, then sampled
-with NUTS:
+A positive map, observed with noise at 300 scattered points and fitted with
+NUTS:
 
 ```python
 import blackjax
@@ -65,17 +65,17 @@ kernel = Matern32(
     variance=Parameter(prior=LogNormal(1.0, 0.5)),
 )
 model = build_model(LineMap, FourierGP(n_modes=(15, 15), kernel=kernel))
-latent = LatentSpace(model)  # standard-normal coordinates for every free parameter
+latent = LatentSpace(model)  # the parameters to fit
 
 xy = random.uniform(random.PRNGKey(0), (2, 300), minval=-3.0, maxval=3.0)
 spaxels = SpatialDataGeneric(x=xy[0], y=xy[1], idx=jnp.arange(300))
-truth = latent.sample_prior_latent(random.PRNGKey(1))  # simulate from the prior
+truth = latent.sample_prior_latent(random.PRNGKey(1))  # fake data from a random draw
 flux = latent.to_model(truth)(spaxels) + 0.05 * random.normal(random.PRNGKey(2), (300,))
 ivar = jnp.full(300, 0.05**-2)
 
 posterior = Posterior(latent, lambda m: m(spaxels), GaussianLikelihood(flux, ivar))
 
-# Any backend works on posterior.log_density; here, NUTS
+# Sample with NUTS
 warmup = blackjax.window_adaptation(blackjax.nuts, posterior.log_density)
 (state, params), _ = warmup.run(random.PRNGKey(3), latent.zeros(), num_steps=300)
 nuts = blackjax.nuts(posterior.log_density, **params)
@@ -88,99 +88,50 @@ def step(state, key):
 
 _, samples = jax.lax.scan(step, state, random.split(random.PRNGKey(4), 300))
 
-posterior.summary(samples, true_latents=truth)  # table of posterior mean ± std vs truth
-maps = posterior.draws(samples, to="model")(spaxels)  # the model at every sample
+posterior.summary(samples, true_latents=truth)  # fitted parameters vs the truth
+maps = posterior.draws(samples, to="model")(spaxels)  # the model for every sample
 mean_map, std_map = maps.mean(), maps.std()
 ```
 
-The [inference guide](https://tomhilder.github.io/spectracles/inference/)
-explains each step, and the
+The [docs](https://tomhilder.github.io/spectracles/inference/) go through this
+step by step, and the
 [worked example](https://tomhilder.github.io/spectracles/examples/inference/)
-fits the same posterior with MGVI, NUTS and MAP and compares them.
+fits the same data with MGVI, NUTS and a best fit.
 
 ## Installation
 
 ```sh
 pip install spectracles            # or: uv add spectracles
-pip install "spectracles[nifty]"   # with MGVI / geoVI through NIFTy.re
+pip install "spectracles[nifty]"   # to use MGVI and geoVI
+pip install blackjax               # to use NUTS
 ```
 
-NUTS needs [BlackJAX](https://github.com/blackjax-devs/blackjax)
-(`pip install blackjax`); MAP uses optax, which is included.
-
-The NUFFTs come from [jax-finufft](https://github.com/flatironinstitute/jax-finufft),
-which has CPU wheels on PyPI. For GPUs, build jax-finufft from source (this
-needs FFTW) as its README describes.
-
-For development, from source:
-
-```sh
-git clone git@github.com:TomHilder/spectracles.git
-cd spectracles
-uv sync  # builds jax-finufft from its git repository, which needs FFTW
-uv run pytest
-```
+To run on a GPU, build [jax-finufft](https://github.com/flatironinstitute/jax-finufft)
+from source as its README describes (this needs FFTW). To work on spectracles
+itself, clone this repository and run `uv sync` (which also builds jax-finufft
+from source).
 
 ## Features
 
-**Modelling**
-
-- **Spatial fields** - Gaussian processes in Fourier space (`FourierGP`, with
-  Matérn-1/2, 3/2, 5/2 and squared-exponential kernels), evaluated at
-  arbitrary positions with NUFFTs
-- **Spectral models** - spectral components (`Gaussian` lines, constants)
-  whose parameters are spatial fields
-- **Composable models** - plain Equinox modules; `build_model` turns one into
-  a model with named parameter paths
-- **Parameter sharing** - one parameter used in several places (e.g. a kernel
-  shared by two lines) is one parameter
-- **Free, fixed and `Known`** - choose what is inferred; fix and free
-  parameters by path or glob pattern (`"*.kernel.*"`)
-
-**Inference**
-
-- **Priors on parameters** - `Normal`, `LogNormal`, `Laplace`, `Uniform`, ...;
-  every free parameter maps to a standard-normal latent
-- **One posterior, any backend** - MGVI/geoVI (NIFTy.re), NUTS (BlackJAX), MAP
-  (optax), or anything else that takes a JAX log-density
-- **Masked Gaussian likelihoods** - NaNs and bad data points are dropped
-- **Results as draws** - summaries, parameter draws, the model or any part of
-  it at every sample (`posterior.draws`, `map_samples`), ready for ArviZ
-- **Staged fits** - freeze parameters for some VI iterations; `posterior.fix`
-  holds them for a whole fit
-
-**Also**
-
-- **Optimisation schedules** - point estimates with your own loss, freeing and
-  fixing parameter groups per phase
-- **Rich output** - pretty-printed model trees, parameter tables and posterior
-  summaries
-- **Saving and loading** - `save_model` and `load_model`
+- Gaussian-process maps with Matérn and squared-exponential kernels
+- Spectral lines and other components whose parameters are maps
+- Parameters shared between components (e.g. one kernel for two lines)
+- Priors on any parameter, and fixing parameters at chosen values
+- Bad pixels and NaNs masked in the likelihood
+- Saving and loading models, and readable summaries of models and fits
 
 ## Stability
 
-From 1.0.0, spectracles follows semantic versioning: the public API (the
-`spectracles`, `spectracles.priors`, `spectracles.inference` and
-`spectracles.nifty` namespaces) only changes incompatibly in a major release,
-after a deprecation warning.
-
-Not covered:
-
-- **`spectracles.lvm_models`** is experimental. The LVM-specific models are
-  being ported to priors and the latent space one at a time.
-- **`OptimiserFrame` and schedules** will move onto the latent space, so that
-  optimisation and inference share one way to fit; the `prior_logpdf` losses
-  will then be deprecated.
-
-Planned work is on the
-[roadmap](https://tomhilder.github.io/spectracles/roadmap/).
+From 1.0.0, spectracles follows semantic versioning: anything in
+`spectracles`, `spectracles.priors`, `spectracles.inference` or
+`spectracles.nifty` only changes in a major release, after a deprecation
+warning. `spectracles.lvm_models` and the optimisation schedules
+(`OptimiserFrame`) are still changing. See the
+[roadmap](https://tomhilder.github.io/spectracles/roadmap/) for what's planned.
 
 ## Documentation
 
-[tomhilder.github.io/spectracles](https://tomhilder.github.io/spectracles/):
-guides to [priors and inference](https://tomhilder.github.io/spectracles/inference/)
-and [schedules](https://tomhilder.github.io/spectracles/schedule_builder/),
-worked examples, and the API reference.
+[tomhilder.github.io/spectracles](https://tomhilder.github.io/spectracles/)
 
 ## Citation
 
