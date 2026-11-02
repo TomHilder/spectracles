@@ -15,6 +15,7 @@ DOCS = Path(__file__).resolve().parents[1] / "docs"
 
 # Pages whose code is run, and the optional packages they need
 PAGES = {
+    "discretisation.md": (),
     "index.md": ("blackjax",),
     "models.md": (),
     "inference.md": ("nifty.re", "optax", "arviz"),

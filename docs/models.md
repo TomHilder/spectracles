@@ -17,6 +17,7 @@ import numpy as np
 from jax import random
 
 from spectracles import (
+    Domain,
     FourierGP,
     Known,
     Matern32,
@@ -34,17 +35,24 @@ jax.config.update("jax_enable_x64", True)
 
 A model is evaluated at a set of points on the sky. `SpatialDataGeneric` holds
 their positions `x` and `y`, and an index `idx` for each point (usually which
-spaxel it is):
+spaxel it is). Here the positions are offsets from the centre of the field, in
+arcseconds:
 
 ```python
 N_SPAXELS = 400
-xy = random.uniform(random.PRNGKey(0), (2, N_SPAXELS), minval=-3.0, maxval=3.0)
+xy = random.uniform(random.PRNGKey(0), (2, N_SPAXELS), minval=-600.0, maxval=600.0)
 spaxels = SpatialDataGeneric(x=xy[0], y=xy[1], idx=jnp.arange(N_SPAXELS))
 ```
 
-The positions can be anywhere: they don't need to lie on a grid. Fields are
-defined over a box a bit larger than the data, so scale your coordinates to
-roughly ±3 (see the roadmap for physical units).
+The positions can be anywhere: they don't need to lie on a grid. Use whatever
+units suit your data; length scales are then in the same units.
+
+A `Domain` describes the region the data cover. Fields use it to work in your
+units:
+
+```python
+domain = Domain.from_points(spaxels.x, spaxels.y)
+```
 
 For LVM data, `SpatialDataLVM` also carries the tile, IFU and fibre of each
 point. [lvm_tools](https://tomhilder.github.io/lvm_tools/) builds it for you
@@ -70,24 +78,53 @@ class ExposureData(SpatialData):
 
 A field is a quantity defined continuously across the sky, such as a line flux
 or a velocity. `FourierGP` is a Gaussian-process field. It needs a kernel,
-which sets how smooth the field is, and the number of Fourier modes in each
-direction (two odd numbers; more modes allow finer structure):
+which sets how smooth the field is, and the domain:
 
 ```python
 field = FourierGP(
-    n_modes=(25, 25),
-    kernel=Matern32(
-        length_scale=Parameter(prior=LogNormal(1.0, 0.3)),
+    Matern32(
+        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),  # arcsec
         variance=Parameter(prior=LogNormal(1.0, 0.5)),
     ),
+    domain=domain,
 )
+print(field.n_modes, field.padding)
 ```
+
+The field is represented by Fourier modes on a box larger than the domain. The
+number of modes and the size of the margin are chosen for you, so that the
+field is accurate (to 0.1%) for every length scale its prior allows. The
+margin grows with the longest length scale, so fields that can vary on scales
+close to the size of the domain get a much larger box.
+[Geometry and discretisation](discretisation.md) explains the choice, how to
+change it, and how to check a fit afterwards.
 
 The kernels are `Matern12`, `Matern32`, `Matern52` and `SquaredExponential`,
 from roughest to smoothest. Each takes a `length_scale` and a `variance`.
 
-A field can be evaluated at any points, not just where the data are. That is
-how you make a dense map after fitting.
+A field can be evaluated at any points inside the domain, not just where the
+data are. That is how you make a dense map after fitting.
+
+### Means and positive fields
+
+A field can have a mean, and a `link` that transforms it. A line flux, for
+example, is positive, and often best modelled as the exponential of a GP:
+
+```python
+flux = FourierGP(
+    Matern32(
+        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),
+        variance=Parameter(prior=LogNormal(1.0, 0.5)),
+    ),
+    domain=domain,
+    mean=Parameter(prior=Normal(0.0, 1.0)),
+    link="exp",
+)
+```
+
+This field is `exp(GP + mean)`. `link="softplus"` (with `lower=`) is another
+positive option, which grows linearly rather than exponentially. The mean is a
+parameter like any other, fitted with its own prior.
 
 ## Per-spaxel terms
 
@@ -114,13 +151,13 @@ C_KMS = 299_792.458
 
 class Line(eqx.Module):
     rest_wavelength: Known
-    log_flux: FourierGP
+    flux: FourierGP
     velocity: FourierGP
     width: Parameter
 
     def __call__(self, wavelength, data):
         centre = self.rest_wavelength.val * (1 + self.velocity(data) / C_KMS)
-        flux = jnp.exp(self.log_flux(data))
+        flux = self.flux(data)
         σ = self.width.val
         return flux / (σ * jnp.sqrt(2 * jnp.pi)) * jnp.exp(-0.5 * ((wavelength - centre) / σ) ** 2)
 
@@ -146,20 +183,20 @@ function that makes a new flux field each time it is called:
 
 ```python
 velocity = FourierGP(
-    n_modes=(25, 25),
-    kernel=Matern32(
-        length_scale=Parameter(prior=LogNormal(1.0, 0.3)),
+    Matern32(
+        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),
         variance=Parameter(prior=LogNormal(400.0, 200.0)),  # (km/s)²
     ),
+    domain=domain,
 )
 
 
 def flux_field():
     kernel = Matern32(
-        length_scale=Parameter(prior=LogNormal(1.0, 0.3)),
+        length_scale=Parameter(prior=LogNormal(120.0, 40.0)),
         variance=Parameter(prior=LogNormal(1.0, 0.5)),
     )
-    return FourierGP(n_modes=(25, 25), kernel=kernel)
+    return FourierGP(kernel, domain=domain, mean=Parameter(prior=Normal(0.0, 1.0)), link="exp")
 ```
 
 Then build the model. The same `velocity` object goes to both lines, so the
@@ -168,13 +205,13 @@ model has one velocity field, not two. Each line gets its own flux field:
 ```python
 halpha = Line(
     rest_wavelength=Known(6562.8),
-    log_flux=flux_field(),
+    flux=flux_field(),
     velocity=velocity,  # shared
     width=Parameter(prior=LogNormal(1.0, 0.2)),
 )
 nii = Line(
     rest_wavelength=Known(6583.5),
-    log_flux=flux_field(),
+    flux=flux_field(),
     velocity=velocity,  # shared
     width=Parameter(prior=LogNormal(1.0, 0.2)),
 )
@@ -186,6 +223,41 @@ model = build_model(TwoLines, halpha=halpha, nii=nii, offset=offset)
 A shared parameter is fitted once, with one prior. Two separate parameters that
 happen to have the same prior, like the two `width`s here, are fitted
 independently.
+
+## Fields built from other fields
+
+Two common constructions have their own classes. `FieldFromRatio` writes one
+field as another times a ratio, which is useful when the ratio is the quantity
+of interest. The ratio is modelled through its base-10 log, and the mean of
+that field is the typical log ratio:
+
+```python
+from spectracles import FieldFromRatio, FieldPlusScatter
+
+log10_ratio = FourierGP(
+    Matern32(
+        length_scale=Parameter(prior=LogNormal(200.0, 80.0)),
+        variance=Parameter(prior=LogNormal(0.1, 0.05)),
+    ),
+    domain=domain,
+    mean=Parameter(prior=Normal(-0.5, 0.3)),
+)
+nii_flux = FieldFromRatio(base=halpha.flux, log10_ratio=log10_ratio)  # Hα flux × ratio
+```
+
+`FieldPlusScatter(field, scatter)` adds a separate value for each spaxel to a
+field, for a quantity with some spaxel-to-spaxel scatter that a continuous
+field can't follow:
+
+```python
+scattered = FieldPlusScatter(
+    field=flux_field(),
+    scatter=PerSpaxel(N_SPAXELS, Parameter(dims=N_SPAXELS, prior=Normal(0.0, 0.05))),
+)
+```
+
+For anything else, such as the sum of two fields, write the arithmetic in your
+model's `__call__`.
 
 ## Looking at the model
 
@@ -233,7 +305,7 @@ grid, use `for_evaluation()` first. It gives a copy in which shared values are
 filled in everywhere:
 
 ```python
-gx, gy = jnp.meshgrid(jnp.linspace(-3, 3, 100), jnp.linspace(-3, 3, 100))
+gx, gy = jnp.meshgrid(jnp.linspace(-600, 600, 100), jnp.linspace(-600, 600, 100))
 grid = SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(gx.size))
 velocity_map = model.for_evaluation().nii.velocity(grid).reshape(gx.shape)
 ```
@@ -293,3 +365,7 @@ each a spatial model, `Constant(c)` is a flat continuum, and
 - **`MultiFourierGP`** (several fields evaluated together) is disabled until
   1.1.
 - **Fields are stationary**: the kernel is the same everywhere on the sky.
+- **Domains are square.** An elongated footprint gets a square box.
+- **Choosing modes for you needs the kernel's continuous form**
+  (`spectral_density` and `covariance`), which the built-in kernels have. For
+  other kernels, give `n_modes` (and `padding`).

@@ -615,7 +615,7 @@ def plot_discretisation(
     *,
     tol: float | None = None,
     ax: Any = None,
-):
+) -> Any:
     """Plot a FourierGP's truncation and aliasing errors against the length scale.
 
     Shows the tolerance, the range of length scales the GP was designed for

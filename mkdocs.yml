@@ -46,6 +46,7 @@ nav:
   - Home: index.md
   - Guides:
     - Building models: models.md
+    - Geometry and discretisation: discretisation.md
     - Priors and inference: inference.md
     - LVM data: lvm.md
     - How it works: inference_design.md
@@ -59,6 +60,7 @@ nav:
     - api/models.md
     - api/priors.md
     - api/inference.md
+    - api/discretisation.md
     - api/nifty.md
     - api/opt_schedule.md
     - api/schedule_builder.md

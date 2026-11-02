@@ -119,7 +119,7 @@ def field(variance_prior):
         length_scale=Parameter(prior=LogNormal(2 * one_arcmin, one_arcmin)),
         variance=Parameter(prior=variance_prior),
     )
-    return FourierGP(n_modes=(41, 41), kernel=kernel)
+    return FourierGP(kernel, n_modes=(41, 41))
 
 
 model = build_model(

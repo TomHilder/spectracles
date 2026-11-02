@@ -92,7 +92,7 @@ kernel = Matern32(
 )
 model = build_model(
     LineMap,
-    log_flux=FourierGP(n_modes=(21, 21), kernel=kernel),
+    log_flux=FourierGP(kernel, n_modes=(21, 21)),
     offset=PerSpaxel(N_SPAXELS),
 )
 ```
@@ -180,10 +180,9 @@ Parameter(0.4642, free, ~LogNormal(0.5, 0.2))
 │ log_flux.coefficients        │ (21, 21) │ (-∞, ∞) │ StdNormal           │  free  │ -           │
 │ log_flux.kernel.length_scale │ (1,)     │ (-∞, ∞) │ LogNormal(0.5, 0.2) │  free  │ -           │
 │ log_flux.kernel.variance     │ (1,)     │ (-∞, ∞) │ LogNormal(1, 0.5)   │  free  │ -           │
-│ log_flux.zeromode            │ (1,)     │ (-∞, ∞) │ -                   │ fixed  │ -           │
 │ offset.spaxel_values         │ (300,)   │ (-∞, ∞) │ Laplace(0.02)       │  free  │ -           │
 └──────────────────────────────┴──────────┴─────────┴─────────────────────┴────────┴─────────────┘
-5 parameters · 4 free, 1 fixed
+4 parameters · 4 free, 0 fixed
 ```
 
 If a free parameter has no prior, you find out when you set up the fit (next
