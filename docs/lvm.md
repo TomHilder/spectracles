@@ -3,11 +3,12 @@
 [lvm_tools](https://tomhilder.github.io/lvm_tools/) reads SDSS-V Local Volume
 Mapper data reduction pipeline (DRP) files and prepares them for spectracles.
 It selects a wavelength window and a region of sky, drops bad fibres and
-pixels, and scales the flux and the sky coordinates to sensible ranges. Files
-are read lazily with dask, so only the window you ask for is loaded.
+pixels, scales the flux, and gives each spaxel's position in arcseconds from
+the centre of the field. Files are read lazily with dask, so only the window
+you ask for is loaded.
 
 ```bash
-pip install "lvm-tools[spectracles]"
+pip install "lvm-tools[spectracles]>=0.2"
 ```
 
 This page fits an Hα map to LVM data, from DRP files to a map on the sky. The
@@ -43,7 +44,7 @@ data = FitDataBuilder(tiles, config).build()
 ```
 
 `print(config)` shows every setting, including how bad data are handled and
-how the flux and coordinates are scaled. The
+how the flux is scaled. The
 [lvm_tools docs](https://tomhilder.github.io/lvm_tools/) cover the options.
 
 ## What you get
@@ -56,11 +57,13 @@ how the flux and coordinates are scaled. The
 | `data.mask` | (wavelengths, spaxels) | `True` where a pixel is good |
 | `data.λ` | (wavelengths,) | wavelengths in Å |
 | `data.lsf_σ` | (wavelengths, spaxels) | the line-spread function's width in Å |
-| `data.αδ_data` | | the spaxel positions, as a `SpatialDataLVM` |
+| `data.sky_data` | | the spaxel positions, as a `SpatialDataLVM` |
 
-`data.αδ_data` is what a spectracles model is evaluated at. Its positions are
-RA and Dec, scaled to roughly ±π. It also carries each spaxel's tile, IFU and
-fibre, for the per-tile and per-IFU models in `spectracles.model.spatial`.
+`data.sky_data` is what a spectracles model is evaluated at. Its positions `x`
+and `y` are each spaxel's offset east and north of the field's centre
+(`data.sky_centre`), in arcseconds, on the tangent plane. It also carries each
+spaxel's tile, IFU and fibre, for the per-tile and per-IFU models in
+`spectracles.model.spatial`.
 
 The flux and inverse variance are scaled consistently, so fitted fluxes are in
 the scaled units. `config.normalise_F_scale` and `config.normalise_F_offset`
@@ -105,21 +108,26 @@ class Halpha(eqx.Module):
         return line * jnp.exp(-0.5 * ((λ - centre) / σ) ** 2) + self.continuum(spaxels)
 ```
 
-Length scales are in the scaled sky coordinates. `data.arcsec_to_model_domain`
-converts from arcseconds, so priors can be written in physical units:
+The fields work in the same units as the positions, so length scales are in
+arcseconds. A `Domain` describes the region the spaxels cover, and each field
+chooses its Fourier modes for the length scales its prior allows (see
+[Geometry and discretisation](discretisation.md)):
 
 ```python
 # sketch
+from spectracles import Domain
+
+spaxels = data.sky_data
+domain = Domain.from_points(spaxels.x, spaxels.y)
 n_spaxels = data.flux.shape[1]
-one_arcmin = data.arcsec_to_model_domain(60.0)
 
 
 def field(variance_prior):
     kernel = Matern32(
-        length_scale=Parameter(prior=LogNormal(2 * one_arcmin, one_arcmin)),
+        length_scale=Parameter(prior=LogNormal(60.0, 20.0)),  # arcsec
         variance=Parameter(prior=variance_prior),
     )
-    return FourierGP(kernel, n_modes=(41, 41))
+    return FourierGP(kernel, domain=domain)
 
 
 model = build_model(
@@ -143,8 +151,6 @@ the likelihood so that bad pixels are skipped:
 # sketch
 from spectracles.inference import GaussianLikelihood, LatentSpace, Posterior
 
-spaxels = data.αδ_data
-
 
 def forward(m):
     return jax.vmap(m, in_axes=(0, None))(data.λ, spaxels)
@@ -162,9 +168,9 @@ From here, fitting and results are the same as for any other model: see
 
 ## Maps on the sky
 
-Fields can be evaluated anywhere, so a map can be drawn on a regular grid
-rather than at the fibres. `data.predict_α` and `data.predict_δ` turn the
-scaled coordinates back into RA and Dec for the axes:
+Fields can be evaluated anywhere in the domain, so a map can be drawn on a
+regular grid rather than at the fibres. `data.sky_to_radec` turns the grid's
+offsets back into RA and Dec for the axes:
 
 ```python
 # sketch
@@ -175,7 +181,7 @@ gx, gy = jnp.meshgrid(
     jnp.linspace(spaxels.y.min(), spaxels.y.max(), 200),
 )
 grid = SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(gx.size))
-ra, dec = data.predict_α(gx), data.predict_δ(gy)
+ra, dec = data.sky_to_radec(gx, gy)
 
 flux = posterior.map_samples(lambda m: jnp.exp(m.log_flux(grid)), samples)
 flux_map = flux.mean().reshape(gx.shape)
@@ -189,4 +195,6 @@ them out when you show the map.
 - `data.v_bary`: the barycentric velocity correction for each spaxel, in km/s.
 - `data.mjd`: the time of each exposure.
 - `data.tile_idx`, `data.ifu_idx`, `data.fibre_idx`: which tile, IFU and fibre
-  each spaxel comes from, also in `data.αδ_data`.
+  each spaxel comes from, also in `data.sky_data`.
+- `data.with_sky_origin(ra, dec)`: the same data with offsets measured from a
+  centre of your choice, e.g. to put several datasets on one frame.
