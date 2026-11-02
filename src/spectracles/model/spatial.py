@@ -1,5 +1,6 @@
 """spatial.py - Spatial models, especially flexible models built on Fourier-accelerated Gaussian Processes."""
 
+import warnings
 from abc import abstractmethod
 
 import jax.numpy as jnp
@@ -42,6 +43,73 @@ def _box(domain: Domain | None, padding: float | None) -> tuple[float, float, fl
     if not (np.isfinite(padding) and padding >= 0):
         raise ValueError(f"padding must be a non-negative number, got {padding!r}.")
     return domain.centre[0], domain.centre[1], domain.box_size(padding)
+
+
+def _length_scale_range(
+    kernel: Kernel, length_scale, quantiles: tuple[float, float]
+) -> tuple[float, float]:
+    """The shortest and longest length scales to choose modes and padding for."""
+    if length_scale is not None:
+        lo, hi = (length_scale, length_scale) if np.ndim(length_scale) == 0 else length_scale
+        lo, hi = float(lo), float(hi)
+        if not (0 < lo <= hi and np.isfinite(hi)):
+            raise ValueError(
+                f"length_scale must be (shortest, longest) > 0, got {length_scale!r}."
+            )
+        return lo, hi
+    param = getattr(kernel, "length_scale", None)
+    if param is None:
+        raise ValueError(
+            f"{type(kernel).__name__} has no length_scale, so modes can't be chosen for you: "
+            "give n_modes (and padding)."
+        )
+    if param.prior is None or param.fix:
+        value = float(jnp.max(param.val))
+        return value, value
+    q_lo, q_hi = quantiles
+    if not 0 < q_lo <= q_hi < 1:
+        raise ValueError(f"quantiles must be in (0, 1), got {quantiles!r}.")
+    lo = float(jnp.min(param.prior.transform(norm.ppf(jnp.asarray(q_lo)))))
+    hi = float(jnp.max(param.prior.transform(norm.ppf(jnp.asarray(q_hi)))))
+    return lo, hi
+
+
+def _choose_modes(kernel, domain, padding, tol, length_scale, quantiles):
+    """Modes and padding for `tol` over the length-scale range, and the design record."""
+    from spectracles.discretisation import (
+        DEFAULT_TOL,
+        discretisation_error,
+        required_modes,
+        required_padding,
+    )
+
+    if domain is None:
+        raise ValueError(
+            "Without a domain, n_modes is needed: FourierGP(kernel, n_modes=(m, m)). Give a "
+            "domain to have the modes chosen for you."
+        )
+    tol = DEFAULT_TOL if tol is None else float(tol)
+    lo, hi = _length_scale_range(kernel, length_scale, quantiles)
+    if padding is None:
+        padding = required_padding(kernel, domain, length_scale=hi, tol=tol)
+    else:
+        alias = discretisation_error(
+            kernel, domain=domain, n_modes=3, padding=padding, length_scale=hi
+        ).aliasing
+        if alias > tol:
+            warnings.warn(
+                f"padding={padding} gives an aliasing error of {alias:.1e} at length scale "
+                f"{hi:.4g}, above tol={tol:g}.",
+                stacklevel=3,
+            )
+    try:
+        m = required_modes(kernel, domain, length_scale=lo, padding=padding, tol=tol)
+    except ValueError as e:
+        raise ValueError(
+            f"{e} The shortest length scale is {lo:.4g}: narrow the prior, pass "
+            "length_scale=(shortest, longest), or give n_modes."
+        ) from None
+    return (m, m), padding, (tol, lo, hi)
 
 
 def _check_in_box(x, y, box: tuple[float, float, float]) -> None:
@@ -208,21 +276,40 @@ class FourierBasis(SpatialModel):
 class FourierGP(SpatialModel):
     """A Gaussian-process field, represented by Fourier modes on a periodic box.
 
-    Without a `domain`, coordinates must already lie in [-π, π] and the
-    kernel's length scale is in those units. With a `domain`, coordinates and
-    length scales are in the domain's units (e.g. arcsec), and the field lives
-    on a periodic box of the domain plus `padding` × extent on each side.
+    With a `domain`, coordinates and length scales are in the domain's units
+    (e.g. arcsec), and the field lives on a periodic box of the domain plus
+    `padding` × extent on each side. The modes and padding are then chosen for
+    you, so that the field matches its kernel to `tol` over the range of
+    length scales it can take (by default, its prior's 1% to 99% quantiles):
+
+        FourierGP(kernel, domain=domain)
+        FourierGP(kernel, domain=domain, tol=1e-4, length_scale=(30.0, 300.0))
+        FourierGP(kernel, domain=domain, n_modes=(301, 301), padding=0.15)  # by hand
+
+    Without a `domain`, coordinates must already lie in [-π, π], the length
+    scale is in those units, and `n_modes` is needed.
 
     Args:
-        n_modes: Modes in each direction, two positive odd integers.
         kernel: The kernel, e.g. `Matern32(length_scale, variance)`.
+        n_modes: Modes in each direction, two positive odd integers. Chosen
+            from `tol` if not given (needs a domain).
+        domain: The region the data cover, in the data's units.
+        padding: The margin on each side of the domain, as a fraction of its
+            extent. Chosen from `tol` if not given, or 0.15 when `n_modes` is.
+        tol: The accuracy the modes and padding are chosen for (1e-3 by
+            default): the truncation error at the shortest length scale and
+            the aliasing error at the longest (see `spectracles.discretisation`).
+        length_scale: The range (shortest, longest) of length scales to choose
+            for, or a single value; the prior's `quantiles` by default.
+        quantiles: The prior quantiles that give the default range.
         coefficients: The (whitened) Fourier coefficients; a standard-normal
             prior by default.
         zeromode: A constant added to the field; fixed at 0 by default.
-        domain: The region the data cover, in the data's units.
-        padding: The margin on each side of the domain, as a fraction of its
-            extent (0.15 by default when a domain is given).
         nufft_tol: The relative accuracy of the non-uniform FFT.
+
+    Attributes:
+        design: (tol, shortest, longest length scale) the modes and padding
+            were chosen for, or None if they were given by hand.
     """
 
     coefficients: Parameter
@@ -232,21 +319,51 @@ class FourierGP(SpatialModel):
     domain: Domain | None = field(static=True)
     padding: float | None = field(static=True)
     nufft_tol: float = field(static=True)
+    design: tuple[float, float, float] | None = field(static=True)
     _box: tuple[float, float, float] = field(static=True)
     _freqs: Array
     _shape_info: tuple[int, int, int]
 
     def __init__(
         self,
-        n_modes: tuple[int, int],
         kernel: Kernel,
-        coefficients: Parameter | None = None,
-        zeromode: Parameter | None = None,
-        *,
+        *legacy,
+        n_modes: tuple[int, int] | None = None,
         domain: Domain | None = None,
         padding: float | None = None,
+        tol: float | None = None,
+        length_scale: float | tuple[float, float] | None = None,
+        quantiles: tuple[float, float] = (0.01, 0.99),
+        coefficients: Parameter | None = None,
+        zeromode: Parameter | None = None,
         nufft_tol: float = DEFAULT_NUFFT_TOL,
     ):
+        if legacy:
+            # FourierGP(n_modes, kernel, coefficients, zeromode): the signature before 1.0
+            if len(legacy) > 3 or n_modes is not None:
+                raise TypeError(
+                    "FourierGP takes the kernel first: FourierGP(kernel, n_modes=..., ...)."
+                )
+            warnings.warn(
+                "FourierGP(n_modes, kernel) is deprecated: use FourierGP(kernel, n_modes=n_modes), "
+                "or give a domain and leave out n_modes to have it chosen.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            n_modes, kernel = kernel, legacy[0]  # type: ignore[assignment]
+            coefficients = legacy[1] if len(legacy) > 1 else coefficients
+            zeromode = legacy[2] if len(legacy) > 2 else zeromode
+        kernel = _check_kernel(kernel)
+        if n_modes is None:
+            n_modes, padding, self.design = _choose_modes(
+                kernel, domain, padding, tol, length_scale, quantiles
+            )
+        else:
+            if tol is not None or length_scale is not None:
+                raise ValueError(
+                    "tol and length_scale choose n_modes; give them or n_modes, not both."
+                )
+            self.design = None
         # Model specfication
         self.n_modes = n_modes = _check_n_modes(n_modes)
         self._box = _box(domain, padding)
@@ -258,7 +375,7 @@ class FourierGP(SpatialModel):
         # Physical frequencies, so the kernel sees length scales in the coordinates' units
         fx, fy = get_freqs(n_modes)
         self._freqs = (2 * np.pi / self._box[2]) * jnp.sqrt(fx**2 + fy**2)
-        self.kernel = _check_kernel(kernel)
+        self.kernel = kernel
         # Initialise parameters. The coefficients are whitened (the kernel scales
         # them), so their prior is a standard normal by construction.
         # A user-supplied Parameter is kept as is (the same object, so it can be

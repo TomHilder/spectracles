@@ -166,3 +166,70 @@ class TestFourierBasisInDataUnits:
         )
         scaled_data = points(scale=a)
         assert jnp.allclose(unit(data), scaled(scaled_data), atol=1e-12)
+
+
+class TestModesChosenForYou:
+    DOMAIN = Domain((0.0, 0.0), 6.0)
+
+    def kernel(self, prior=True):
+        from spectracles.priors import LogNormal
+
+        ls = Parameter(prior=LogNormal(0.5, 0.1)) if prior else Parameter(0.5)
+        return Matern32(length_scale=ls, variance=Parameter(1.0))
+
+    def test_chosen_for_the_tolerance(self):
+        from spectracles.discretisation import discretisation_error
+
+        gp = FourierGP(self.kernel(), domain=self.DOMAIN, tol=1e-3)
+        tol, lo, hi = gp.design
+        assert tol == 1e-3 and lo < 0.5 < hi
+        m = gp.n_modes[0]
+        assert gp.n_modes == (m, m)
+        assert discretisation_error(gp, length_scale=lo).truncation <= tol
+        assert discretisation_error(gp, length_scale=lo, n_modes=m - 2).truncation > tol
+        assert discretisation_error(gp, length_scale=hi).aliasing <= tol
+
+    def test_stricter_tolerance_needs_more(self):
+        loose = FourierGP(self.kernel(), domain=self.DOMAIN, tol=1e-2)
+        strict = FourierGP(self.kernel(), domain=self.DOMAIN, tol=1e-4)
+        assert strict.n_modes[0] > loose.n_modes[0] and strict.padding > loose.padding
+
+    def test_length_scale_range(self):
+        gp = FourierGP(self.kernel(), domain=self.DOMAIN, length_scale=(0.3, 1.0))
+        assert gp.design[1:] == (0.3, 1.0)
+
+    def test_fixed_length_scale(self):
+        gp = FourierGP(self.kernel(prior=False), domain=self.DOMAIN)
+        assert gp.design[1:] == (0.5, 0.5)
+
+    def test_given_padding_is_kept(self):
+        gp = FourierGP(self.kernel(), domain=self.DOMAIN, padding=0.5)
+        assert gp.padding == 0.5
+
+    def test_too_little_padding_warns(self):
+        with pytest.warns(UserWarning, match="aliasing error"):
+            FourierGP(self.kernel(), domain=self.DOMAIN, padding=0.0)
+
+    def test_by_hand(self):
+        gp = FourierGP(self.kernel(), domain=self.DOMAIN, n_modes=(21, 21))
+        assert gp.n_modes == (21, 21) and gp.padding == DEFAULT_PADDING and gp.design is None
+
+    def test_n_modes_needed_without_a_domain(self):
+        with pytest.raises(ValueError, match="Without a domain, n_modes is needed"):
+            FourierGP(self.kernel())
+
+    def test_tol_or_n_modes_not_both(self):
+        with pytest.raises(ValueError, match="not both"):
+            FourierGP(self.kernel(), domain=self.DOMAIN, n_modes=(21, 21), tol=1e-3)
+
+    def test_too_short_a_length_scale(self):
+        with pytest.raises(ValueError, match="narrow the prior"):
+            FourierGP(self.kernel(), domain=Domain((0.0, 0.0), 6000.0))
+
+    def test_old_signature_still_works(self):
+        with pytest.warns(DeprecationWarning, match="FourierGP\\(n_modes, kernel\\)"):
+            old = FourierGP((21, 21), self.kernel(prior=False))
+        new = FourierGP(self.kernel(prior=False), n_modes=(21, 21))
+        data = points()
+        assert old.n_modes == new.n_modes
+        assert jnp.array_equal(old(data), new(data))
