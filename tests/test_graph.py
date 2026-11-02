@@ -1,17 +1,14 @@
 """test_graph.py - tests for the spectracles.model.graph module."""
 
-import io
-import sys
-
-import pytest
+import matplotlib as mpl
 from networkx import DiGraph
+
 from spectracles.model.graph import (
     DEFAULT_NX_KWDS,
     layered_hierarchy_pos,
     print_graph,
     temporarily_disable_tex,
 )
-import matplotlib as mpl
 
 
 class TestDefaultNxKwds:

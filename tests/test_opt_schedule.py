@@ -3,6 +3,7 @@
 import jax.numpy as jnp
 import optax  # type: ignore[import]
 import pytest
+
 from spectracles.model.share_module import build_model
 from spectracles.optimise.opt_schedule import (
     ManagedOptimiserSchedule,
@@ -12,7 +13,7 @@ from spectracles.optimise.opt_schedule import (
     PhaseState,
 )
 
-from .test_models import SimpleModel, SharedLeafModel
+from .test_models import SharedLeafModel, SimpleModel
 
 
 class TestPhaseConfig:
@@ -270,7 +271,7 @@ class TestOptimiserSchedule:
 
         # Final model should be close to optimal
         final_model = schedule.model_history[-1]
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         assert jnp.allclose(locked.a.val, 0.5, rtol=1e-1)
 
 
@@ -591,18 +592,18 @@ class TestManagedOptimiserSchedule:
         ]
 
         schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
-        initial_loss = self.loss_fn(self.model.get_locked_model(), self.x, self.y)
+        initial_loss = self.loss_fn(self.model.for_evaluation(), self.x, self.y)
 
         schedule.run_all(x=self.x, y=self.y)
 
         final_model = schedule.model_history[-1]
-        final_loss = self.loss_fn(final_model.get_locked_model(), self.x, self.y)
+        final_loss = self.loss_fn(final_model.for_evaluation(), self.x, self.y)
 
         # Loss should decrease significantly
         assert final_loss < initial_loss * 0.1
 
         # Parameter should be close to optimal (2.0)
-        locked = final_model.get_locked_model()
+        locked = final_model.for_evaluation()
         assert jnp.allclose(locked.param.val, 2.0, rtol=0.1)
 
     def test_reset_and_rerun(self):
@@ -614,14 +615,12 @@ class TestManagedOptimiserSchedule:
         schedule = ManagedOptimiserSchedule(self.model, self.loss_fn, configs)
         schedule.run_all(x=self.x, y=self.y)
 
-        first_run_final = schedule.model_history[-1]
         first_run_losses = schedule.loss_history.copy()
 
         # Reset and run again
         schedule.reset()
         schedule.run_all(x=self.x, y=self.y)
 
-        second_run_final = schedule.model_history[-1]
         second_run_losses = schedule.loss_history
 
         # Both runs should produce similar results (fresh optimizer state)

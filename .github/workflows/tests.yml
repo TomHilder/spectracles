@@ -7,12 +7,27 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      # Same ruff version as uv.lock (bump both together)
+      - name: Ruff lint
+        run: uvx ruff@0.17.2 check .
+
+      - name: Ruff format
+        run: uvx ruff@0.17.2 format --check .
+
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
 
     steps:
       - uses: actions/checkout@v4

@@ -1,10 +1,13 @@
 """parameter.py - Parameter objects for use with the modelling framework."""
 
-from typing import Callable
+from collections.abc import Callable
 
 import jax.numpy as jnp
-from equinox import Module
-from jaxtyping import Array
+import numpy as np
+from equinox import Module, field
+from jaxtyping import Array, ArrayLike
+
+from spectracles.priors import Prior
 
 
 class BoundsError(Exception):
@@ -17,40 +20,90 @@ def _to_float_array(x) -> Array:
     return jnp.asarray(x, dtype=float)
 
 
+def _is_int(x) -> bool:
+    return isinstance(x, int | np.integer) and not isinstance(x, bool | np.bool_)
+
+
+def _shape_from_dims(dims) -> tuple[int, ...]:
+    """The shape `dims` asks for: an int n means (n,)."""
+    if isinstance(dims, Prior):
+        raise TypeError("dims got a Prior. Pass priors by keyword: Parameter(value, prior=...).")
+    if _is_int(dims):
+        shape = (int(dims),)
+    elif isinstance(dims, tuple) and all(_is_int(d) for d in dims):
+        shape = tuple(int(d) for d in dims)
+    else:
+        raise TypeError(f"dims must be an int or a tuple of ints, got {dims!r}.")
+    if any(d < 1 for d in shape):
+        raise ValueError(f"dims must be positive, got {dims!r}.")
+    return shape
+
+
+def _check_fixed(fixed) -> bool:
+    if not isinstance(fixed, bool | np.bool_):
+        raise TypeError(f"fixed must be True or False, got {fixed!r}.")
+    return bool(fixed)
+
+
 def _array_from_user(
     dims: int | tuple | None = None,
-    initial: float | Array | None = None,
+    initial: ArrayLike | None = None,
 ) -> Array:
+    if isinstance(initial, Prior):
+        raise TypeError(
+            "The initial value got a Prior. Pass priors by keyword: Parameter(prior=...)."
+        )
+    shape = None if dims is None else _shape_from_dims(dims)
     if initial is not None:
         param_vals = _to_float_array(initial).copy()
-        if dims is not None:
-            expected_shape = (dims,) if isinstance(dims, int) else dims
-            if param_vals.shape != expected_shape:
-                raise ValueError("The shape of initial must match dims.")
+        if shape is not None and param_vals.shape != shape:
+            raise ValueError(
+                f"The initial value's shape {param_vals.shape} doesn't match dims {shape}."
+            )
     else:
-        if dims is None:
-            shape = (1,)
-        else:
-            shape = (dims,) if isinstance(dims, int) else dims
-        param_vals = jnp.zeros(shape)
+        param_vals = jnp.zeros((1,) if shape is None else shape)
 
     return param_vals
 
 
+def _check_prior(prior: Prior | None) -> Prior | None:
+    if prior is not None and not isinstance(prior, Prior):
+        raise TypeError(
+            f"prior must be a spectracles.priors.Prior or None, got {type(prior).__name__}."
+        )
+    return prior
+
+
 class Parameter(Module):
-    """A parameter in a statistical model, which may be fixed or free."""
+    """A parameter in a statistical model, which may be fixed or free, and may have a prior.
+
+    A free parameter is inferred (and needs a prior for that). A fixed one
+    (`fixed=True`) keeps its value, but can be freed again, e.g. by
+    `set_fixed_status` or a schedule. For constants that should never be
+    freed, use `Known`.
+
+    The prior is a static field: it is part of the model's structure, not an
+    array leaf, so it is never optimised and never mistaken for a shared array.
+    """
 
     val: Array
     fix: bool
+    prior: Prior | None = field(static=True, default=None)
 
     def __init__(
         self,
-        initial: Array | None = None,
+        initial: ArrayLike | None = None,
         dims: int | tuple | None = None,
         fixed: bool = False,
+        prior: Prior | None = None,
     ):
-        self.fix = fixed
-        self.val = _array_from_user(dims, initial)
+        self.fix = _check_fixed(fixed)
+        self.prior = _check_prior(prior)
+        val = _array_from_user(dims, initial)
+        if initial is None and self.prior is not None:
+            # Start at the prior's median, T(0): where LatentSpace.zeros() starts too
+            val = jnp.asarray(self.prior.transform(jnp.zeros_like(val)), dtype=val.dtype)
+        self.val = val
 
     def __repr__(self) -> str:
         from spectracles.model.formatting import (
@@ -61,18 +114,20 @@ class Parameter(Module):
         from spectracles.model.share_module import Shared
 
         # Check if val is a Shared sentinel (in unlocked ShareModule context)
+        prior_str = repr(self.prior) if self.prior is not None else None
         if isinstance(self.val, Shared):
             text = parameter_repr_parts(
-                "Parameter", "", self.fix, shared_path=self.val.parent_path
+                "Parameter", "", self.fix, shared_path=self.val.parent_path, prior_str=prior_str
             )
         else:
             value_str = format_array_value(self.val)
-            text = parameter_repr_parts("Parameter", value_str, self.fix)
+            text = parameter_repr_parts("Parameter", value_str, self.fix, prior_str=prior_str)
         return render_to_string(text)
 
     def debug_repr(self) -> str:
         """Return the full equinox-style repr for debugging."""
         import equinox as eqx
+
         return eqx.tree_pformat(self)
 
 
@@ -90,14 +145,21 @@ class ConstrainedParameter(Module):
 
     def __init__(
         self,
-        initial: Array | None = None,
+        initial: ArrayLike | None = None,
         dims: int | tuple | None = None,
         fixed: bool = False,
         lower: float | None = None,
         upper: float | None = None,
         log: bool = False,
+        prior: Prior | None = None,
     ):
-        self.fix = fixed
+        if prior is not None:
+            raise ValueError(
+                "ConstrainedParameter cannot have a prior: the prior's transform already "
+                "sets the support. Use a Parameter with a prior instead (e.g. LogNormal "
+                "for a positive parameter)."
+            )
+        self.fix = _check_fixed(fixed)
         # Store bounds for repr
         self._lower = lower
         self._upper = upper
@@ -143,7 +205,7 @@ class ConstrainedParameter(Module):
         try:
             self.unconstrained_val = self.backward_transform(_array_from_user(dims, initial))
         # Initial is outside bounds either
-        except BoundsError as e:
+        except BoundsError:
             # Because we auto-initialised with zeros which is outside the bounds
             if init_none_flag:
                 if log:
@@ -159,7 +221,7 @@ class ConstrainedParameter(Module):
                     )
             # Or because the user asked for an initial value outside the bounds
             else:
-                raise e
+                raise
 
         # Final check that we haven't become a nan somehow
         if jnp.any(jnp.isnan(self.unconstrained_val)):
@@ -185,8 +247,11 @@ class ConstrainedParameter(Module):
         # Check if unconstrained_val is a Shared sentinel (in unlocked ShareModule context)
         if isinstance(self.unconstrained_val, Shared):
             text = parameter_repr_parts(
-                "ConstrainedParameter", "", self.fix, constraint_str,
-                shared_path=self.unconstrained_val.parent_path
+                "ConstrainedParameter",
+                "",
+                self.fix,
+                constraint_str,
+                shared_path=self.unconstrained_val.parent_path,
             )
         else:
             value_str = format_array_value(self.val)
@@ -198,6 +263,7 @@ class ConstrainedParameter(Module):
     def debug_repr(self) -> str:
         """Return the full equinox-style repr for debugging."""
         import equinox as eqx
+
         return eqx.tree_pformat(self)
 
 
@@ -205,13 +271,21 @@ AnyParameter = Parameter | ConstrainedParameter
 
 
 class Known(Parameter):
-    """A known value that will never be optimised."""
+    """A constant of the problem, such as a rest wavelength: never inferred or optimised.
+
+    Unlike a fixed `Parameter`, it can never be freed, it is left out of
+    parameter summaries and path listings by default (`show_knowns=True`), and
+    `set` refuses to change it unless given `allow_set_knowns=True`.
+    """
 
     def __init__(
         self,
-        value: float | Array | None = None,
+        value: ArrayLike | None = None,
         dims: int | tuple | None = None,
+        prior: Prior | None = None,
     ):
+        if prior is not None:
+            raise ValueError("Known values are constants and cannot have a prior.")
         super().__init__(initial=value, dims=dims, fixed=True)
 
     def __repr__(self) -> str:
@@ -219,8 +293,8 @@ class Known(Parameter):
             format_array_value,
             known_repr_parts,
             render_to_string,
-            styled_type,
             styled_shared,
+            styled_type,
         )
         from spectracles.model.share_module import Shared
 
@@ -236,8 +310,22 @@ class Known(Parameter):
         return render_to_string(text)
 
 
-def init_parameter(parameter: Parameter | None, **kwargs) -> Parameter:
-    return Parameter(**kwargs) if parameter is None else parameter
+def init_parameter(parameter: Parameter | None, name: str = "parameter", **kwargs) -> Parameter:
+    """A new Parameter from `kwargs`, or the given one after checking its type and shape."""
+    if parameter is None:
+        return Parameter(**kwargs)
+    if not isinstance(parameter, AnyParameter):
+        raise TypeError(
+            f"{name} must be a Parameter, e.g. Parameter(value) or "
+            f"Parameter(dims=..., prior=...); got {type(parameter).__name__}."
+        )
+    if kwargs.get("dims") is not None:
+        expected = _shape_from_dims(kwargs["dims"])
+        if tuple(parameter.val.shape) != expected:
+            raise ValueError(
+                f"{name} must have shape {expected}, got {tuple(parameter.val.shape)}."
+            )
+    return parameter
 
 
 def is_parameter(x):

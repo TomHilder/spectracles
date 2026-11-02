@@ -1,8 +1,9 @@
 """opt_schedule.py - OptimiserSchedule encapsulates many OptimiserFrames in a sequence for more control over how the optimisation proceeds."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Literal, Optional, Union, get_args
+from typing import Literal
 
 import jax.numpy as jnp
 from jaxtyping import Array
@@ -11,7 +12,7 @@ from optax import GradientTransformation  # type: ignore[import]
 from spectracles.model.share_module import ShareModule
 from spectracles.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
 
-ExitStrategy = Literal[None, "placeholder"]
+ExitStrategy = Literal["placeholder"] | None
 
 
 @dataclass(frozen=True)
@@ -55,7 +56,6 @@ class PhaseConfig:
         if not isinstance(self.n_steps, int):
             raise TypeError("n_steps must be int.")
         # TODO: Check optimiser is okay somehow?
-        ...
         # Check fix updates are bool
         for fix in self.fix_status_updates.values():
             if not isinstance(fix, bool):
@@ -309,9 +309,7 @@ class ManagedOptimiserSchedule:
     def run_phase_by_index(self, phase_idx: int, *loss_args, **loss_kwargs) -> None:
         """Run a specific phase by index, with validation."""
         if phase_idx < 0 or phase_idx >= len(self.phases):
-            raise ValueError(
-                f"Phase index {phase_idx} out of range [0, {len(self.phases) - 1}]"
-            )
+            raise ValueError(f"Phase index {phase_idx} out of range [0, {len(self.phases) - 1}]")
 
         # Validation: can't run phases out of order
         if phase_idx > self.current_phase_index:
@@ -336,10 +334,10 @@ class ManagedOptimiserSchedule:
             if phase_idx == self.current_phase_index:
                 self.current_phase_index += 1
 
-        except Exception as e:
+        except Exception:
             # Reset state on failure
             self.phase_states[phase_idx] = PhaseState.PENDING
-            raise e
+            raise
 
     def run_phase(self, phase: Phase, *loss_args, **loss_kwargs) -> None:
         """Run a single phase in the schedule."""
@@ -361,9 +359,7 @@ class ManagedOptimiserSchedule:
         # Update the model history
         self.model_history.append(updated_model)
 
-    def run_phases(
-        self, phase_indices: Union[int, list[int]], *loss_args, **loss_kwargs
-    ) -> None:
+    def run_phases(self, phase_indices: int | list[int], *loss_args, **loss_kwargs) -> None:
         """Run multiple phases by index."""
         if isinstance(phase_indices, int):
             phase_indices = [phase_indices]
@@ -377,9 +373,7 @@ class ManagedOptimiserSchedule:
             raise ValueError(f"Phase index {phase_idx} out of range")
 
         if phase_idx > self.current_phase_index:
-            raise RuntimeError(
-                f"Cannot skip phase {phase_idx} - must process phases in order"
-            )
+            raise RuntimeError(f"Cannot skip phase {phase_idx} - must process phases in order")
 
         if self.phase_states[phase_idx] == PhaseState.COMPLETED:
             raise RuntimeError(f"Phase {phase_idx} has already been completed")
@@ -440,25 +434,17 @@ class ManagedOptimiserSchedule:
         """Check if all phases are completed."""
         return self.current_phase_index >= len(self.phases)
 
-    def get_next_phase_index(self) -> Optional[int]:
+    def get_next_phase_index(self) -> int | None:
         """Get the index of the next phase to run, or None if complete."""
         return self.current_phase_index if not self.is_complete() else None
 
     def get_completed_phases(self) -> list[int]:
         """Get indices of all completed phases."""
-        return [
-            i
-            for i, state in enumerate(self.phase_states)
-            if state == PhaseState.COMPLETED
-        ]
+        return [i for i, state in enumerate(self.phase_states) if state == PhaseState.COMPLETED]
 
     def get_pending_phases(self) -> list[int]:
         """Get indices of all pending phases."""
-        return [
-            i
-            for i, state in enumerate(self.phase_states)
-            if state == PhaseState.PENDING
-        ]
+        return [i for i, state in enumerate(self.phase_states) if state == PhaseState.PENDING]
 
     @property
     def loss_histories(self) -> list[Array]:

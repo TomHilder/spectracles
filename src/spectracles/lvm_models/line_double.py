@@ -9,7 +9,6 @@ from spectracles import (
     Constant,
     FourierGP,
     Kernel,
-    Parameter,
     PerSpaxel,
     SpatialDataLVM,
     SpatialModel,

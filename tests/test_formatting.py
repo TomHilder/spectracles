@@ -1,24 +1,24 @@
 """test_formatting.py - smoke tests for the spectracles.model.formatting module."""
 
 import jax.numpy as jnp
-import pytest
+
 from spectracles.model.formatting import (
+    add_tree_node,
+    create_gradient_table,
+    create_model_tree,
     format_array_value,
     format_constraint,
     get_console,
+    known_repr_parts,
+    parameter_repr_parts,
     render_to_string,
+    shared_repr_parts,
+    styled_dim,
+    styled_fixed,
+    styled_free,
+    styled_shared,
     styled_type,
     styled_value,
-    styled_free,
-    styled_fixed,
-    styled_shared,
-    styled_dim,
-    parameter_repr_parts,
-    known_repr_parts,
-    shared_repr_parts,
-    create_gradient_table,
-    create_model_tree,
-    add_tree_node,
 )
 
 
@@ -124,9 +124,7 @@ class TestReprParts:
         assert "x > 0" in result
 
     def test_parameter_repr_parts_with_shared_path(self):
-        text = parameter_repr_parts(
-            "Parameter", "", is_fixed=False, shared_path="a.val"
-        )
+        text = parameter_repr_parts("Parameter", "", is_fixed=False, shared_path="a.val")
         result = str(text)
         assert "a.val" in result
 

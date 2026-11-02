@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 import pytest
+
 from spectracles.model.data import SpatialDataGeneric
 from spectracles.model.kernels import Matern12, Matern32, Matern52, SquaredExponential
 from spectracles.model.parameter import Parameter

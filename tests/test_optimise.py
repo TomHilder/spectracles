@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import optax  # type: ignore[import]
 import pytest
 from jax.tree_util import tree_map
+
 from spectracles.model.parameter import AnyParameter, Parameter
 from spectracles.model.share_module import ShareModule, build_model
 from spectracles.optimise.opt_frame import OptimiserFrame, get_opt_filter_spec
@@ -293,7 +294,7 @@ class TestGradientDiagnostics:
         assert len(summary) >= 1
 
         # Check structure of summary entries
-        for path, info in summary.items():
+        for info in summary.values():
             assert "norm" in info
             assert "max" in info
             assert "min" in info

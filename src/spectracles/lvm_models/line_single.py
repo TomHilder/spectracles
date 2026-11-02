@@ -303,7 +303,7 @@ class LVMModelSingle(SpectralSpatialModel):
 def neg_ln_posterior(model, λ, xy_data, data, u_data, mask):
     vmapped_model = jax.vmap(model, in_axes=(0, None))
     ln_like = ln_likelihood(vmapped_model, λ, xy_data, data, u_data, mask)
-    locked = model.get_locked_model()
+    locked = model.for_evaluation()
     ln_prior = (
         locked.line.A.gp.prior_logpdf()
         + locked.line.v.gp.prior_logpdf()

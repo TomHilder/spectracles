@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 from jax import vmap
+
 from spectracles.model.data import SpatialDataGeneric
 from spectracles.model.spatial import SpatialModel
 from spectracles.model.spectral import Constant, Gaussian

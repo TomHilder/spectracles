@@ -1,6 +1,7 @@
 """test.io - tests for the spectracles.model.io module."""
 
 import pytest
+
 from spectracles.model.io import MODELFILE_EXT, load_model, save_model
 from spectracles.model.share_module import ShareModule, build_model
 
@@ -107,7 +108,7 @@ class TestLoadModel:
         loaded_model = load_model(file_path)
 
         # Use the sharing structure to removed Shared sentinels
-        locked_loaded_model = loaded_model.get_locked_model()
+        locked_loaded_model = loaded_model.for_evaluation()
 
         # Check that the model structure is preserved
         # inner1.param, param, inner2.param, and inner3.inner1.param should all be the same
@@ -119,3 +120,29 @@ class TestLoadModel:
         # Check that calling the model works
         x = 2.0
         assert loaded_model(x) == original_model(x)
+
+    def test_save_and_load_class_defined_in_a_function(self, temp_dir):
+        # A class defined here (as in a script or notebook) is saved by value,
+        # code objects included
+        import equinox as eqx
+        import jax.numpy as jnp
+
+        from spectracles import FourierGP, Matern32, Parameter, SpatialDataGeneric
+        from spectracles.priors import LogNormal
+
+        class LocalModel(eqx.Module):
+            field: FourierGP
+
+            def __call__(self, data):
+                return jnp.exp(self.field(data))
+
+        kernel = Matern32(
+            length_scale=Parameter(prior=LogNormal(0.5, 0.2)),
+            variance=Parameter(prior=LogNormal(1.0, 0.5)),
+        )
+        model = build_model(LocalModel, FourierGP(n_modes=(5, 5), kernel=kernel))
+        save_model(model, temp_dir / "local_model")
+        loaded = load_model(temp_dir / "local_model")
+
+        data = SpatialDataGeneric(x=jnp.linspace(-1, 1, 7), y=jnp.zeros(7), idx=jnp.arange(7))
+        assert jnp.array_equal(loaded(data), model(data))

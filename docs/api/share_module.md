@@ -4,15 +4,20 @@
 
 ## Building Models
 
-Use `build_model()` to construct your Equinox model and wrap it in a ShareModule.
-Pass the model class followed by its constructor arguments:
+Use `build_model()` to turn your Equinox model into a spectracles model (a
+`ShareModule`). It accepts either a model instance, or the model class followed
+by its constructor arguments; the two are equivalent:
 
 ```python
 import spectracles as sp
 
-# Equivalent to wrapping MyModel(shared_component=inner, ...)
-model = sp.build_model(MyModel, shared_component=inner, ...)
+model = sp.build_model(MyModel(shared_component=inner, ...))
+model = sp.build_model(MyModel, shared_component=inner, ...)  # the same
 ```
+
+`build_model` is also where sharing is detected: a component or parameter used
+in several places becomes one shared component or parameter. Don't construct a
+`ShareModule` directly.
 
 ## Inspecting the Model
 
@@ -82,10 +87,7 @@ model.plot_model_graph(sharing_level="parameter")
 model = model.set("line_1.A.coefficients", new_value)
 
 # Set multiple parameters
-model = model.set(
-    ["path.to.param1", "path.to.param2"],
-    [value1, value2]
-)
+model = model.set(["path.to.param1", "path.to.param2"], [value1, value2])
 ```
 
 ### Fixing/Freeing Parameters
@@ -103,6 +105,58 @@ model = model.fix_all()
 # Free all parameters
 model = model.free_all()
 ```
+
+## Evaluating Parts of a Model
+
+Calling the whole model always works, with or without sharing:
+
+```python
+prediction = model(data)
+```
+
+Calling a *part* of it needs care when that part contains sharing. A shared
+parameter is stored once, at its parent location; its other locations hold a
+`Shared` reference to it. That is what makes it one parameter: it is updated in
+one place (by `set`, an optimiser or the latent space) and every location sees
+the same value. But a submodule that holds such a reference can't be called on
+its own, because the reference is not a value:
+
+```python
+model = build_model(TwoLines, line_1=Line(v=shared_gp), line_2=Line(v=shared_gp))
+model.line_1(data)  # fine: line_1 holds the shared GP itself
+model.line_2(data)  # RuntimeError: line_2 holds a reference to line_1.v
+```
+
+`for_evaluation()` returns a copy with every reference replaced by its value, so
+any part can be called or inspected:
+
+```python
+evaluable = model.for_evaluation()
+flux_2 = evaluable.line_2(data)
+velocity = evaluable.line_2.v(grid)
+```
+
+The copy no longer tracks sharing, so use it for evaluation only (predictions,
+plots, checks), not for optimisation or to build a `LatentSpace`. Keep working
+with the original model for those. (`get_locked_model()` is the old name of
+`for_evaluation()` and is deprecated.)
+
+## Priors
+
+```python
+from spectracles.priors import Laplace, LogNormal
+
+model = model.with_priors(
+    {
+        "**.kernel.length_scale": LogNormal(0.5, 0.2),
+        "offset.spaxel_values": Laplace(0.02),
+        "line.σ_lsf.spaxel_values": "fixed",
+    }
+)
+model.get_priors()  # {path: prior} for every parameter that has one
+```
+
+See [Priors and inference](../inference.md) for the full workflow.
 
 ## Validation
 
@@ -123,11 +177,13 @@ info = model.validate_sharing()
         - plot_model_graph
         - set
         - set_fixed_status
+        - with_priors
+        - get_priors
         - fix_all
         - free_all
         - validate_sharing
         - copy
-        - get_locked_model
+        - for_evaluation
         - debug_repr
 
 ::: spectracles.build_model

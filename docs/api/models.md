@@ -60,6 +60,11 @@ implement `feature_weights(freqs)`, returning `sqrt(P(k))` on the mode grid.
 
 ## Data
 
+`SpatialData` is the base class for the points a spatial model is evaluated at.
+Subclass it to carry extra per-point fields your models need.
+
+::: spectracles.SpatialData
+
 ::: spectracles.SpatialDataGeneric
 
 ::: spectracles.SpatialDataLVM

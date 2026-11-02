@@ -1,12 +1,22 @@
 from spectracles.model.data import SpatialData, SpatialDataGeneric, SpatialDataLVM
 from spectracles.model.io import load_model, save_model
 from spectracles.model.kernels import Kernel, Matern12, Matern32, Matern52, SquaredExponential
-from spectracles.model.parameter import AnyParameter, ConstrainedParameter, Known, Parameter, l_bounded
+from spectracles.model.parameter import (
+    AnyParameter,
+    ConstrainedParameter,
+    Known,
+    Parameter,
+    l_bounded,
+)
 from spectracles.model.share_module import ShareModule, build_model, contains_shared
 from spectracles.model.spatial import FourierGP, PerSpaxel, SpatialModel
 from spectracles.model.spectral import Constant, Gaussian, SpectralSpatialModel, WindowConstant
 from spectracles.optimise.opt_frame import OptimiserFrame
-from spectracles.optimise.opt_schedule import ManagedOptimiserSchedule, OptimiserSchedule, PhaseConfig
+from spectracles.optimise.opt_schedule import (
+    ManagedOptimiserSchedule,
+    OptimiserSchedule,
+    PhaseConfig,
+)
 from spectracles.optimise.schedule_builder import (
     build_schedule,
     fixed_in,
@@ -19,46 +29,46 @@ from spectracles.optimise.schedule_builder import (
 )
 
 __all__ = [
+    "AnyParameter",
+    "Constant",
+    "ConstrainedParameter",
     "FourierGP",
     "Gaussian",
-    "SpatialData",
-    "SpatialDataGeneric",
-    "SpatialDataLVM",
-    "PerSpaxel",
-    "Constant",
     "Kernel",
+    "Known",
+    "ManagedOptimiserSchedule",
     "Matern12",
     "Matern32",
     "Matern52",
-    "SquaredExponential",
-    "build_model",
-    "contains_shared",
+    "OptimiserFrame",
+    "OptimiserSchedule",
+    "Parameter",
+    "PerSpaxel",
+    "PhaseConfig",
     "ShareModule",
+    "SpatialData",
+    "SpatialDataGeneric",
+    "SpatialDataLVM",
     "SpatialModel",
     "SpectralSpatialModel",
-    "Parameter",
-    "Known",
-    "ConstrainedParameter",
-    "AnyParameter",
-    "l_bounded",
+    "SquaredExponential",
     "WindowConstant",
-    "OptimiserFrame",
-    "save_model",
-    "load_model",
-    "PhaseConfig",
-    "OptimiserSchedule",
-    "ManagedOptimiserSchedule",
+    "build_model",
     "build_schedule",
-    "free_in",
-    "free_after",
-    "free_until",
+    "contains_shared",
     "fixed_in",
+    "free_after",
+    "free_in",
+    "free_until",
     "init_normal",
-    "init_value",
     "init_uniform",
+    "init_value",
+    "l_bounded",
+    "load_model",
+    "save_model",
 ]
 
 try:
     from ._version import __version__
-except Exception:
+except ImportError:
     __version__ = "0+unknown"
