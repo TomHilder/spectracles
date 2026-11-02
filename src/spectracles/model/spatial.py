@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 from equinox import Module, field
 from jax.core import Tracer
+from jax.nn import softplus
 from jax.scipy.stats import norm
 from jax_finufft import nufft2  # type: ignore
 from jaxtyping import Array
@@ -23,6 +24,12 @@ from spectracles.priors import StdNormal
 #     this, but from memory it doesn't work right now. This is why p is
 #     repeated in the shape info right now, since I didn't implement n_modes
 #     != n_requested_modes yet.
+
+LINKS = {
+    "identity": lambda f, lower: f,
+    "exp": lambda f, lower: jnp.exp(f),
+    "softplus": lambda f, lower: lower + softplus(f),
+}
 
 DEFAULT_PADDING = 0.15
 DEFAULT_NUFFT_TOL = 1e-10
@@ -74,7 +81,7 @@ def _length_scale_range(
     return lo, hi
 
 
-def _choose_modes(kernel, domain, padding, tol, length_scale, quantiles):
+def _choose_modes(kernel, domain, padding, tol, length_scale, quantiles, has_mean=False):
     """Modes and padding for `tol` over the length-scale range, and the design record."""
     from spectracles.discretisation import (
         DEFAULT_TOL,
@@ -103,7 +110,9 @@ def _choose_modes(kernel, domain, padding, tol, length_scale, quantiles):
                 stacklevel=3,
             )
     try:
-        m = required_modes(kernel, domain, length_scale=lo, padding=padding, tol=tol)
+        m = required_modes(
+            kernel, domain, length_scale=lo, padding=padding, tol=tol, has_mean=has_mean
+        )
     except ValueError as e:
         raise ValueError(
             f"{e} The shortest length scale is {lo:.4g}: narrow the prior, pass "
@@ -289,6 +298,15 @@ class FourierGP(SpatialModel):
     Without a `domain`, coordinates must already lie in [-π, π], the length
     scale is in those units, and `n_modes` is needed.
 
+    A field can have a mean, a `Parameter` added to the GP, and a `link` that
+    transforms the result, e.g. for a positive line flux:
+
+        FourierGP(kernel, domain=domain, mean=Parameter(prior=Normal(0.0, 1.0)), link="exp")
+
+    With a mean, the GP's own constant (k = 0) mode is dropped, so the mean
+    alone sets the field's average over the box; the kernel's variance is
+    still the field's pointwise variance.
+
     Args:
         kernel: The kernel, e.g. `Matern32(length_scale, variance)`.
         n_modes: Modes in each direction, two positive odd integers. Chosen
@@ -302,9 +320,14 @@ class FourierGP(SpatialModel):
         length_scale: The range (shortest, longest) of length scales to choose
             for, or a single value; the prior's `quantiles` by default.
         quantiles: The prior quantiles that give the default range.
+        mean: A Parameter added to the GP before the link. None (default)
+            means no mean: a zero-mean stationary GP.
+        link: "identity" (default), "exp" (positive, log-normal) or
+            "softplus" (`lower` + softplus, positive and close to linear when large).
+        lower: The lower bound for `link="softplus"`.
         coefficients: The (whitened) Fourier coefficients; a standard-normal
             prior by default.
-        zeromode: A constant added to the field; fixed at 0 by default.
+        zeromode: Deprecated name for `mean`.
         nufft_tol: The relative accuracy of the non-uniform FFT.
 
     Attributes:
@@ -314,8 +337,10 @@ class FourierGP(SpatialModel):
 
     coefficients: Parameter
     kernel: Kernel
-    zeromode: Parameter
+    mean: Parameter | None
     n_modes: tuple[int, int]
+    link: str = field(static=True)
+    lower: float = field(static=True)
     domain: Domain | None = field(static=True)
     padding: float | None = field(static=True)
     nufft_tol: float = field(static=True)
@@ -334,6 +359,9 @@ class FourierGP(SpatialModel):
         tol: float | None = None,
         length_scale: float | tuple[float, float] | None = None,
         quantiles: tuple[float, float] = (0.01, 0.99),
+        mean: Parameter | None = None,
+        link: str = "identity",
+        lower: float = 0.0,
         coefficients: Parameter | None = None,
         zeromode: Parameter | None = None,
         nufft_tol: float = DEFAULT_NUFFT_TOL,
@@ -353,10 +381,31 @@ class FourierGP(SpatialModel):
             n_modes, kernel = kernel, legacy[0]  # type: ignore[assignment]
             coefficients = legacy[1] if len(legacy) > 1 else coefficients
             zeromode = legacy[2] if len(legacy) > 2 else zeromode
+        if zeromode is not None:
+            if mean is not None:
+                raise TypeError("Give mean or zeromode (its old name), not both.")
+            warnings.warn(
+                "zeromode is deprecated: use mean=. With a mean, the GP's k = 0 mode is dropped.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            mean = zeromode
         kernel = _check_kernel(kernel)
+        if mean is not None and not isinstance(mean, AnyParameter):
+            raise TypeError(
+                f"mean must be a Parameter, e.g. mean=Parameter(prior=Normal(0.0, 1.0)); got "
+                f"{type(mean).__name__}."
+            )
+        if link not in LINKS:
+            raise ValueError(f"link must be one of {sorted(LINKS)}, got {link!r}.")
+        if link != "softplus" and lower != 0.0:
+            raise ValueError('lower only applies to link="softplus".')
+        self.mean = mean  # type: ignore[assignment]
+        self.link = link
+        self.lower = float(lower)
         if n_modes is None:
             n_modes, padding, self.design = _choose_modes(
-                kernel, domain, padding, tol, length_scale, quantiles
+                kernel, domain, padding, tol, length_scale, quantiles, has_mean=mean is not None
             )
         else:
             if tol is not None or length_scale is not None:
@@ -383,19 +432,33 @@ class FourierGP(SpatialModel):
         self.coefficients = init_parameter(
             coefficients, name="coefficients", dims=n_modes, prior=StdNormal()
         )
-        # Zero-mode: scalar added to the field after NUFFT. Defaults to a fixed
-        # zero so kernels with non-zero DC (e.g. Matern) behave as before. Kernels
-        # that zero their DC (e.g. LogLogLinear) require a non-trivial zeromode
-        # Parameter to represent the field's spatial mean.
-        self.zeromode = init_parameter(zeromode, name="zeromode", initial=0.0, fixed=True)
+        if mean is not None and jnp.size(mean.val) != 1:
+            raise ValueError(f"mean must be a single value, got shape {jnp.shape(mean.val)}.")
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
 
+    @property
+    def zeromode(self) -> Parameter | None:
+        """Deprecated name for `mean`."""
+        warnings.warn(
+            "FourierGP.zeromode is deprecated: use .mean.", DeprecationWarning, stacklevel=2
+        )
+        return self.mean
+
+    def feature_weights(self) -> Array:
+        """The square root of each mode's power: the kernel's, without the k = 0
+        mode when the field has a mean (rescaled so the variance is unchanged)."""
+        fw = self.kernel.feature_weights(self._freqs)
+        if self.mean is None:
+            return fw
+        kept = jnp.where(self._freqs == 0, 0.0, fw)
+        return kept * jnp.sqrt(jnp.sum(fw**2) / jnp.sum(kept**2))
+
     def __call__(self, data: SpatialData) -> Array:
         x, y = _to_box(data.x, data.y, self._box)
         # Feature weighted coefficients
-        scaled_coeffs = self.coefficients.val * self.kernel.feature_weights(self._freqs)
+        scaled_coeffs = self.coefficients.val * self.feature_weights()
         # Sum basis functions with nufft after processing the coefficients to enforce conjugate symmetry
         model_eval: Array = nufft2(
             conjugate_symmetry(scaled_coeffs.flatten(), self.n_modes, self._shape_info),
@@ -403,10 +466,12 @@ class FourierGP(SpatialModel):
             y,
             eps=self.nufft_tol,
         ).real
-        return model_eval + self.zeromode.val
+        if self.mean is not None:
+            model_eval = model_eval + self.mean.val
+        return LINKS[self.link](model_eval, self.lower)
 
     def prior_logpdf(self) -> Array:
-        fw = self.kernel.feature_weights(self._freqs)
+        fw = self.feature_weights()
         # DC-safe: kernels with zero DC contribute no Jacobian term for that mode.
         safe_fw = jnp.where(fw > 0, fw, 1.0)
         log_normalisation = jnp.where(fw > 0, -jnp.log(safe_fw), 0.0).sum()

@@ -164,7 +164,7 @@ class LogLogLinear(Kernel):
 
     `feature_weights(freqs) = exp(m_0 + m_s * log(k))` with DC (k=0) forced to zero
     so the fluctuation field has zero mean by construction. The field's spatial
-    mean should be provided separately via `FourierGP.zeromode`.
+    mean should be provided separately via `FourierGP(..., mean=...)`.
 
     `m_s` is the spectral index; `m_0` the log-amplitude. For negative `m_s`
     (the physically common regime) the continuous PSD is IR-divergent, which is

@@ -136,14 +136,19 @@ def _mode_grid(n_modes: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
     return jx, jy
 
 
-def _weights(kernel: Kernel, n_modes: tuple[int, int], size: float):
-    """The field's mode weights w_j and the kernel's trapezoid weights c_j (absolute units)."""
+def _weights(kernel: Kernel, n_modes: tuple[int, int], size: float, has_mean: bool = False):
+    """The field's mode weights w_j and the kernel's trapezoid weights c_j (absolute
+    units), and the dropped k = 0 weight c_0 (0 unless the field has a mean)."""
     jx, jy = _mode_grid(n_modes)
     dk = 2 * np.pi / size
     k = dk * np.hypot(jx[:, None], jy[None, :])
     w = np.asarray(kernel.feature_weights(jnp.asarray(k)), dtype=float) ** 2
     c = np.asarray(kernel.spectral_density(jnp.asarray(k)), dtype=float) * dk**2
-    return w, c
+    c0 = 0.0
+    if has_mean:
+        w = np.where(k == 0, 0.0, w)
+        c0 = float(c[k == 0].sum())
+    return w, c, c0
 
 
 def _check_continuous_form(kernel: Kernel) -> None:
@@ -221,27 +226,31 @@ def _aliasing(kernel: Kernel, geometry: _Geometry) -> float:
     return float(np.abs(images).max() / _variance(kernel))
 
 
-def _truncation(kernel: Kernel, n_modes: tuple[int, int], geometry: _Geometry):
+def _truncation(
+    kernel: Kernel, n_modes: tuple[int, int], geometry: _Geometry, has_mean: bool = False
+):
     """(relative Frobenius error, worst-case error / s², tau) from the finite mode grid."""
     s2 = _variance(kernel)
-    w, c = _weights(kernel, n_modes, geometry.size)
+    w, c, c0 = _weights(kernel, n_modes, geometry.size, has_mean)
     tau = 1.0 - c.sum() / s2
     grid = _LagGrid(geometry, n_modes)
     realised = s2 * _on_lag_grid(w, grid) / w.sum()
-    # The continuous kernel scaled to variance s² / (1 - tau), periodised so the
-    # images (the aliasing error) don't count as truncation
-    reference = _periodised(kernel, grid.zx, grid.zy, geometry, include_centre=True)
-    reference *= s2 / c.sum()
+    # The continuous kernel, periodised so the images (the aliasing error) don't
+    # count as truncation, without the k = 0 mode if the field has a mean, and
+    # scaled so its weights on the grid sum to s² as the field's do
+    reference = _periodised(kernel, grid.zx, grid.zy, geometry, include_centre=True) - c0
+    reference *= s2 / (c.sum() - c0)
     err = realised - reference
     frob = np.sqrt(np.sum(grid.q * err**2) / np.sum(grid.q * reference**2))
     return float(frob), float(np.abs(err).max() / s2), float(tau)
 
 
-def _resolve(gp_or_kernel, domain, n_modes, padding):
-    """The kernel, mode grid and geometry: from a FourierGP, with any overrides."""
+def _resolve(gp_or_kernel, domain, n_modes, padding, has_mean):
+    """The kernel, mode grid, geometry and mean flag: from a FourierGP, with any overrides."""
     if isinstance(gp_or_kernel, FourierGP):
         gp = gp_or_kernel
         kernel = gp.kernel
+        has_mean = gp.mean is not None
         domain = gp.domain if domain is None else domain
         n_modes = gp.n_modes if n_modes is None else n_modes
         if padding is None and domain is gp.domain:
@@ -258,7 +267,7 @@ def _resolve(gp_or_kernel, domain, n_modes, padding):
     _check_continuous_form(kernel)
     if isinstance(n_modes, (int, np.integer)):
         n_modes = (int(n_modes), int(n_modes))
-    return kernel, _check_n_modes(n_modes), _geometry(domain, padding)
+    return kernel, _check_n_modes(n_modes), _geometry(domain, padding), has_mean
 
 
 def discretisation_error(
@@ -268,6 +277,7 @@ def discretisation_error(
     n_modes: int | tuple[int, int] | None = None,
     padding: float | None = None,
     length_scale: float | ArrayLike | None = None,
+    has_mean: bool = False,
 ) -> DiscretisationError:
     """The truncation and aliasing errors of a FourierGP, or of a kernel on a given grid.
 
@@ -287,18 +297,22 @@ def discretisation_error(
         padding: Padding as a fraction of the extent; the GP's by default, or 0.15.
         length_scale: The kernel's length scale; its current value by default.
             An array gives the errors at each value.
+        has_mean: For a kernel: whether the field has a mean (its k = 0 mode is
+            then dropped). A FourierGP's own setting is used otherwise.
 
     Returns:
         A DiscretisationError.
     """
-    kernel, n_modes, geometry = _resolve(gp_or_kernel, domain, n_modes, padding)
+    kernel, n_modes, geometry, has_mean = _resolve(
+        gp_or_kernel, domain, n_modes, padding, has_mean
+    )
     if length_scale is None:
         kernels, scales = [kernel], None
     else:
         scales = np.asarray(length_scale, dtype=float)
         kernels = [_with_length_scale(kernel, v) for v in scales.ravel()]
     rows = np.array(
-        [(*_truncation(k, n_modes, geometry), _aliasing(k, geometry)) for k in kernels]
+        [(*_truncation(k, n_modes, geometry, has_mean), _aliasing(k, geometry)) for k in kernels]
     )
     if scales is None:
         trunc, trunc_max, tau, alias = (float(v) for v in rows[0])
@@ -326,6 +340,7 @@ def required_modes(
     length_scale: float | None = None,
     padding: float = DEFAULT_PADDING,
     tol: float = DEFAULT_TOL,
+    has_mean: bool = False,
 ) -> int:
     """The fewest modes per side (odd) with a truncation error at most `tol`.
 
@@ -338,7 +353,7 @@ def required_modes(
     geometry = _geometry(domain, padding)
 
     def ok(m: int) -> bool:
-        return _truncation(kernel, (m, m), geometry)[0] <= tol
+        return _truncation(kernel, (m, m), geometry, has_mean)[0] <= tol
 
     lo, hi = 1, 3
     while not ok(hi):
@@ -410,6 +425,8 @@ def realised_covariance(gp: FourierGP, dx: ArrayLike, dy: ArrayLike) -> np.ndarr
     dk = 2 * np.pi / geometry.size
     k = dk * np.hypot(jx[:, None], jy[None, :])
     w = np.asarray(gp.kernel.feature_weights(jnp.asarray(k)), dtype=float) ** 2
+    if gp.mean is not None:
+        w = np.where(k == 0, 0.0, w)
     s2 = _variance(gp.kernel)
     dx, dy = np.asarray(dx, dtype=float), np.asarray(dy, dtype=float)
     phase = dk * (dx[..., None, None] * jx[:, None] + dy[..., None, None] * jy[None, :])
