@@ -19,7 +19,7 @@
   </a>
 
   <p align="center">
-    Continuous field models for integral fields spectroscopy and beyond
+    Continuous field models for integral field spectroscopy and beyond
   </p>
 </div>
 
