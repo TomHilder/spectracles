@@ -169,22 +169,18 @@ From here, fitting and results are the same as for any other model: see
 ## Maps on the sky
 
 Fields can be evaluated anywhere in the domain, so a map can be drawn on a
-regular grid rather than at the fibres. `data.sky_to_radec` turns the grid's
-offsets back into RA and Dec for the axes:
+regular grid rather than at the fibres. `domain.grid` makes one over the whole
+domain, and `data.sky_to_radec` turns its offsets back into RA and Dec for the
+axes:
 
 ```python
 # sketch
-from spectracles import SpatialDataGeneric
-
-gx, gy = jnp.meshgrid(
-    jnp.linspace(spaxels.x.min(), spaxels.x.max(), 200),
-    jnp.linspace(spaxels.y.min(), spaxels.y.max(), 200),
-)
-grid = SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(gx.size))
+grid = domain.grid((200, 200))
+gx, gy = grid.x.reshape(200, 200), grid.y.reshape(200, 200)
 ra, dec = data.sky_to_radec(gx, gy)
 
 flux = posterior.map_samples(lambda m: jnp.exp(m.log_flux(grid)), samples)
-flux_map = flux.mean().reshape(gx.shape)
+flux_map = flux.mean().reshape(200, 200)
 ```
 
 Areas far from any fibre are only constrained by the prior, so mask or grey

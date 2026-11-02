@@ -303,10 +303,12 @@ grid, use `for_evaluation()` first. It gives a copy in which shared values are
 filled in everywhere:
 
 ```python
-gx, gy = jnp.meshgrid(jnp.linspace(-600, 600, 100), jnp.linspace(-600, 600, 100))
-grid = SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(gx.size))
-velocity_map = model.for_evaluation().nii.velocity(grid).reshape(gx.shape)
+grid = domain.grid((100, 100))  # 100 × 100 points over the whole domain
+velocity_map = model.for_evaluation().nii.velocity(grid).reshape(100, 100)
 ```
+
+`domain.grid((n, m), padding=...)` can also reach past the domain, as far as a
+field's own padding: `domain.grid((100, 100), padding=velocity.padding)`.
 
 (Without `for_evaluation()`, `model.nii.velocity` would fail: the shared field
 lives at `halpha.velocity`, and `nii` only holds a reference to it.) Use the

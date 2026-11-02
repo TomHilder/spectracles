@@ -2,8 +2,11 @@
 
 from dataclasses import dataclass
 
+import jax.numpy as jnp
 import numpy as np
 from jaxtyping import ArrayLike
+
+from spectracles.model.data import SpatialDataGeneric
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,41 @@ class Domain:
         if extent == 0:
             raise ValueError("All the points are at one position, so they don't span a region.")
         return cls(centre=((x_lo + x_hi) / 2, (y_lo + y_hi) / 2), extent=extent)
+
+    def grid(self, shape: tuple[int, int], padding: float = 0.0) -> SpatialDataGeneric:
+        """A regular grid of points over the domain, e.g. to map a field after fitting.
+
+        With `padding=0.0` (the default) the grid spans the data region, which
+        is inside the periodic box of every GP on this domain. To span one GP's
+        whole box, pass its padding, e.g. `domain.grid((200, 200), padding=gp.padding)`.
+
+        Args:
+            shape: `(n, m)`: n points along x and m along y, edges included.
+            padding: How far past the domain to extend on each side, as a fraction
+                of the extent.
+
+        Returns:
+            The points, flattened. Values evaluated on them reshape to `(n, m)`,
+            as do the grid's own `x` and `y` (e.g. for `pcolormesh`):
+
+                grid = domain.grid((200, 200))
+                flux_map = field(grid).reshape(200, 200)
+                x, y = grid.x.reshape(200, 200), grid.y.reshape(200, 200)
+        """
+        try:
+            n, m = (int(v) for v in shape)
+        except (TypeError, ValueError):
+            raise TypeError(f"shape must be two integers (n, m), got {shape!r}.") from None
+        if n < 1 or m < 1:
+            raise ValueError(f"shape must be positive, got {shape!r}.")
+        padding = float(padding)
+        if not (np.isfinite(padding) and padding >= 0):
+            raise ValueError(f"padding must be a non-negative number, got {padding!r}.")
+        half = 0.5 * self.box_size(padding)
+        x = jnp.linspace(self.centre[0] - half, self.centre[0] + half, n)
+        y = jnp.linspace(self.centre[1] - half, self.centre[1] + half, m)
+        gx, gy = jnp.meshgrid(x, y, indexing="ij")
+        return SpatialDataGeneric(x=gx, y=gy, idx=jnp.arange(n * m))
 
     def box_size(self, padding: float) -> float:
         """The side of the periodic box: the extent plus `padding` × extent on each side."""

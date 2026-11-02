@@ -233,3 +233,36 @@ class TestModesChosenForYou:
         data = points()
         assert old.n_modes == new.n_modes
         assert jnp.array_equal(old(data), new(data))
+
+
+class TestDomainGrid:
+    DOMAIN = Domain((1.0, 2.0), 10.0)
+
+    def test_spans_the_domain(self):
+        grid = self.DOMAIN.grid((3, 2))
+        assert grid.x.shape == (6,) and np.array_equal(grid.idx, np.arange(6))
+        x, y = np.asarray(grid.x).reshape(3, 2), np.asarray(grid.y).reshape(3, 2)
+        assert np.allclose(x[:, 0], [-4.0, 1.0, 6.0]) and np.allclose(y[0], [-3.0, 7.0])
+
+    def test_padding(self):
+        grid = self.DOMAIN.grid((5, 5), padding=0.2)
+        assert np.isclose(float(grid.x.min()), 1.0 - 7.0) and np.isclose(
+            float(grid.y.max()), 2.0 + 7.0
+        )
+
+    def test_a_gps_whole_box_can_be_evaluated(self):
+        # Edges exactly on the box are inside it
+        model = gp(domain=self.DOMAIN, padding=0.3)
+        values = model(self.DOMAIN.grid((40, 30), padding=model.padding))
+        assert values.reshape(40, 30).shape == (40, 30)
+        with pytest.raises(ValueError, match="outside"):
+            model(self.DOMAIN.grid((10, 10), padding=0.5))
+
+    @pytest.mark.parametrize("shape", [(0, 5), (5,), "ab"])
+    def test_invalid_shape(self, shape):
+        with pytest.raises((TypeError, ValueError)):
+            self.DOMAIN.grid(shape)
+
+    def test_invalid_padding(self):
+        with pytest.raises(ValueError):
+            self.DOMAIN.grid((5, 5), padding=-0.1)
