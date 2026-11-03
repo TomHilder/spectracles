@@ -4,7 +4,7 @@ All notable changes to **spectracles** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased (1.0.0)
+## [1.0.0] - 2026-11-03
 
 ### Added
 
@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 - `ShareModule.for_evaluation()`: an evaluable copy of a model, with shared values filled in.
 - `ShareModule.set` accepts a dict from path to value; `build_model` accepts an instance as well as a class.
 - Physical units: `Domain(centre, extent)` (or `Domain.from_points(x, y)`) describes the region the data cover, in the data's own units. `FourierGP` and `FourierBasis` take `domain=`, `padding=` (0.15 of the extent on each side by default) and `nufft_tol=`. With a domain, length scales are in the coordinates' units. Positions outside the periodic box raise an error.
+- `Domain.grid((n, m), padding=0.0)`: a regular grid of points over the domain (or over a GP's whole box with `padding=gp.padding`), e.g. to map a field after fitting.
 - `FourierGP(kernel, domain=...)` chooses its own modes and padding for a tolerance (`tol=1e-3` by default) over the length-scale prior's 1% to 99% quantiles (or `length_scale=`, or `quantiles=`). The choice is recorded in `gp.design`. `n_modes=` and `padding=` can still be given by hand.
 - `spectracles.discretisation`: `discretisation_error` (the truncation and aliasing errors of a `FourierGP`, or what they would be with other settings; an array of length scales gives a curve), `required_modes`, `required_padding`, `realised_covariance`, `report` (every `FourierGP` in a model, latent space or posterior, optionally across samples) and `plot_discretisation`.
 - Kernels: `spectral_density` and `covariance`, the continuous forms of the built-in kernels.
