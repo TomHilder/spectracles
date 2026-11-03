@@ -32,6 +32,16 @@ memory. For many samples of a field on many points, summaries will be computed
 in chunks of samples (streaming mean and variance; quantiles in chunks of
 points), with the full draws built only on request.
 
+## 1D and 3D fields
+
+Fields are two-dimensional: `FourierGP` takes positions `x`, `y` and a square
+`Domain`. Fields in one dimension (e.g. along wavelength or time) and three
+(e.g. position on the sky and wavelength, or a volume) will use the same
+Fourier representation, through jax-finufft's 1D and 3D transforms. That means
+a `Domain` and spatial data with any number of axes, kernels and the
+discretisation diagnostic in d dimensions (the error rates depend on d), and
+the automatic choice of modes and padding per axis.
+
 ## Saving fits rather than models
 
 `save_model` pickles the whole model with dill, including the code of your
