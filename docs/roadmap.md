@@ -11,6 +11,21 @@ Models can currently be fitted two ways: with `OptimiserFrame` and schedules
 unified: optimisation will move to the latent space, schedules and VI stages
 will share one vocabulary, and the `prior_logpdf` losses will be deprecated.
 
+## Power-law kernels with deviations
+
+A kernel whose power spectrum is a power law plus smooth deviations from it,
+as in NIFTy's correlated-field model: the log amplitude is linear in log k,
+plus an integrated Wiener process in log k with a learnable flexibility (and
+optionally asperity), with its linear trend removed so the slope stays
+identifiable. It suits broadband fields that have no single correlation
+length. Alongside it:
+
+- `LogLogLinear`'s amplitude `m_0` will be defined at a pivot wavenumber on
+  the mode grid, rather than at k = 1, so that it doesn't depend strongly on
+  the slope;
+- modes and padding chosen automatically for kernels without a length scale;
+- the discretisation diagnostic and docs extended to these kernels.
+
 ## Parameters in lists, tuples and dicts (1.1)
 
 Parameters, and modules holding them, must currently be named attributes of a
