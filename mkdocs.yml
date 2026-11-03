@@ -46,11 +46,11 @@ nav:
   - Home: index.md
   - Guides:
     - Building models: models.md
+    - Geometry and discretisation: discretisation.md
     - Priors and inference: inference.md
     - LVM data: lvm.md
     - How it works: inference_design.md
     - Schedule Builder: schedule_builder.md
-    - Roadmap: roadmap.md
   - Examples:
     - examples/inference.md
     - examples/schedule_builder.md
@@ -59,9 +59,14 @@ nav:
     - api/models.md
     - api/priors.md
     - api/inference.md
+    - api/discretisation.md
     - api/nifty.md
     - api/opt_schedule.md
     - api/schedule_builder.md
+  - Development:
+    - Roadmap: roadmap.md
+    - Changelog: changelog.md
+    - Contributing: contributing.md
 
 plugins:
   - search

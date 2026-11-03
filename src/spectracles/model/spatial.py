@@ -1,14 +1,19 @@
 """spatial.py - Spatial models, especially flexible models built on Fourier-accelerated Gaussian Processes."""
 
+import warnings
 from abc import abstractmethod
 
 import jax.numpy as jnp
-from equinox import Module
+import numpy as np
+from equinox import Module, field
+from jax.core import Tracer
+from jax.nn import softplus
 from jax.scipy.stats import norm
 from jax_finufft import nufft2  # type: ignore
 from jaxtyping import Array
 
 from spectracles.model.data import SpatialData, SpatialDataLVM
+from spectracles.model.domain import Domain
 from spectracles.model.kernels import Kernel
 from spectracles.model.parameter import AnyParameter, Parameter, _is_int, init_parameter
 from spectracles.priors import StdNormal
@@ -20,7 +25,131 @@ from spectracles.priors import StdNormal
 #     repeated in the shape info right now, since I didn't implement n_modes
 #     != n_requested_modes yet.
 
-FINUFFT_KWDS = {"eps": 1e-10}
+LINKS = {
+    "identity": lambda f, lower: f,
+    "exp": lambda f, lower: jnp.exp(f),
+    "softplus": lambda f, lower: lower + softplus(f),
+}
+
+DEFAULT_PADDING = 0.15
+DEFAULT_NUFFT_TOL = 1e-10
+
+
+def _box(domain: Domain | None, padding: float | None) -> tuple[float, float, float]:
+    """The periodic box (centre x, centre y, side) for a domain and padding.
+
+    Without a domain, coordinates are already in [-π, π]: the box is that square.
+    """
+    if domain is None:
+        if padding is not None:
+            raise ValueError("padding needs a domain: FourierGP(..., domain=Domain(...)).")
+        return 0.0, 0.0, 2 * np.pi
+    if not isinstance(domain, Domain):
+        raise TypeError(f"domain must be a Domain, got {type(domain).__name__}.")
+    padding = DEFAULT_PADDING if padding is None else float(padding)
+    if not (np.isfinite(padding) and padding >= 0):
+        raise ValueError(f"padding must be a non-negative number, got {padding!r}.")
+    return domain.centre[0], domain.centre[1], domain.box_size(padding)
+
+
+def _length_scale_range(
+    kernel: Kernel, length_scale, quantiles: tuple[float, float]
+) -> tuple[float, float]:
+    """The shortest and longest length scales to choose modes and padding for."""
+    if length_scale is not None:
+        lo, hi = (length_scale, length_scale) if np.ndim(length_scale) == 0 else length_scale
+        lo, hi = float(lo), float(hi)
+        if not (0 < lo <= hi and np.isfinite(hi)):
+            raise ValueError(
+                f"length_scale must be (shortest, longest) > 0, got {length_scale!r}."
+            )
+        return lo, hi
+    param = getattr(kernel, "length_scale", None)
+    if param is None:
+        raise ValueError(
+            f"{type(kernel).__name__} has no length_scale, so modes can't be chosen for you: "
+            "give n_modes (and padding)."
+        )
+    if param.prior is None or param.fix:
+        value = float(jnp.max(param.val))
+        return value, value
+    q_lo, q_hi = quantiles
+    if not 0 < q_lo <= q_hi < 1:
+        raise ValueError(f"quantiles must be in (0, 1), got {quantiles!r}.")
+    lo = float(jnp.min(param.prior.transform(norm.ppf(jnp.asarray(q_lo)))))
+    hi = float(jnp.max(param.prior.transform(norm.ppf(jnp.asarray(q_hi)))))
+    return lo, hi
+
+
+def _choose_modes(kernel, domain, padding, tol, length_scale, quantiles, has_mean=False):
+    """Modes and padding for `tol` over the length-scale range, and the design record."""
+    from spectracles.discretisation import (
+        DEFAULT_TOL,
+        discretisation_error,
+        required_modes,
+        required_padding,
+    )
+
+    if domain is None:
+        raise ValueError(
+            "Without a domain, n_modes is needed: FourierGP(kernel, n_modes=(m, m)). Give a "
+            "domain to have the modes chosen for you."
+        )
+    tol = DEFAULT_TOL if tol is None else float(tol)
+    lo, hi = _length_scale_range(kernel, length_scale, quantiles)
+    if padding is None:
+        padding = required_padding(kernel, domain, length_scale=hi, tol=tol)
+    else:
+        alias = discretisation_error(
+            kernel, domain=domain, n_modes=3, padding=padding, length_scale=hi
+        ).aliasing
+        if alias > tol:
+            warnings.warn(
+                f"padding={padding} gives an aliasing error of {alias:.1e} at length scale "
+                f"{hi:.4g}, above tol={tol:g}.",
+                stacklevel=3,
+            )
+    try:
+        m = required_modes(
+            kernel, domain, length_scale=lo, padding=padding, tol=tol, has_mean=has_mean
+        )
+    except ValueError as e:
+        raise ValueError(
+            f"{e} The shortest length scale is {lo:.4g}: narrow the prior, pass "
+            "length_scale=(shortest, longest), or give n_modes."
+        ) from None
+    return (m, m), padding, (tol, lo, hi)
+
+
+def _check_in_box(x, y, box: tuple[float, float, float]) -> None:
+    """Raise if any point is outside the periodic box (it would wrap to the other side).
+
+    Runs on concrete positions only, so it costs nothing inside compiled code;
+    positions that are themselves traced (e.g. jit arguments) aren't checked.
+    """
+    if isinstance(x, Tracer) or isinstance(y, Tracer):
+        return
+    cx, cy, size = box
+    half = 0.5 * size * (1 + 1e-12)
+    x, y = np.asarray(x), np.asarray(y)
+    if x.size == 0:
+        return
+    dx, dy = np.abs(x - cx).max(), np.abs(y - cy).max()
+    if dx > half or dy > half:
+        raise ValueError(
+            f"Points lie outside the GP's periodic box (centre ({cx:.6g}, {cy:.6g}), side "
+            f"{size:.6g}): x spans [{x.min():.6g}, {x.max():.6g}], y spans "
+            f"[{y.min():.6g}, {y.max():.6g}]. They would wrap to the opposite side. Use a "
+            "Domain that covers them, or more padding."
+        )
+
+
+def _to_box(x, y, box: tuple[float, float, float]):
+    """Map coordinates into the box's [-π, π] square."""
+    _check_in_box(x, y, box)
+    cx, cy, size = box
+    scale = 2 * np.pi / size
+    return (x - cx) * scale, (y - cy) * scale
 
 
 def _check_n_modes(n_modes) -> tuple[int, int]:
@@ -104,6 +233,10 @@ class FourierBasis(SpatialModel):
 
     coefficients: Parameter
     n_modes: tuple[int, int]
+    domain: Domain | None = field(static=True)
+    padding: float | None = field(static=True)
+    nufft_tol: float = field(static=True)
+    _box: tuple[float, float, float] = field(static=True)
     _freqs: Array
     _shape_info: tuple[int, int, int]
 
@@ -111,11 +244,21 @@ class FourierBasis(SpatialModel):
         self,
         n_modes: tuple[int, int],
         coefficients: Parameter | None = None,
+        *,
+        domain: Domain | None = None,
+        padding: float | None = None,
+        nufft_tol: float = DEFAULT_NUFFT_TOL,
     ):
         # Model specfication
         self.n_modes = n_modes = _check_n_modes(n_modes)
+        self._box = _box(domain, padding)
+        self.domain = domain
+        self.padding = (
+            None if domain is None else (DEFAULT_PADDING if padding is None else float(padding))
+        )
+        self.nufft_tol = float(nufft_tol)
         fx, fy = get_freqs(n_modes)
-        self._freqs = jnp.sqrt(fx**2 + fy**2)
+        self._freqs = (2 * np.pi / self._box[2]) * jnp.sqrt(fx**2 + fy**2)
         # Initialise parameters
         self.coefficients = init_parameter(coefficients, name="coefficients", dims=n_modes)
         # Initialise the shape info
@@ -123,12 +266,13 @@ class FourierBasis(SpatialModel):
         self._shape_info = (p, p // 2, p)
 
     def __call__(self, data: SpatialData) -> Array:
+        x, y = _to_box(data.x, data.y, self._box)
         # Sum basis functions with nufft
         model_eval: Array = nufft2(
             conjugate_symmetry(self.coefficients.val.flatten(), self.n_modes, self._shape_info),
-            data.x,
-            data.y,
-            **FINUFFT_KWDS,
+            x,
+            y,
+            eps=self.nufft_tol,
         ).real
         return model_eval
 
@@ -139,25 +283,148 @@ class FourierBasis(SpatialModel):
 
 
 class FourierGP(SpatialModel):
+    """A Gaussian-process field, represented by Fourier modes on a periodic box.
+
+    With a `domain`, coordinates and length scales are in the domain's units
+    (e.g. arcsec), and the field lives on a periodic box of the domain plus
+    `padding` × extent on each side. The modes and padding are then chosen for
+    you, so that the field matches its kernel to `tol` over the range of
+    length scales it can take (by default, its prior's 1% to 99% quantiles):
+
+        FourierGP(kernel, domain=domain)
+        FourierGP(kernel, domain=domain, tol=1e-4, length_scale=(30.0, 300.0))
+        FourierGP(kernel, domain=domain, n_modes=(301, 301), padding=0.15)  # by hand
+
+    Without a `domain`, coordinates must already lie in [-π, π], the length
+    scale is in those units, and `n_modes` is needed.
+
+    A field can have a mean, a `Parameter` added to the GP, and a `link` that
+    transforms the result, e.g. for a positive line flux:
+
+        FourierGP(kernel, domain=domain, mean=Parameter(prior=Normal(0.0, 1.0)), link="exp")
+
+    With a mean, the GP's own constant (k = 0) mode is dropped, so the mean
+    alone sets the field's average over the box; the kernel's variance is
+    still the field's pointwise variance.
+
+    Args:
+        kernel: The kernel, e.g. `Matern32(length_scale, variance)`.
+        n_modes: Modes in each direction, two positive odd integers. Chosen
+            from `tol` if not given (needs a domain).
+        domain: The region the data cover, in the data's units.
+        padding: The margin on each side of the domain, as a fraction of its
+            extent. Chosen from `tol` if not given, or 0.15 when `n_modes` is.
+        tol: The accuracy the modes and padding are chosen for (1e-3 by
+            default): the truncation error at the shortest length scale and
+            the aliasing error at the longest (see `spectracles.discretisation`).
+        length_scale: The range (shortest, longest) of length scales to choose
+            for, or a single value; the prior's `quantiles` by default.
+        quantiles: The prior quantiles that give the default range.
+        mean: A Parameter added to the GP before the link. None (default)
+            means no mean: a zero-mean stationary GP.
+        link: "identity" (default), "exp" (positive, log-normal) or
+            "softplus" (`lower` + softplus, positive and close to linear when large).
+        lower: The lower bound for `link="softplus"`.
+        coefficients: The (whitened) Fourier coefficients; a standard-normal
+            prior by default.
+        zeromode: Deprecated name for `mean`.
+        nufft_tol: The relative accuracy of the non-uniform FFT.
+
+    Attributes:
+        design: (tol, shortest, longest length scale) the modes and padding
+            were chosen for, or None if they were given by hand.
+    """
+
     coefficients: Parameter
     kernel: Kernel
-    zeromode: Parameter
+    mean: Parameter | None
     n_modes: tuple[int, int]
+    link: str = field(static=True)
+    lower: float = field(static=True)
+    domain: Domain | None = field(static=True)
+    padding: float | None = field(static=True)
+    nufft_tol: float = field(static=True)
+    design: tuple[float, float, float] | None = field(static=True)
+    _box: tuple[float, float, float] = field(static=True)
     _freqs: Array
     _shape_info: tuple[int, int, int]
 
     def __init__(
         self,
-        n_modes: tuple[int, int],
         kernel: Kernel,
+        *legacy,
+        n_modes: tuple[int, int] | None = None,
+        domain: Domain | None = None,
+        padding: float | None = None,
+        tol: float | None = None,
+        length_scale: float | tuple[float, float] | None = None,
+        quantiles: tuple[float, float] = (0.01, 0.99),
+        mean: Parameter | None = None,
+        link: str = "identity",
+        lower: float = 0.0,
         coefficients: Parameter | None = None,
         zeromode: Parameter | None = None,
+        nufft_tol: float = DEFAULT_NUFFT_TOL,
     ):
+        if legacy:
+            # FourierGP(n_modes, kernel, coefficients, zeromode): the signature before 1.0
+            if len(legacy) > 3 or n_modes is not None:
+                raise TypeError(
+                    "FourierGP takes the kernel first: FourierGP(kernel, n_modes=..., ...)."
+                )
+            warnings.warn(
+                "FourierGP(n_modes, kernel) is deprecated: use FourierGP(kernel, n_modes=n_modes), "
+                "or give a domain and leave out n_modes to have it chosen.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            n_modes, kernel = kernel, legacy[0]  # type: ignore[assignment]
+            coefficients = legacy[1] if len(legacy) > 1 else coefficients
+            zeromode = legacy[2] if len(legacy) > 2 else zeromode
+        if zeromode is not None:
+            if mean is not None:
+                raise TypeError("Give mean or zeromode (its old name), not both.")
+            warnings.warn(
+                "zeromode is deprecated: use mean=. With a mean, the GP's k = 0 mode is dropped.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            mean = zeromode
+        kernel = _check_kernel(kernel)
+        if mean is not None and not isinstance(mean, AnyParameter):
+            raise TypeError(
+                f"mean must be a Parameter, e.g. mean=Parameter(prior=Normal(0.0, 1.0)); got "
+                f"{type(mean).__name__}."
+            )
+        if link not in LINKS:
+            raise ValueError(f"link must be one of {sorted(LINKS)}, got {link!r}.")
+        if link != "softplus" and lower != 0.0:
+            raise ValueError('lower only applies to link="softplus".')
+        self.mean = mean  # type: ignore[assignment]
+        self.link = link
+        self.lower = float(lower)
+        if n_modes is None:
+            n_modes, padding, self.design = _choose_modes(
+                kernel, domain, padding, tol, length_scale, quantiles, has_mean=mean is not None
+            )
+        else:
+            if tol is not None or length_scale is not None:
+                raise ValueError(
+                    "tol and length_scale choose n_modes; give them or n_modes, not both."
+                )
+            self.design = None
         # Model specfication
         self.n_modes = n_modes = _check_n_modes(n_modes)
+        self._box = _box(domain, padding)
+        self.domain = domain
+        self.padding = (
+            None if domain is None else (DEFAULT_PADDING if padding is None else float(padding))
+        )
+        self.nufft_tol = float(nufft_tol)
+        # Physical frequencies, so the kernel sees length scales in the coordinates' units
         fx, fy = get_freqs(n_modes)
-        self._freqs = jnp.sqrt(fx**2 + fy**2)
-        self.kernel = _check_kernel(kernel)
+        self._freqs = (2 * np.pi / self._box[2]) * jnp.sqrt(fx**2 + fy**2)
+        self.kernel = kernel
         # Initialise parameters. The coefficients are whitened (the kernel scales
         # them), so their prior is a standard normal by construction.
         # A user-supplied Parameter is kept as is (the same object, so it can be
@@ -165,29 +432,46 @@ class FourierGP(SpatialModel):
         self.coefficients = init_parameter(
             coefficients, name="coefficients", dims=n_modes, prior=StdNormal()
         )
-        # Zero-mode: scalar added to the field after NUFFT. Defaults to a fixed
-        # zero so kernels with non-zero DC (e.g. Matern) behave as before. Kernels
-        # that zero their DC (e.g. LogLogLinear) require a non-trivial zeromode
-        # Parameter to represent the field's spatial mean.
-        self.zeromode = init_parameter(zeromode, name="zeromode", initial=0.0, fixed=True)
+        if mean is not None and jnp.size(mean.val) != 1:
+            raise ValueError(f"mean must be a single value, got shape {jnp.shape(mean.val)}.")
         # Initialise the shape info
         p = int(jnp.prod(jnp.array(n_modes)))
         self._shape_info = (p, p // 2, p)
 
+    @property
+    def zeromode(self) -> Parameter | None:
+        """Deprecated name for `mean`."""
+        warnings.warn(
+            "FourierGP.zeromode is deprecated: use .mean.", DeprecationWarning, stacklevel=2
+        )
+        return self.mean
+
+    def feature_weights(self) -> Array:
+        """The square root of each mode's power: the kernel's, without the k = 0
+        mode when the field has a mean (rescaled so the variance is unchanged)."""
+        fw = self.kernel.feature_weights(self._freqs)
+        if self.mean is None:
+            return fw
+        kept = jnp.where(self._freqs == 0, 0.0, fw)
+        return kept * jnp.sqrt(jnp.sum(fw**2) / jnp.sum(kept**2))
+
     def __call__(self, data: SpatialData) -> Array:
+        x, y = _to_box(data.x, data.y, self._box)
         # Feature weighted coefficients
-        scaled_coeffs = self.coefficients.val * self.kernel.feature_weights(self._freqs)
+        scaled_coeffs = self.coefficients.val * self.feature_weights()
         # Sum basis functions with nufft after processing the coefficients to enforce conjugate symmetry
         model_eval: Array = nufft2(
             conjugate_symmetry(scaled_coeffs.flatten(), self.n_modes, self._shape_info),
-            data.x,
-            data.y,
-            **FINUFFT_KWDS,
+            x,
+            y,
+            eps=self.nufft_tol,
         ).real
-        return model_eval + self.zeromode.val
+        if self.mean is not None:
+            model_eval = model_eval + self.mean.val
+        return LINKS[self.link](model_eval, self.lower)
 
     def prior_logpdf(self) -> Array:
-        fw = self.kernel.feature_weights(self._freqs)
+        fw = self.feature_weights()
         # DC-safe: kernels with zero DC contribute no Jacobian term for that mode.
         safe_fw = jnp.where(fw > 0, fw, 1.0)
         log_normalisation = jnp.where(fw > 0, -jnp.log(safe_fw), 0.0).sum()
@@ -255,7 +539,7 @@ class MultiFourierGP(SpatialModel):
             coeffs_for_nufft,  # (n_components, n_data)
             data.x,  # (1, n_data) where 1 is implicit
             data.y,  # (1, n_data) where 1 is implicit
-            **FINUFFT_KWDS,
+            eps=DEFAULT_NUFFT_TOL,
         ).real  # (n_components, n_data)
         return model_eval
 

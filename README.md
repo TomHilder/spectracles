@@ -58,7 +58,7 @@ kernel = Matern32(
     length_scale=Parameter(prior=LogNormal(0.5, 0.2)),
     variance=Parameter(prior=LogNormal(1.0, 0.5)),
 )
-model = build_model(LineMap, FourierGP(n_modes=(15, 15), kernel=kernel))
+model = build_model(LineMap, FourierGP(kernel, n_modes=(15, 15)))
 latent = LatentSpace(model)  # the parameters to fit
 
 xy = random.uniform(random.PRNGKey(0), (2, 300), minval=-3.0, maxval=3.0)

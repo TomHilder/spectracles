@@ -1,4 +1,6 @@
 from spectracles.model.data import SpatialData, SpatialDataGeneric, SpatialDataLVM
+from spectracles.model.domain import Domain
+from spectracles.model.fields import FieldFromRatio, FieldPlusScatter
 from spectracles.model.io import load_model, save_model
 from spectracles.model.kernels import Kernel, Matern12, Matern32, Matern52, SquaredExponential
 from spectracles.model.parameter import (
@@ -32,6 +34,9 @@ __all__ = [
     "AnyParameter",
     "Constant",
     "ConstrainedParameter",
+    "Domain",
+    "FieldFromRatio",
+    "FieldPlusScatter",
     "FourierGP",
     "Gaussian",
     "Kernel",

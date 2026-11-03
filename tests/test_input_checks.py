@@ -73,8 +73,8 @@ def test_fourier_gp_arguments():
         FourierGP((5, 5), kernel(), coefficients=jnp.zeros((5, 5)))  # type: ignore[arg-type]
     with pytest.raises(ValueError, match=r"coefficients must have shape \(5, 5\)"):
         FourierGP((5, 5), kernel(), coefficients=Parameter(dims=(3, 3)))
-    with pytest.raises(TypeError, match="zeromode must be a Parameter"):
-        FourierGP((5, 5), kernel(), zeromode=1.0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="mean must be a Parameter"):
+        FourierGP(kernel(), n_modes=(5, 5), mean=1.0)  # type: ignore[arg-type]
     assert FourierGP([5, 5], kernel()).n_modes == (5, 5)  # type: ignore[arg-type]
 
 

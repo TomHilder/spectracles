@@ -32,7 +32,13 @@ implement `feature_weights(freqs)`, returning `sqrt(P(k))` on the mode grid.
 
 ::: spectracles.SpatialModel
 
+::: spectracles.Domain
+
 ::: spectracles.FourierGP
+
+::: spectracles.FieldFromRatio
+
+::: spectracles.FieldPlusScatter
 
 ::: spectracles.model.spatial.FourierBasis
 
