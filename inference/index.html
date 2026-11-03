@@ -1,0 +1,2242 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Spectrospatial modelling with JAX">
+      
+      
+      
+      
+        <link rel="prev" href="../discretisation/">
+      
+      
+        <link rel="next" href="../lvm/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Priors and inference - spectracles</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#priors-and-inference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="spectracles" class="md-header__button md-logo" aria-label="spectracles" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            spectracles
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Priors and inference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/TomHilder/spectracles" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TomHilder/spectracles
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="spectracles" class="md-nav__button md-logo" aria-label="spectracles" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    spectracles
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/TomHilder/spectracles" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TomHilder/spectracles
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discretisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geometry and discretisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Priors and inference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Priors and inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#priors-likelihoods-and-posteriors-in-one-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priors, likelihoods and posteriors in one minute
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-running-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A running example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declaring-priors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declaring priors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#free-fixed-and-known" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Free, fixed and Known
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-your-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking your model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The posterior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fitting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fitting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mgvi-and-geovi-niftyre" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MGVI and geoVI (NIFTy.re)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nuts-blackjax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NUTS (BlackJAX)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#best-fit-map-with-optax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best fit (MAP, with optax)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixing-parameters-for-a-whole-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixing parameters for a whole fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#staged-fits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Staged fits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-results-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting results back
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting results back">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-summary-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A summary table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anything-else-you-compute-from-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anything else you compute from the model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#several-chains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several chains
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-arviz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With ArviZ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-your-priors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking your priors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#under-the-hood-the-latent-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Under the hood: the latent space
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-ways-to-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two ways to fit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lvm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LVM data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inference_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schedule_builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule Builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fitting a GP field with VI, NUTS and MAP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/schedule_builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule Builder Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/share_module/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ShareModule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/priors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Priors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/inference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/discretisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discretisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/nifty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NIFTy.re adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/opt_schedule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimization API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/schedule_builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schedule Builder API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#priors-likelihoods-and-posteriors-in-one-minute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priors, likelihoods and posteriors in one minute
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-running-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A running example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declaring-priors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declaring priors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#free-fixed-and-known" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Free, fixed and Known
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-your-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking your model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The posterior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fitting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fitting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mgvi-and-geovi-niftyre" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MGVI and geoVI (NIFTy.re)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nuts-blackjax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NUTS (BlackJAX)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#best-fit-map-with-optax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best fit (MAP, with optax)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixing-parameters-for-a-whole-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixing parameters for a whole fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#staged-fits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Staged fits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-results-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting results back
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting results back">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-summary-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A summary table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anything-else-you-compute-from-the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anything else you compute from the model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#several-chains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several chains
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-arviz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With ArviZ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-your-priors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking your priors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#under-the-hood-the-latent-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Under the hood: the latent space
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-ways-to-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two ways to fit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="priors-and-inference">Priors and inference<a class="headerlink" href="#priors-and-inference" title="Permanent link">&para;</a></h1>
+<p>To fit a spectracles model with Bayesian inference, you put a prior on each
+parameter you want to fit, describe the noise in your data with a likelihood,
+and hand the result to a fitting method. The same model works with:</p>
+<ul>
+<li>MGVI and geoVI, through <a href="https://github.com/NIFTy-PPL/NIFTy">NIFTy.re</a>;</li>
+<li>NUTS, through <a href="https://github.com/blackjax-devs/blackjax">BlackJAX</a>;</li>
+<li>a best fit (MAP), through <a href="https://github.com/google-deepmind/optax">optax</a>.</li>
+</ul>
+<p>Switching method changes how the fit is done, not the problem being solved.</p>
+<p>This page is the practical guide. <a href="../inference_design/">How it works</a> explains
+the design in more depth. To build the model in the first place, see
+<a href="../models/">Building models</a>.</p>
+<h2 id="priors-likelihoods-and-posteriors-in-one-minute">Priors, likelihoods and posteriors in one minute<a class="headerlink" href="#priors-likelihoods-and-posteriors-in-one-minute" title="Permanent link">&para;</a></h2>
+<p>When you fit a model to an IFU cube, you are estimating maps (a line flux, a
+velocity field) together with a few global numbers, such as how quickly those
+maps vary.</p>
+<ul>
+<li>A <strong>prior</strong> says which values are plausible before you look at the data. For
+  example, "the correlation length is around 0.5, give or take 0.2", or "the
+  per-spaxel offsets are small".</li>
+<li>The <strong>likelihood</strong> says how probable the observed spectra are for given
+  parameter values. For Gaussian noise of known variance, it is the familiar
+  χ².</li>
+<li>The <strong>posterior</strong> combines the two: what is plausible <em>after</em> seeing the
+  data. A best fit is its peak. Samples from it give uncertainties on every map
+  and every quantity you derive from them.</li>
+</ul>
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"spectracles[nifty]"</span><span class="w">   </span><span class="c1"># for MGVI and geoVI</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span>blackjax<span class="w">               </span><span class="c1"># for NUTS</span>
+</code></pre></div>
+<p>Inference should be done in double precision:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">jax</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">"jax_enable_x64"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="a-running-example">A running example<a class="headerlink" href="#a-running-example" title="Permanent link">&para;</a></h2>
+<p>A line-flux map, made of a positive Gaussian-process field plus a small offset
+per spaxel, observed at 300 spaxels:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">random</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">spectracles</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">FourierGP</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">Matern32</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">Parameter</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">PerSpaxel</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">SpatialDataGeneric</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">build_model</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="p">)</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="kn">from</span><span class="w"> </span><span class="nn">spectracles.priors</span><span class="w"> </span><span class="kn">import</span> <span class="n">Laplace</span><span class="p">,</span> <span class="n">LogNormal</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="k">class</span><span class="w"> </span><span class="nc">LineMap</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="sd">"""A line-flux map: a log-normal GP field plus a small per-spaxel offset."""</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="n">log_flux</span><span class="p">:</span> <span class="n">FourierGP</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    <span class="n">offset</span><span class="p">:</span> <span class="n">PerSpaxel</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>        <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log_flux</span><span class="p">(</span><span class="n">data</span><span class="p">))</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="n">N_SPAXELS</span> <span class="o">=</span> <span class="mi">300</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="n">xy</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">N_SPAXELS</span><span class="p">),</span> <span class="n">minval</span><span class="o">=-</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">maxval</span><span class="o">=</span><span class="mf">3.0</span><span class="p">)</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="n">spaxels</span> <span class="o">=</span> <span class="n">SpatialDataGeneric</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">xy</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">xy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">idx</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N_SPAXELS</span><span class="p">))</span>
+</code></pre></div>
+<h2 id="declaring-priors">Declaring priors<a class="headerlink" href="#declaring-priors" title="Permanent link">&para;</a></h2>
+<p>Give a <code>Parameter</code> its prior when you create it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">kernel</span> <span class="o">=</span> <span class="n">Matern32</span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">length_scale</span><span class="o">=</span><span class="n">Parameter</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">LogNormal</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)),</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">variance</span><span class="o">=</span><span class="n">Parameter</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">LogNormal</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)),</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">model</span> <span class="o">=</span> <span class="n">build_model</span><span class="p">(</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">LineMap</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">log_flux</span><span class="o">=</span><span class="n">FourierGP</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="n">n_modes</span><span class="o">=</span><span class="p">(</span><span class="mi">21</span><span class="p">,</span> <span class="mi">21</span><span class="p">)),</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">offset</span><span class="o">=</span><span class="n">PerSpaxel</span><span class="p">(</span><span class="n">N_SPAXELS</span><span class="p">),</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">)</span>
+</code></pre></div>
+<p>The priors are in <code>spectracles.priors</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Prior</th>
+<th>Arguments</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>StdNormal()</code></td>
+<td>none</td>
+<td>GP coefficients (the default for them)</td>
+</tr>
+<tr>
+<td><code>Normal(mean, std)</code></td>
+<td>mean and standard deviation</td>
+<td>offsets, calibration terms</td>
+</tr>
+<tr>
+<td><code>LogNormal(mean, std)</code></td>
+<td>mean and standard deviation <strong>of the value itself</strong></td>
+<td>positive quantities: length scales, variances, amplitudes</td>
+</tr>
+<tr>
+<td><code>Laplace(alpha)</code></td>
+<td>scale (centred on 0)</td>
+<td>corrections that are mostly near zero</td>
+</tr>
+<tr>
+<td><code>Uniform(low, high)</code></td>
+<td>bounds</td>
+<td>a bounded quantity with no preferred value</td>
+</tr>
+</tbody>
+</table>
+<p>A parameter with a prior starts at the prior's median, unless you give it a
+starting value: <code>Parameter(0.7, prior=...)</code>.</p>
+<p>A prior's arguments are single numbers, and apply to every element of the
+parameter (e.g. every spaxel of a <code>PerSpaxel</code>).</p>
+<p><code>FourierGP</code> gives its coefficients a <code>StdNormal</code> prior automatically, since the
+kernel already sets their scale. If you pass in your own <code>coefficients</code>
+parameter, give it <code>prior=StdNormal()</code> yourself.</p>
+<p>You can also set priors after building the model, by path or by glob pattern
+(<code>*</code> matches one part of a path, <code>**</code> any number of parts):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">with_priors</span><span class="p">({</span><span class="s2">"offset.spaxel_values"</span><span class="p">:</span> <span class="n">Laplace</span><span class="p">(</span><span class="mf">0.02</span><span class="p">)})</span>
+</code></pre></div>
+<p>A value of <code>"fixed"</code> fixes the matching parameters instead, e.g.
+<code>model.with_priors({"**.variance": "fixed"})</code>. <code>with_priors</code> returns a new
+model and leaves the old one unchanged.</p>
+<h2 id="free-fixed-and-known">Free, fixed and Known<a class="headerlink" href="#free-fixed-and-known" title="Permanent link">&para;</a></h2>
+<p>Every number in a model that isn't data is one of three kinds.</p>
+<p>A <strong>free <code>Parameter</code></strong>, such as <code>Parameter(prior=LogNormal(0.5, 0.2))</code>, is
+something you want to learn from the data. It needs a prior.</p>
+<p>A <strong>fixed <code>Parameter</code></strong>, such as <code>Parameter(0.5, fixed=True)</code>, is something
+you've chosen not to fit, for now. It keeps its value, but it is still a
+parameter: it shows up in summaries, <code>model.set</code> can change it, and it can be
+freed again. <code>with_priors({...: "fixed"})</code>, <code>posterior.fix</code> and
+<a href="#staged-fits">staged fits</a> all fix parameters.</p>
+<p><strong><code>Known(value)</code></strong> is a constant, such as a rest wavelength or the instrument's
+line-spread width. It can never be fitted. Summaries leave it out (pass
+<code>show_knowns=True</code> to include it), and <code>model.set</code> won't change it unless you
+pass <code>allow_set_knowns=True</code>.</p>
+<p>If you might ever want to fit it, make it a <code>Parameter</code>. If it's a fact about
+the world or the instrument, make it <code>Known</code>. While fitting, fixed parameters
+and <code>Known</code> values behave the same way.</p>
+<table>
+<thead>
+<tr>
+<th>Declared as</th>
+<th>Fitted?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Parameter(prior=P)</code> or <code>Parameter(value, prior=P)</code></td>
+<td><strong>yes</strong></td>
+</tr>
+<tr>
+<td><code>Parameter(value, fixed=True)</code></td>
+<td>no; it keeps its value</td>
+</tr>
+<tr>
+<td><code>Known(value)</code></td>
+<td>no; it's a constant</td>
+</tr>
+<tr>
+<td><code>Parameter(value)</code>, free, no prior</td>
+<td><strong>error</strong>: give it a prior, or fix it</td>
+</tr>
+<tr>
+<td><code>ConstrainedParameter(...)</code>, free</td>
+<td><strong>error</strong>: use a <code>Parameter</code> with a prior instead; the prior sets the range (e.g. <code>LogNormal</code> for positive values)</td>
+</tr>
+</tbody>
+</table>
+<p>A parameter shared between two parts of the model (say, one velocity field
+used by two lines) is fitted once, with one prior. Two separate parameters that
+happen to have the same prior are fitted independently.</p>
+<h2 id="checking-your-model">Checking your model<a class="headerlink" href="#checking-your-model" title="Permanent link">&para;</a></h2>
+<p>The parameter summary shows each parameter's prior:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">kernel</span><span class="o">.</span><span class="n">length_scale</span><span class="p">)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">model</span><span class="o">.</span><span class="n">get_parameter_summary</span><span class="p">()</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Parameter(0.4642, free, ~LogNormal(0.5, 0.2))
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>                                        Parameter Summary
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━┓
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>┃ Path                         ┃ Shape    ┃ Bounds  ┃ Prior               ┃ Status ┃ Shared from ┃
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━┩
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>│ log_flux.coefficients        │ (21, 21) │ (-∞, ∞) │ StdNormal           │  free  │ -           │
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>│ log_flux.kernel.length_scale │ (1,)     │ (-∞, ∞) │ LogNormal(0.5, 0.2) │  free  │ -           │
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>│ log_flux.kernel.variance     │ (1,)     │ (-∞, ∞) │ LogNormal(1, 0.5)   │  free  │ -           │
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>│ offset.spaxel_values         │ (300,)   │ (-∞, ∞) │ Laplace(0.02)       │  free  │ -           │
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>└──────────────────────────────┴──────────┴─────────┴─────────────────────┴────────┴─────────────┘
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>4 parameters · 4 free, 0 fixed
+</code></pre></div>
+<p>If a free parameter has no prior, you find out when you set up the fit (next
+section), with every such parameter listed. Before the <code>with_priors</code> call
+above, you would have seen:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ValueError: Cannot build the latent space; free parameters without a prior (give them one
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>with Parameter(prior=...) or model.with_priors, or fix them): ['offset.spaxel_values']
+</code></pre></div>
+<h2 id="the-posterior">The posterior<a class="headerlink" href="#the-posterior" title="Permanent link">&para;</a></h2>
+<p>A <code>Posterior</code> brings together three things:</p>
+<ul>
+<li>the model's free parameters and their priors, collected by <code>LatentSpace</code>;</li>
+<li>a <strong>forward model</strong>: a function that turns the model into a prediction with
+  the same shape as your data;</li>
+<li>a <strong>likelihood</strong> for the data.</li>
+</ul>
+<p>Here we simulate data from a random draw of the model, with 10 spaxels set to
+NaN:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">spectracles.inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">GaussianLikelihood</span><span class="p">,</span> <span class="n">LatentSpace</span><span class="p">,</span> <span class="n">Posterior</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">latent</span> <span class="o">=</span> <span class="n">LatentSpace</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">truth</span> <span class="o">=</span> <span class="n">latent</span><span class="o">.</span><span class="n">sample_prior_latent</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">noise</span> <span class="o">=</span> <span class="mf">0.05</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="n">flux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">latent</span><span class="o">.</span><span class="n">to_model</span><span class="p">(</span><span class="n">truth</span><span class="p">)(</span><span class="n">spaxels</span><span class="p">))</span> <span class="o">+</span> <span class="n">noise</span> <span class="o">*</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="n">N_SPAXELS</span><span class="p">)</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="n">ivar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">N_SPAXELS</span><span class="p">,</span> <span class="n">noise</span><span class="o">**-</span><span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="n">flux</span><span class="p">[:</span><span class="mi">10</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>  <span class="c1"># e.g. bad fibres</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>    <span class="k">return</span> <span class="n">m</span><span class="p">(</span><span class="n">spaxels</span><span class="p">)</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="n">posterior</span> <span class="o">=</span> <span class="n">Posterior</span><span class="p">(</span><span class="n">latent</span><span class="p">,</span> <span class="n">forward</span><span class="p">,</span> <span class="n">GaussianLikelihood</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span> <span class="n">ivar</span><span class="p">))</span>
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Posterior(LatentSpace(4 parameters, 743 latent dimensions), GaussianLikelihood on 290 data points)
+</code></pre></div>
+<p>For spectra, the forward model is usually the model evaluated at every
+wavelength:
+<code>lambda m: jax.vmap(m, in_axes=(0, None))(wavelengths, spatial_data)</code>.</p>
+<p><code>GaussianLikelihood(data, ivar, mask)</code> skips data points that are masked, NaN,
+or have an inverse variance of zero, so bad pixels in real data are safe.</p>
+<p>For other noise models, write your own likelihood by subclassing
+<code>spectracles.inference.Likelihood</code> (see its
+<a href="../api/inference/">API reference</a>). <code>GaussianLikelihood</code> is a short example of
+one.</p>
+<h2 id="fitting">Fitting<a class="headerlink" href="#fitting" title="Permanent link">&para;</a></h2>
+<p>Every method works on the same function, <code>posterior.log_density</code>. It is plain
+JAX, so <code>jit</code>, <code>grad</code> and <code>vmap</code> all work on it.</p>
+<h3 id="mgvi-and-geovi-niftyre">MGVI and geoVI (NIFTy.re)<a class="headerlink" href="#mgvi-and-geovi-niftyre" title="Permanent link">&para;</a></h3>
+<p><code>to_nifty</code> turns the posterior into something NIFTy can fit:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">nifty.re</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jft</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">spectracles.nifty</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_nifty</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">lh</span> <span class="o">=</span> <span class="n">to_nifty</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">key_init</span><span class="p">,</span> <span class="n">key_vi</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="n">samples</span><span class="p">,</span> <span class="n">state</span> <span class="o">=</span> <span class="n">jft</span><span class="o">.</span><span class="n">optimize_kl</span><span class="p">(</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">lh</span><span class="p">,</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="n">jft</span><span class="o">.</span><span class="n">Vector</span><span class="p">(</span><span class="n">lh</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">key_init</span><span class="p">)),</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="n">key</span><span class="o">=</span><span class="n">key_vi</span><span class="p">,</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="n">n_total_iterations</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    <span class="n">n_samples</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># pairs of mirrored samples</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="n">sample_mode</span><span class="o">=</span><span class="s2">"linear_resample"</span><span class="p">,</span>  <span class="c1"># MGVI; "nonlinear_resample" for geoVI</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>    <span class="n">kl_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"minimize_kwargs"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"maxiter"</span><span class="p">:</span> <span class="mi">20</span><span class="p">}},</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="p">)</span>
+</code></pre></div>
+<p>Real fits use more iterations and samples. NIFTy's documentation covers the
+settings.</p>
+<h3 id="nuts-blackjax">NUTS (BlackJAX)<a class="headerlink" href="#nuts-blackjax" title="Permanent link">&para;</a></h3>
+<p><code>posterior.log_density</code> can be passed straight to BlackJAX. NIFTy isn't needed:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># sketch</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">blackjax</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">warmup</span> <span class="o">=</span> <span class="n">blackjax</span><span class="o">.</span><span class="n">window_adaptation</span><span class="p">(</span><span class="n">blackjax</span><span class="o">.</span><span class="n">nuts</span><span class="p">,</span> <span class="n">posterior</span><span class="o">.</span><span class="n">log_density</span><span class="p">)</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">parameters</span><span class="p">),</span> <span class="n">_</span> <span class="o">=</span> <span class="n">warmup</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">latent</span><span class="o">.</span><span class="n">zeros</span><span class="p">(),</span> <span class="n">num_steps</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">nuts</span> <span class="o">=</span> <span class="n">blackjax</span><span class="o">.</span><span class="n">nuts</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">log_density</span><span class="p">,</span> <span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># ...then the usual BlackJAX sampling loop over nuts.step</span>
+</code></pre></div>
+<p>The <a href="../examples/inference/">worked example</a> runs this end to end.</p>
+<h3 id="best-fit-map-with-optax">Best fit (MAP, with optax)<a class="headerlink" href="#best-fit-map-with-optax" title="Permanent link">&para;</a></h3>
+<p>The best fit minimises <code>-posterior.log_density</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">optax</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">optimiser</span> <span class="o">=</span> <span class="n">optax</span><span class="o">.</span><span class="n">adam</span><span class="p">(</span><span class="mf">0.05</span><span class="p">)</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">ξ</span> <span class="o">=</span> <span class="n">latent</span><span class="o">.</span><span class="n">zeros</span><span class="p">()</span>  <span class="c1"># start from the priors' medians</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">opt_state</span> <span class="o">=</span> <span class="n">optimiser</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">ξ</span><span class="p">)</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="k">def</span><span class="w"> </span><span class="nf">step</span><span class="p">(</span><span class="n">ξ</span><span class="p">,</span> <span class="n">opt_state</span><span class="p">):</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="n">loss</span><span class="p">,</span> <span class="n">grad</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">value_and_grad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="o">-</span><span class="n">posterior</span><span class="o">.</span><span class="n">log_density</span><span class="p">(</span><span class="n">x</span><span class="p">))(</span><span class="n">ξ</span><span class="p">)</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="n">updates</span><span class="p">,</span> <span class="n">opt_state</span> <span class="o">=</span> <span class="n">optimiser</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">grad</span><span class="p">,</span> <span class="n">opt_state</span><span class="p">)</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="k">return</span> <span class="n">optax</span><span class="o">.</span><span class="n">apply_updates</span><span class="p">(</span><span class="n">ξ</span><span class="p">,</span> <span class="n">updates</span><span class="p">),</span> <span class="n">opt_state</span><span class="p">,</span> <span class="n">loss</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">300</span><span class="p">):</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>    <span class="n">ξ</span><span class="p">,</span> <span class="n">opt_state</span><span class="p">,</span> <span class="n">loss</span> <span class="o">=</span> <span class="n">step</span><span class="p">(</span><span class="n">ξ</span><span class="p">,</span> <span class="n">opt_state</span><span class="p">)</span>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a><span class="n">map_model</span> <span class="o">=</span> <span class="n">latent</span><span class="o">.</span><span class="n">to_model</span><span class="p">(</span><span class="n">ξ</span><span class="p">)</span>
+</code></pre></div>
+<p>The fit works on rescaled versions of the parameters (ξ, see
+<a href="#under-the-hood-the-latent-space">Under the hood</a>), and <code>latent.to_model</code>
+turns the result back into a model.</p>
+<h3 id="fixing-parameters-for-a-whole-fit">Fixing parameters for a whole fit<a class="headerlink" href="#fixing-parameters-for-a-whole-fit" title="Permanent link">&para;</a></h3>
+<p><code>fix</code> gives a new posterior with some parameters held at chosen values. It
+works with every method, and the original posterior is unchanged:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">fixed</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">fix</span><span class="p">({</span><span class="s2">"log_flux.kernel.length_scale"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">})</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">latent</span><span class="o">.</span><span class="n">paths</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">fixed</span><span class="o">.</span><span class="n">latent</span><span class="o">.</span><span class="n">paths</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>4 3
+</code></pre></div>
+<p>A single number fills a parameter of any shape.</p>
+<h3 id="staged-fits">Staged fits<a class="headerlink" href="#staged-fits" title="Permanent link">&para;</a></h3>
+<p>With NIFTy, <code>stages</code> holds some parameters fixed for the first few
+iterations only. It uses the same words as the
+<a href="../schedule_builder/">schedule builder</a> (<code>free_in</code>, <code>free_after</code>, <code>free_until</code>,
+<code>fixed_in</code>), counting VI iterations:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">spectracles</span><span class="w"> </span><span class="kn">import</span> <span class="n">fixed_in</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">spectracles.nifty</span><span class="w"> </span><span class="kn">import</span> <span class="n">stages</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">staging</span> <span class="o">=</span> <span class="n">stages</span><span class="p">(</span><span class="n">latent</span><span class="p">,</span> <span class="p">{</span><span class="s2">"offset.*"</span><span class="p">:</span> <span class="n">fixed_in</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)},</span> <span class="n">n_iterations</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">staging</span><span class="p">[</span><span class="s2">"constants"</span><span class="p">](</span><span class="mi">0</span><span class="p">),</span> <span class="n">staging</span><span class="p">[</span><span class="s2">"constants"</span><span class="p">](</span><span class="mi">2</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>('offset.spaxel_values',) ()
+</code></pre></div>
+<p>Pass it to NIFTy with <code>jft.optimize_kl(..., **staging)</code>.</p>
+<h2 id="getting-results-back">Getting results back<a class="headerlink" href="#getting-results-back" title="Permanent link">&para;</a></h2>
+<p>Every method gives you samples. The posterior turns them into what you want,
+whichever method made them.</p>
+<h3 id="a-summary-table">A summary table<a class="headerlink" href="#a-summary-table" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">summary</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>  <span class="c1"># prints a table; also returns {path: {"mean", "std"}}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>                                         Posterior Summary
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>┃ Path                         ┃ Shape    ┃ Prior               ┃ Posterior mean ± std             ┃
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>│ log_flux.coefficients        │ (21, 21) │ StdNormal           │ mean 0.003982, median std 0.58   │
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>│ log_flux.kernel.length_scale │ (1,)     │ LogNormal(0.5, 0.2) │ 0.8031 ± 0.168                   │
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>│ log_flux.kernel.variance     │ (1,)     │ LogNormal(1, 0.5)   │ 0.2602 ± 0.111                   │
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>│ offset.spaxel_values         │ (300,)   │ Laplace(0.02)       │ mean 0.0002367, median std       │
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>│                              │          │                     │ 0.0182                           │
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>└──────────────────────────────┴──────────┴─────────────────────┴──────────────────────────────────┘
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>4 samples · 4 parameters
+</code></pre></div>
+<p>For simulated data, pass the truth as <code>true_params=</code> (parameter values) or
+<code>true_latents=</code> (as drawn with <code>sample_prior_latent</code>). The table then shows
+the true values, and how many standard deviations each fit is from them.</p>
+<h3 id="parameter-values">Parameter values<a class="headerlink" href="#parameter-values" title="Permanent link">&para;</a></h3>
+<p><code>posterior.draws(samples)</code> gives the parameter values at every sample. Index it
+by path, and summarise over the samples:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">params</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">draws</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">params</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>  <span class="c1"># {path: mean}</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">params</span><span class="p">[</span><span class="s2">"log_flux.kernel.length_scale"</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+</code></pre></div>
+<p><code>.values</code> holds the samples themselves, e.g. for a corner plot.</p>
+<h3 id="maps">Maps<a class="headerlink" href="#maps" title="Permanent link">&para;</a></h3>
+<p>With <code>to="model"</code>, you get the model at every sample. Call it like the model,
+and summarise the result:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">models</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">draws</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="s2">"model"</span><span class="p">)</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="n">maps</span> <span class="o">=</span> <span class="n">models</span><span class="p">(</span><span class="n">spaxels</span><span class="p">)</span>  <span class="c1"># the whole model, at every sample</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="n">mean_map</span><span class="p">,</span> <span class="n">std_map</span> <span class="o">=</span> <span class="n">maps</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">maps</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span> <span class="o">=</span> <span class="n">maps</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.16</span><span class="p">),</span> <span class="n">maps</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.84</span><span class="p">)</span>
+</code></pre></div>
+<p>Any part of the model works the same way, even parts that use shared
+parameters:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">flux</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">log_flux</span><span class="p">(</span><span class="n">spaxels</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+</code></pre></div>
+<p><code>maps.reduce(fn)</code> applies any other statistic, e.g. <code>maps.reduce(jnp.var)</code>.</p>
+<h3 id="anything-else-you-compute-from-the-model">Anything else you compute from the model<a class="headerlink" href="#anything-else-you-compute-from-the-model" title="Permanent link">&para;</a></h3>
+<p>For a quantity that isn't a single call, such as a ratio of two fields, give
+<code>map_samples</code> a function of the model:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">ratio</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">map_samples</span><span class="p">(</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="n">m</span><span class="o">.</span><span class="n">log_flux</span><span class="p">(</span><span class="n">spaxels</span><span class="p">)</span> <span class="o">-</span> <span class="n">m</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">spaxels</span><span class="p">),</span> <span class="n">samples</span><span class="p">)</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="n">predictions</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">map_samples</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">forward</span><span class="p">,</span> <span class="n">samples</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="several-chains">Several chains<a class="headerlink" href="#several-chains" title="Permanent link">&para;</a></h3>
+<p>NUTS chains stacked as <code>(chain, draw, ...)</code> are summarised over both axes.
+Give <code>axis=</code> to summarise over some of them, e.g. <code>maps.mean(axis=1)</code> for the
+mean of each chain.</p>
+<p>Everything is held in memory. For very large fields, evaluate on fewer points
+or fewer samples at a time.</p>
+<div class="admonition note">
+<p class="admonition-title">Which posterior mean?</p>
+<p>For a nonlinear model, these give different answers:</p>
+<ul>
+<li>the mean of each parameter: <code>posterior.draws(samples).mean()</code>;</li>
+<li>the model at the mean parameters:
+  <code>posterior.to_model(posterior.draws(samples).mean(), space="params")</code>;</li>
+<li>the mean of a derived quantity, such as a map: <code>maps.mean()</code>.</li>
+</ul>
+<p>For maps and their uncertainties, use the last. Averaging the GP
+coefficients first gives a map smoother than any sample.</p>
+</div>
+<h3 id="with-arviz">With ArviZ<a class="headerlink" href="#with-arviz" title="Permanent link">&para;</a></h3>
+<p>Parameter values keep the layout of the samples, <code>(draw, ...)</code> or
+<code>(chain, draw, ...)</code>. That is what <a href="https://www.arviz.org">ArviZ</a> expects:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">for_arviz</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">    </span><span class="sd">"""{path: array} -&gt; ArviZ variables, adding a chain axis if there isn't one.</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="sd">    GP coefficients are left out: they are large and rarely wanted."""</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    <span class="k">return</span> <span class="p">{</span><span class="n">p</span><span class="p">:</span> <span class="n">v</span> <span class="k">if</span> <span class="n">chains</span> <span class="k">else</span> <span class="n">v</span><span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="s2">"coefficients"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">p</span><span class="p">}</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="n">idata</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>    <span class="p">{</span>
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>        <span class="s2">"posterior"</span><span class="p">:</span> <span class="n">for_arviz</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">draws</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">),</span>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>        <span class="s2">"prior"</span><span class="p">:</span> <span class="n">for_arviz</span><span class="p">(</span><span class="n">latent</span><span class="o">.</span><span class="n">sample_prior_params</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">n</span><span class="o">=</span><span class="mi">500</span><span class="p">)),</span>
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>    <span class="p">}</span>
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a><span class="p">)</span>
+<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a><span class="nb">print</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"log_flux.kernel.length_scale"</span><span class="p">],</span> <span class="n">kind</span><span class="o">=</span><span class="s2">"stats"</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>                                mean    sd eti89_lb eti89_ub
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>log_flux.kernel.length_scale[0]  0.8  0.19     0.63     0.98
+</code></pre></div>
+<p>For chains run in parallel, pass <code>chains=True</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Convergence diagnostics are for MCMC only</p>
+<p>MGVI and geoVI samples are not Markov chains, so R-hat and effective sample
+sizes mean nothing for them. Use ArviZ's summaries and plots for VI
+samples, and its diagnostics only for NUTS.</p>
+</div>
+<h2 id="checking-your-priors">Checking your priors<a class="headerlink" href="#checking-your-priors" title="Permanent link">&para;</a></h2>
+<p>Before fitting, it's worth checking that your priors give sensible maps. Draws
+from the prior come as a model, as parameter values, or as latents:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">draw</span> <span class="o">=</span> <span class="n">latent</span><span class="o">.</span><span class="n">sample_prior_model</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="n">prior_map</span> <span class="o">=</span> <span class="n">draw</span><span class="p">(</span><span class="n">spaxels</span><span class="p">)</span>  <span class="c1"># a line-flux map drawn from the priors</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="n">ls</span> <span class="o">=</span> <span class="n">latent</span><span class="o">.</span><span class="n">sample_prior_params</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">n</span><span class="o">=</span><span class="mi">1000</span><span class="p">)[</span><span class="s2">"log_flux.kernel.length_scale"</span><span class="p">]</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">ls</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">ls</span><span class="o">.</span><span class="n">mean</span><span class="p">()))</span>  <span class="c1"># 1000 prior draws of the length scale</span>
+</code></pre></div>
+<p>Prior draws of parameter values can be summarised like posterior samples. Say
+that they are already parameter values with <code>space="params"</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">prior_values</span> <span class="o">=</span> <span class="n">latent</span><span class="o">.</span><span class="n">sample_prior_params</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">4</span><span class="p">),</span> <span class="n">n</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="n">prior_summary</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">prior_values</span><span class="p">,</span> <span class="n">space</span><span class="o">=</span><span class="s2">"params"</span><span class="p">,</span> <span class="n">print_table</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="under-the-hood-the-latent-space">Under the hood: the latent space<a class="headerlink" href="#under-the-hood-the-latent-space" title="Permanent link">&para;</a></h2>
+<p>You rarely need this section, but it explains what the fitting methods
+actually see.</p>
+<p>Each element of each free parameter is written as a standard-normal number, ξ,
+passed through its prior. For example, <code>LogNormal(0.5, 0.2)</code> turns ξ = 0 into
+its median and ξ = ±1 into roughly its ±1σ values. Every fitting method works
+with ξ, where all parameters are on the same scale. <code>LatentSpace</code> holds this
+mapping:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">latent</span><span class="p">)</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">latent</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>LatentSpace(4 parameters, 743 latent dimensions)
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>['log_flux.coefficients', 'log_flux.kernel.length_scale', 'log_flux.kernel.variance', 'offset.spaxel_values']
+</code></pre></div>
+<p>ξ is a dict keyed by parameter path. The latent space converts it:</p>
+<ul>
+<li><code>latent.to_params(ξ)</code> gives the parameter values;</li>
+<li><code>latent.to_model(ξ)</code> gives a model with those values;</li>
+<li><code>latent.from_model(model)</code> goes back from a model to ξ, e.g. to start a fit
+  from an earlier one.</li>
+</ul>
+<p>Functions that take samples assume they are ξ, as fitting methods return them.
+For parameter values, pass <code>space="params"</code>.</p>
+<h2 id="two-ways-to-fit">Two ways to fit<a class="headerlink" href="#two-ways-to-fit" title="Permanent link">&para;</a></h2>
+<p>spectracles also has an older way to get a best fit:
+<a href="../api/opt_schedule/"><code>OptimiserFrame</code></a> and <a href="../schedule_builder/">schedules</a>,
+with a loss you write yourself. It ignores priors. Use it for quick best fits
+with a custom loss, and the posterior for uncertainties. The two will be
+merged (see the <a href="../roadmap/">roadmap</a>).</p>
+<h2 id="current-limitations">Current limitations<a class="headerlink" href="#current-limitations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Priors are independent.</strong> A prior can't depend on another parameter,
+  except through the field hierarchy that <code>FourierGP</code> builds in.</li>
+<li><strong>Prior arguments are single numbers.</strong> There's a workaround for giving each
+  element its own prior in
+  <a href="../inference_design/#limitations-and-extension-points">How it works</a>.</li>
+<li><strong><code>from_model</code> is exact only for some priors</strong> (<code>StdNormal</code>, <code>Normal</code>,
+  <code>LogNormal</code>). Others fall back to the prior median, with a warning.</li>
+<li><strong>Parameters in lists, tuples or dicts</strong> aren't supported yet (planned for
+  1.1), and <code>MultiFourierGP</code> is disabled until then. See
+  <a href="../models/#current-limitations">Building models</a>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.sections", "navigation.expand", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
