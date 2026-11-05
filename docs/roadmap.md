@@ -3,6 +3,17 @@
 Planned work, roughly in order. Nothing here is covered by the
 [stability promise](index.md#stability) until it is released.
 
+## Writing results to FITS
+
+Fit results will be writable to FITS files, the format most astronomy tools
+read: posterior summaries (mean, standard deviation, quantiles) and draws of
+model quantities, evaluated either on the data's spatial points (as binary
+tables) or on a regular grid over the `Domain` (as image extensions, with a
+celestial WCS when the domain's reference point on the sky is given). Units are
+written in the headers, and the parameter paths name the columns and
+extensions, so a file can be read without spectracles. astropy will be an
+optional extra.
+
 ## One way to fit
 
 Models can currently be fitted two ways: with `OptimiserFrame` and schedules
